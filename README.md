@@ -1,25 +1,31 @@
-# aliados_sistem_app
-# Estructura del proyecto React Native con TypeScript y roles de usuario
+# 📱 aliados_sistem_app
+_Estructura del proyecto **React Native + TypeScript** con arquitectura modular y soporte de múltiples roles de usuario._
+
+---
+
+## 📂 Estructura de carpetas
+
+```bash
 /project-root
 │── app/                        
-│   ├── App.tsx                 # App principal
-│   └── index.js                # Registro de la app
+│   ├── App.tsx                 # Componente raíz de la aplicación
+│   └── index.js                # Punto de entrada (registro de la app)
 │
 │── src/
-│   ├── assets/                 # Recursos estáticos
+│   ├── assets/                 # Recursos estáticos (imágenes, fuentes, íconos)
 │   │   ├── fonts/
 │   │   ├── images/
 │   │   └── icons/
 │   │
-│   ├── components/             # Componentes globales (reutilizables)
-│   │   ├── ui/                 # UI atómica (Button, Input, Modal)
-│   │   ├── layouts/            # Layouts globales (Header, Footer)
-│   │   └── shared/             # Cards, ListItem, LoadingSpinner, etc.
+│   ├── components/             # Componentes globales y reutilizables
+│   │   ├── ui/                 # Elementos UI atómicos (Button, Input, Modal)
+│   │   ├── layouts/            # Layouts generales (Header, Footer, etc.)
+│   │   └── shared/             # Reusables (Cards, ListItem, LoadingSpinner, etc.)
 │   │
-│   ├── modules/                # Feature-based
+│   ├── modules/                # Feature-based (módulos por dominio)
 │   │   ├── auth/               # Autenticación
 │   │   │   ├── screens/        # Login, Register, ForgotPassword
-│   │   │   ├── components/     # Forms, Inputs
+│   │   │   ├── components/     # Formularios, Inputs
 │   │   │   ├── hooks/          # useAuth
 │   │   │   └── services/       # authService.ts
 │   │   │
@@ -29,7 +35,7 @@
 │   │   │   ├── hooks/          # useOrders, useOrderDetail
 │   │   │   └── services/       # orderService.ts
 │   │   │
-│   │   ├── products/           # Productos (si aplica marketplace)
+│   │   ├── products/           # Productos (marketplace opcional)
 │   │   │   ├── screens/        
 │   │   │   ├── components/     
 │   │   │   └── services/       
@@ -66,8 +72,8 @@
 │   │
 │   ├── navigation/             # Navegación centralizada
 │   │   ├── AppNavigator.tsx    # Navegador raíz (elige stack por rol)
-│   │   ├── AuthNavigator.tsx   # Stack Auth
-│   │   ├── TabNavigator.tsx    # Tabs globales
+│   │   ├── AuthNavigator.tsx   # Stack de autenticación
+│   │   ├── TabNavigator.tsx    # Tabs principales
 │   │   ├── DrawerNavigator.tsx # Drawer (si aplica)
 │   │   └── roleNavigators/     # Navegadores por rol
 │   │       ├── ClientNavigator.tsx
