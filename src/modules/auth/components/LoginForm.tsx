@@ -1,14 +1,25 @@
-import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Platform } from "react-native";
+import { useState } from "react"
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Platform, ActivityIndicator } from "react-native"
+import { useAuth } from "@/providers/AuthProvider"
 
 export default function LoginForm() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const { login } = useAuth() // 👈 usamos el login del provider
 
-  const handleLogin = () => {
-    console.log("Login con:", email, password);
-    // Aquí luego conectamos con supabase.auth.signInWithPassword()
-  };
+  const handleLogin = async () => {
+    try {
+      setLoading(true)
+      await login(email, password) // 👈 llama al provider
+      // ⚡️ La redirección ocurre automáticamente en AuthProvider
+    } catch (error: any) {
+      console.error("Error al iniciar sesión:", error.message)
+      alert("Correo o contraseña incorrectos")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <View style={styles.wrapper}>
@@ -41,22 +52,26 @@ export default function LoginForm() {
       />
 
       {/* Botón */}
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>INICIAR SESIÓN</Text>
+      <TouchableOpacity style={[styles.button, loading && { opacity: 0.7 }]} onPress={handleLogin} disabled={loading}>
+        {loading ? (
+          <ActivityIndicator color="#000" />
+        ) : (
+          <Text style={styles.buttonText}>INICIAR SESIÓN</Text>
+        )}
       </TouchableOpacity>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
   wrapper: {
     width: "100%",
-    maxWidth: 400, // ✅ esto asegura que en web no se expanda demasiado
+    maxWidth: 400, // ✅ asegura que en web no se expanda demasiado
     alignItems: "center",
   },
   logo: {
-    width: 200,
-    height: 120,
+    width: 300,
+    height: 150,
     marginBottom: 30,
   },
   label: {
@@ -74,7 +89,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   button: {
-    backgroundColor: "#FBCB0A", // amarillo según tu branding
+    backgroundColor: "#FBCB0A", // amarillo branding
     paddingVertical: 14,
     borderRadius: 8,
     width: "100%",
@@ -85,4 +100,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 16,
   },
-});
+})
