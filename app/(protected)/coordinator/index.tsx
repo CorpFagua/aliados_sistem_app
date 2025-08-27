@@ -1,5 +1,5 @@
 import CoordinatorHome from "@/modules/users/coordinator/screens/CoordinatorHome"
 
-export default function CoordinadorPague() {
+export default function CoordinatorPage() {
   return <CoordinatorHome />
 }
