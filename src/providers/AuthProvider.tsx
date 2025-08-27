@@ -5,7 +5,7 @@ import { router } from "expo-router"
 import { signIn, signOut, signUp, getSession, onAuthStateChange } from "@/services/auth"
 import { fetchUserRole } from "@/services/user"
 
-type UserRole = "admin" | "superadmin" | "delivery" | "store" | null
+type UserRole = "coordinator" | "superadmin" | "delivery" | "store" | "client" | null
 
 type AuthContextType = {
     loading: boolean
@@ -14,6 +14,7 @@ type AuthContextType = {
     login: (email: string, password: string) => Promise<void>
     register: (email: string, password: string) => Promise<void>
     logout: () => Promise<void>
+    isActive: boolean
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -23,18 +24,20 @@ const AuthContext = createContext<AuthContextType>({
     login: async () => { },
     register: async () => { },
     logout: async () => { },
+    isActive: false,
 })
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true)
     const [session, setSession] = useState<Session | null>(null)
     const [role, setRole] = useState<UserRole>(null)
+    const [isActive, setIsActive] = useState(false)
 
     // ✅ función de redirección centralizada según rol
     const redirectByRole = (role: UserRole) => {
         switch (role) {
-            case "admin":
-                router.replace("/(protected)/admin")
+            case "coordinator":
+                router.replace("/(protected)/coordinator")
                 break
             case "superadmin":
                 router.replace("/(protected)/superadmin")
@@ -45,6 +48,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             case "store":
                 router.replace("/(protected)/store") // 👈 ojo aquí, tu carpeta es "store"
                 break
+            case "client":
+                router.replace("/(protected)/client")
+                break
             default:
                 console.log("Unknown role:", role)
                 router.replace("/(auth)/login")
@@ -53,15 +59,20 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
 
     useEffect(() => {
-        
         const initSession = async () => {
             const { data } = await getSession()
             const currentSession = data.session ?? null
             setSession(currentSession)
 
             if (currentSession?.user) {
-                const userRole = await fetchUserRole(currentSession.user.id)
+                const { role: userRole, isActive } = await fetchUserRole(currentSession.user.id)
                 setRole(userRole)
+                setIsActive(isActive)
+                if (!isActive) {
+                    await logout()
+                    router.replace("/(auth)/login")
+                    return
+                }
                 redirectByRole(userRole)
             } else {
                 router.replace("/(auth)/login")
@@ -76,11 +87,18 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
             setLoading(false)
 
             if (newSession?.user) {
-                const userRole = await fetchUserRole(newSession.user.id)
+                const { role: userRole, isActive } = await fetchUserRole(newSession.user.id)
                 setRole(userRole)
+                setIsActive(isActive)
+                if (!isActive) {
+                    await logout()
+                    router.replace("/(auth)/login")
+                    return
+                }
                 redirectByRole(userRole)
             } else {
                 setRole(null)
+                setIsActive(false)
                 router.replace("/(auth)/login")
             }
         })
@@ -91,8 +109,21 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     }, [])
 
     const login = async (email: string, password: string) => {
-        const { error } = await signIn(email, password)
-        if (error) throw error
+        try {
+            const { error, data } = await signIn(email, password);
+            if (error) throw error;
+            
+            if (data?.user) {
+                const { isActive } = await fetchUserRole(data.user.id);
+                if (!isActive) {
+                    await logout();
+                    throw new Error("Usuario inactivo");
+                }
+            }
+        } catch (error: any) {
+            console.log("Error en AuthProvider:", error.message); // Para debug
+            throw error; // Importante: propagar el error
+        }
     }
 
     const register = async (email: string, password: string) => {
@@ -106,7 +137,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     }
 
     return (
-        <AuthContext.Provider value={{ loading, session, role, login, register, logout }}>
+        <AuthContext.Provider value={{ loading, session, role, login, register, logout, isActive }}>
             {children}
         </AuthContext.Provider>
     )

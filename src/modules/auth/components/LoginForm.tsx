@@ -1,103 +1,179 @@
 import { useState } from "react"
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Platform, ActivityIndicator } from "react-native"
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, Platform, useWindowDimensions } from "react-native"
 import { useAuth } from "@/providers/AuthProvider"
 
 export default function LoginForm() {
+  const { width } = useWindowDimensions();
+  const isLargeScreen = width > 768;
+  const { login } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
-  const { login } = useAuth() // 👈 usamos el login del provider
+  const [isLoading, setIsLoading] = useState(false)
+
+  const showAlert = (title: string, message: string) => {
+    if (Platform.OS === 'web') {
+        window.alert(`${title}\n${message}`);
+    } else {
+        Alert.alert(title, message, [{ text: 'OK' }]);
+    }
+  };
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      showAlert("Campos requeridos", "Por favor ingresa tu correo y contraseña");
+      return;
+    }
+
     try {
-      setLoading(true)
-      await login(email, password) // 👈 llama al provider
-      // ⚡️ La redirección ocurre automáticamente en AuthProvider
+      setIsLoading(true);
+      await login(email, password);
     } catch (error: any) {
-      console.error("Error al iniciar sesión:", error.message)
-      alert("Correo o contraseña incorrectos")
+      
+      if (error.message === "Usuario inactivo") {
+        showAlert(
+          "Cuenta Desactivada",
+          "Tu cuenta ha sido desactivada. Por favor contacta al administrador del sistema."
+        );
+      } else {
+        showAlert(
+          "Error",
+          "Credenciales inválidas. Por favor verifica tus datos."
+        );
+      }
     } finally {
-      setLoading(false)
+      setIsLoading(false);
+      setPassword(""); // Limpiar la contraseña después de un intento fallido
     }
   }
 
   return (
-    <View style={styles.wrapper}>
-      {/* Logo */}
-      <Image 
-        source={require("../../../../assets/images/logo.png")} 
-        style={styles.logo}
+    <View style={styles.container}>
+      <Image
+        source={require("../../../../assets/images/logo.png")}
+        style={[
+          styles.logo,
+          isLargeScreen && styles.logoLarge
+        ]}
         resizeMode="contain"
       />
+      
+      <Text style={styles.title}>¡Bienvenido a Aliados Express!</Text>
+      <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
+      
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={[styles.input, isLargeScreen && styles.inputLarge]}
+          placeholder="Correo electrónico"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+          editable={!isLoading}
+          placeholderTextColor="#666"
+        />
 
-      {/* Campo Email */}
-      <Text style={styles.label}>Correo</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="ejemplo@correo.com"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
+        <TextInput
+          style={[styles.input, isLargeScreen && styles.inputLarge]}
+          placeholder="Contraseña"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoComplete="password"
+          editable={!isLoading}
+          placeholderTextColor="#666"
+        />
 
-      {/* Campo Contraseña */}
-      <Text style={styles.label}>Contraseña</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="********"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-
-      {/* Botón */}
-      <TouchableOpacity style={[styles.button, loading && { opacity: 0.7 }]} onPress={handleLogin} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color="#000" />
-        ) : (
-          <Text style={styles.buttonText}>INICIAR SESIÓN</Text>
-        )}
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.button,
+            isLargeScreen && styles.buttonLarge
+          ]}
+          onPress={handleLogin}
+          disabled={isLoading}
+        >
+          <Text style={styles.buttonText}>
+            {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
+  container: {
     width: "100%",
-    maxWidth: 400, // ✅ asegura que en web no se expanda demasiado
     alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
   },
   logo: {
-    width: 300,
-    height: 150,
+    width: 200,
+    height: 80,
     marginBottom: 30,
   },
-  label: {
-    alignSelf: "flex-start",
-    fontWeight: "600",
-    marginBottom: 5,
+  logoLarge: {
+    width: 300,
+    height: 120,
+    marginBottom: 40,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#000",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 30,
+    textAlign: "center",
+  },
+  inputContainer: {
+    width: "100%",
+    maxWidth: 400,
   },
   input: {
     width: "100%",
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: Platform.OS === "web" ? 12 : 10,
-    marginBottom: 20,
+    height: 55,
+    borderWidth: 2,
+    borderColor: "#FFD700", // Color amarillo
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    marginBottom: 15,
+    backgroundColor: "rgba(255,255,255,0.95)",
     fontSize: 16,
+    color: "#000",
+  },
+  inputLarge: {
+    fontSize: 18,
+    height: 60,
   },
   button: {
-    backgroundColor: "#FBCB0A", // amarillo branding
-    paddingVertical: 14,
-    borderRadius: 8,
     width: "100%",
+    height: 55,
+    backgroundColor: "#2563EB", // Azul más llamativo
+    borderRadius: 12,
     alignItems: "center",
-    marginTop: 10,
+    justifyContent: "center",
+    marginTop: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  buttonLarge: {
+    height: 60,
   },
   buttonText: {
-    fontWeight: "700",
-    fontSize: 16,
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
   },
 })
