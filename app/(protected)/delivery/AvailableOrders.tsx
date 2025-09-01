@@ -16,7 +16,6 @@ const mockOrders = [
 export default function AvailableOrders() {
   return (
     <View style={styles.container}>
-      <Header />
       <FlatList
         data={mockOrders}
         contentContainerStyle={styles.content}

@@ -5,7 +5,6 @@ import Header from '@/components/Header';
 export default function PendingPickups() {
   return (
     <View style={styles.container}>
-      <Header />
       <FlatList
         data={[]} // Aquí irán los pedidos pendientes
         contentContainerStyle={styles.content}

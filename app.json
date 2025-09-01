@@ -25,6 +25,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "scheme": "aliados_sistem_app",
     "plugins": [
       "expo-router"
     ]

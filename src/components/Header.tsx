@@ -1,142 +1,98 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Modal } from 'react-native';
-import { useAuth } from '@/providers/AuthProvider';
+import React from "react";
+import {
+  View,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter, usePathname } from "expo-router";
+import { useAuth } from "@/providers/AuthProvider";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-interface HeaderProps {
-  onProfilePress?: () => void;
-}
+export default function Header() {
+  const { session } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
 
-export default function Header({ onProfilePress }: HeaderProps) {
-  const [menuVisible, setMenuVisible] = useState(false);
-  const { logout, session } = useAuth();
-  
+  const isProfile = pathname === "/shared/profile";
+
   return (
-    <View style={styles.container}>
-      <Image
-        source={require('../../assets/images/logo.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
-      
-      <TouchableOpacity 
-        onPress={onProfilePress}
-        style={styles.profileButton}
-      >
-        <Image
-          source={{ 
-            uri: session?.user?.user_metadata?.avatar_url || 
-                 'https://via.placeholder.com/40'
-          }}
-          style={styles.profileImage}
-        />
-      </TouchableOpacity>
-
-      <Modal
-        visible={menuVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setMenuVisible(false)}
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setMenuVisible(false)}
-        >
-          <View style={styles.menuContainer}>
-            <TouchableOpacity 
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuVisible(false);
-                // Aquí agregar navegación al perfil
-              }}
+    <SafeAreaView edges={["top"]} style={styles.safeArea}>
+      <View style={styles.container}>
+        {isProfile ? (
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={28} color="#000" />
+            <Text style={styles.title}>Mi Perfil</Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            <Image
+              source={require("../../assets/images/LOGO-BLACK.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <TouchableOpacity
+              onPress={() => router.push("/shared/profile")}
+              style={styles.profileButton}
             >
-              <Text style={styles.menuItemText}>Mi Perfil</Text>
+              <Image
+                source={{
+                  uri:
+                    session?.user?.user_metadata?.avatar_url ||
+                    "https://via.placeholder.com/150", // 🔧 usa placeholder visible
+                }}
+                style={styles.profileImage}
+              />
             </TouchableOpacity>
-            
-            <View style={styles.separator} />
-            
-            <TouchableOpacity 
-              style={[styles.menuItem, styles.logoutItem]}
-              onPress={logout}
-            >
-              <Text style={[styles.menuItemText, styles.logoutText]}>
-                Cerrar Sesión
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-    </View>
+          </>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: "#FFF",
+  },
   container: {
-    height: 80,
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    height: 60,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: "#E5E7EB",
   },
   logo: {
-    width: 150,
-    height: 40,
+    width: 120,
+    height: 35,
   },
   profileButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    overflow: 'hidden',
+    overflow: "hidden",
     borderWidth: 2,
-    borderColor: '#FFD700',
+    borderColor: "#FFD700",
   },
   profileImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-start',
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  menuContainer: {
-    position: 'absolute',
-    top: 80,
-    right: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 8,
-    minWidth: 180,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  menuItem: {
-    padding: 12,
-    borderRadius: 4,
-  },
-  menuItemText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 4,
-  },
-  logoutItem: {
-    backgroundColor: '#FEE2E2',
-  },
-  logoutText: {
-    color: '#DC2626',
+  title: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginLeft: 8,
+    color: "#000",
   },
 });

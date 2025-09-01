@@ -28,7 +28,6 @@ const mockDeliveries = [
 export default function ActiveDeliveries() {
   return (
     <View style={styles.container}>
-      <Header />
       <FlatList
         data={mockDeliveries}
         contentContainerStyle={styles.content}
