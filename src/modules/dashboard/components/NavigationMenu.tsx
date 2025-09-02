@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   activeTabText: {
-    color: Colors.activeTabText,
+    color: Colors.activeMenuText,
     fontWeight: "600",
   },
 });
