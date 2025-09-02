@@ -37,7 +37,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     const redirectByRole = (role: UserRole) => {
         switch (role) {
             case "coordinator":
-                router.replace("/(protected)/coordinator")
+                router.replace("/(protected)/(coordinator)")
                 break
             case "superadmin":
                 router.replace("/(protected)/superadmin")
