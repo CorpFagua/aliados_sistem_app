@@ -31,7 +31,7 @@ export default function Header({
   const pathname = usePathname();
   const { width } = useWindowDimensions();
   const isLargeScreen = width > 768;
-  const isProfile = pathname === "/shared/profile";
+ const isProfile = pathname?.includes("/profile");
 
   const [isCardVisible, setCardVisible] = useState(false);
   const [cardPosition, setCardPosition] = useState({ top: 0, left: 0 });

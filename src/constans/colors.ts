@@ -1,27 +1,25 @@
-// colors.ts
 export const Colors = {
   // Fondos
-  Background: "#111",
-  Border: "#222",
-  activeMenuBackground: "#171717",
-  tabBarBackground: "#111",
-  tabBarBorder: "#222",
+  Background: "#0B0B0B",         // Negro profundo para el fondo general
+  Border: "#2A2A2A",             // Gris oscuro para separadores
+  activeMenuBackground: "#1C1C1E", // Gris neutro para tarjetas/menus (más claro que el fondo)
+  tabBarBackground: "#0B0B0B",   // Igual que el fondo
+  tabBarBorder: "#2A2A2A",
 
   // Texto
-  menuText: "#aaa",
-  activeMenuText: "#fff200ff",
-  tabText: "#aaa",
-  activeTabText: "#00FF75",
-  // Texto de los botones
-  normalText: "#fff",
+  menuText: "#9E9E9E",           // Gris medio para texto inactivo
+  activeMenuText: "#FFD60A",     // Amarillo brillante (Uber usa este tono)
+  tabText: "#9E9E9E",
+  activeTabText: "#00FF75",      // Verde neón para resaltar tab activo
+  normalText: "#FFFFFF",         // Texto principal blanco
 
   // Iconos
-  iconDefault: "#aaa",
-  iconActive: "#fff200ff",
+  iconDefault: "#9E9E9E",        // Gris medio
+  iconActive: "#FFD60A",         // Amarillo Uber
 
-  // Gradientes
-  gradientStart: "#00FF75", // Verde neón
-  gradientEnd: "#2563EB",   // Azul intenso
-  gradientAltStart: "#fff200ff", // Amarillo (para variantes divertidas)
-  gradientAltEnd: "#FF00FF",     // Fucsia (para resaltar botones, si quieres)
+  // Gradientes (opcional, si quieres darle vida a botones/headers)
+  gradientStart: "#00FF75",      // Verde neón
+  gradientEnd: "#2563EB",        // Azul intenso
+  gradientAltStart: "#FFD60A",   // Amarillo Uber
+  gradientAltEnd: "#FF00FF",     // Fucsia vibrante
 };

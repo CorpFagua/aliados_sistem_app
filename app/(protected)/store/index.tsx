@@ -1,6 +1,5 @@
-import StoreHome from "@/modules/users/store/screens/StoreHome"
+import StoreHome from "@/modules/users/store/StoreHome"
 
 export default function StorePage() {
-  
   return <StoreHome />
 } 

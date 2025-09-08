@@ -5,25 +5,29 @@ import { Colors } from "@/constans/colors";
 type MenuItem = {
   id: string;
   label: string;
-  icon: keyof typeof Ionicons.glyphMap; // 🚀 asegura que sea un ícono válido
+  icon: keyof typeof Ionicons.glyphMap;
 };
 
 type NavigationMenuProps = {
   active: string;
   onSelect: (id: string) => void;
-  mobileItems: MenuItem[];
-  desktopItems: MenuItem[];
+  mobileItems?: MenuItem[];  // 👈 opcionales
+  desktopItems?: MenuItem[]; // 👈 opcionales
 };
 
 export default function NavigationMenu({
   active,
   onSelect,
-  mobileItems,
-  desktopItems,
+  mobileItems = [],
+  desktopItems = [],
 }: NavigationMenuProps) {
   const { width } = useWindowDimensions();
   const isLargeScreen = width > 768;
+
   const items = isLargeScreen ? desktopItems : mobileItems;
+
+  // ✅ Si no hay items, no renderiza nada
+  if (!items || items.length === 0) return null;
 
   if (isLargeScreen) {
     // 📌 Sidebar (desktop / tablet)

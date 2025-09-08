@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
+import { SafeAreaFrameContext, SafeAreaView } from "react-native-safe-area-context";
 
 export default function OrdersList({ section }) {
   const sectionTitles = {
@@ -9,21 +10,18 @@ export default function OrdersList({ section }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={styles.title}>{sectionTitles[section]}</Text>
       <Text style={styles.subtitle}>
         Aquí se mostrarán los pedidos de la sección seleccionada.
       </Text>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#111",
-    borderRadius: 12,
-    padding: 20,
   },
   title: {
     fontSize: 20,
