@@ -9,6 +9,8 @@ import { Colors } from "@/constans/colors";
 // Pantallas
 import DisponiblesScreen from "./screens/DisponiblesScreen";
 import NotificationsScreen from "./screens/NotificationsScreen";
+import AsignadosScreen from "./screens/AsignadosScreen";
+import EnRutaScreen from "./screens/EnRutaScreen";
 
 const mobileMenuItems = [
   { id: "disponibles", label: "Disponibles", icon: "list-outline" as const },
@@ -33,9 +35,10 @@ export default function DeliveryHome() {
     switch (activeSection) {
       case "disponibles":
         return <DisponiblesScreen />;
-      case "notifications":
-        return <NotificationsScreen />;
- 
+      case "asignados":
+        return <AsignadosScreen />;
+      case "en-camino":
+        return <EnRutaScreen />;
       default:
         return <DisponiblesScreen />;
     }
@@ -80,7 +83,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 12, // 👈 más compacto en móvil
     paddingTop: 8,
   },
 });

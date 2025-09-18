@@ -1,264 +1,214 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import ServiceFormModal from "../components/ServiceFormModal";
+import StoreOrderCard from "../components/StoreOrderCard";
+import OrderDetailModal from "../components/OrderDetailModal";
+import { useAuth } from "@/providers/AuthProvider";
+import { fetchServices } from "@/services/services";
+import { Service } from "@/models/service"; // 👈 usamos nuestro modelo tipado
 
 const TABS = ["Disponibles", "Tomados", "Por recoger"];
-const { width } = Dimensions.get("window");
-const isLargeScreen = width > 768;
 
 export default function HomeScreen() {
-  const [activeTab, setActiveTab] = useState("Disponibles");
+  const { width } = useWindowDimensions();
+  const isLargeScreen = width >= 1024;
+  const isTablet = width >= 768 && width < 1024;
+  const isMobile = width < 768;
 
-  // 📌 Ejemplo de pedidos
-  const pedidos = {
-    Disponibles: [
-      {
-        id: "1",
-        cliente: "Carlos Pérez",
-        direccion: "Cra 15 #45-22",
-        detalle: "2 Hamburguesas + 1 Gaseosa",
-      },
-      {
-        id: "2",
-        cliente: "María López",
-        direccion: "Cl 80 #30-10",
-        detalle: "Pizza grande de peperoni",
-      },
-    ],
-    Tomados: [
-      {
-        id: "3",
-        cliente: "Juan Gómez",
-        direccion: "Cra 20 #12-33",
-        detalle: "Ensalada + Jugo natural",
-      },
-    ],
-    "Por recoger": [
-      {
-        id: "4",
-        cliente: "Ana Torres",
-        direccion: "Cl 50 #22-15",
-        detalle: "3 Perros calientes",
-      },
-    ],
-  };
+  const { session } = useAuth();
+
+  const [activeTab, setActiveTab] = useState("Disponibles");
+  const [selectedOrder, setSelectedOrder] = useState<Service | null>(null);
+  const [showForm, setShowForm] = useState(false);
+
+  // 👇 Estado de pedidos tipado
+  const [pedidos, setPedidos] = useState<Record<string, Service[]>>({
+    Disponibles: [],
+    Tomados: [],
+    "Por recoger": [],
+  });
+
+  // ⚡ Traer servicios del backend
+  useEffect(() => {
+    if (!session) return;
+
+    const loadServices = async () => {
+      try {
+        const data = await fetchServices(session.access_token);
+
+        const grouped: Record<string, Service[]> = {
+          Disponibles: data.filter((s) => s.status === "disponible"),
+          Tomados: data.filter((s) => s.status === "asignado"),
+          "Por recoger": data.filter((s) => s.status === "en_ruta"),
+        };
+
+        setPedidos(grouped);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    loadServices();
+  }, [session]);
 
   return (
-    <View style={styles.container} >
-      {/* 📌 Tabs superiores */}
-      <View style={styles.tabsWrapper}>
-        <View style={styles.tabs}>
-          {TABS.map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[
-                styles.tabButton,
-                activeTab === tab && styles.activeTabButton,
-              ]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === tab && styles.activeTabText,
-                ]}
+    <View style={styles.container}>
+      {/* Tabs móviles */}
+      {isMobile && (
+        <View style={styles.tabsWrapper}>
+          <View style={styles.tabs}>
+            {TABS.map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tabButton, activeTab === tab && styles.activeTabButton]}
+                onPress={() => setActiveTab(tab)}
               >
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                  {tab}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
-      </View>
+      )}
 
-      {/* 📌 Contenido dinámico */}
+      {/* Listado */}
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          isLargeScreen && styles.scrollContentDesktop,
+          (isTablet || isLargeScreen) && styles.scrollContentDesktop,
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {pedidos[activeTab].map((pedido) => (
-          <View key={pedido.id} style={styles.card}>
-            {/* Header */}
-            <View style={styles.cardHeader}>
-              <Ionicons
-                name="fast-food-outline"
-                size={22}
-                color={Colors.iconActive}
-              />
-              <Text style={styles.cardTitle}>Pedido #{pedido.id}</Text>
-            </View>
+        {isMobile &&
+          pedidos[activeTab].map((pedido) => (
+            <StoreOrderCard
+              key={pedido.id}
+              pedido={pedido}
+              onPress={() => setSelectedOrder(pedido)}
+              showCreatedAt
+            />
+          ))}
 
-            {/* Info */}
-            <View style={styles.cardBody}>
-              <Text style={styles.cardText}>
-                <Text style={styles.cardLabel}>Cliente: </Text>
-                {pedido.cliente}
-              </Text>
-              <Text style={styles.cardText}>
-                <Text style={styles.cardLabel}>Dirección: </Text>
-                {pedido.direccion}
-              </Text>
-              <Text style={styles.cardText}>
-                <Text style={styles.cardLabel}>Detalle: </Text>
-                {pedido.detalle}
-              </Text>
-            </View>
-
-            {/* Acciones */}
-            <TouchableOpacity style={styles.chatButton}>
-              <Ionicons
-                name="chatbubble-ellipses-outline"
-                size={18}
-                color="#000"
-              />
-              <Text style={styles.chatText}>Chatear</Text>
-            </TouchableOpacity>
+        {(isTablet || isLargeScreen) && (
+          <View style={styles.columnsWrapper}>
+            {TABS.map((tab, idx) => (
+              <View
+                key={tab}
+                style={[styles.column, idx < TABS.length - 1 && styles.columnSpacing]}
+              >
+                <Text style={styles.columnTitle}>{tab}</Text>
+                <View style={styles.columnInner}>
+                  {pedidos[tab].map((pedido) => (
+                    <StoreOrderCard
+                      key={pedido.id}
+                      pedido={pedido}
+                      onPress={() => setSelectedOrder(pedido)}
+                      showCreatedAt
+                    />
+                  ))}
+                </View>
+              </View>
+            ))}
           </View>
-        ))}
+        )}
       </ScrollView>
 
-      {/* 📌 Botón flotante para crear pedido */}
-      <TouchableOpacity style={styles.fab}>
+      {/* Modal detalle */}
+      <OrderDetailModal
+        visible={!!selectedOrder}
+        pedido={selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+      />
+
+      {/* Botón FAB */}
+      <TouchableOpacity style={styles.fab} onPress={() => setShowForm(true)}>
         <LinearGradient
           colors={[Colors.gradientStart, Colors.gradientEnd]}
-          start={[0, 0]}
-          end={[1, 1]}
           style={styles.fabGradient}
         >
           <Ionicons name="add" size={28} color="#000" />
         </LinearGradient>
       </TouchableOpacity>
+
+      {/* Modal de crear servicio */}
+      <ServiceFormModal
+        visible={showForm}
+        onClose={() => setShowForm(false)}
+        onSuccess={() => {
+          setShowForm(false);
+          if (session) {
+            fetchServices(session.access_token).then((data) => {
+              const grouped: Record<string, Service[]> = {
+                Disponibles: data.filter((s) => s.status === "disponible"),
+                Tomados: data.filter((s) => s.status === "asignado"),
+                "Por recoger": data.filter((s) => s.status === "en_ruta"),
+              };
+              setPedidos(grouped);
+            });
+          }
+        }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.Background,
+  container: { flex: 1, backgroundColor: Colors.Background },
+  tabsWrapper: { paddingTop: 10, paddingBottom: 12 },
+  tabs: {
+    flexDirection: "row",
+    backgroundColor: Colors.activeMenuBackground,
+    borderRadius: 30,
+    padding: 4,
+    marginHorizontal: 12,
   },
-
-// Tabs superiores
-tabsWrapper: {
-
-  paddingTop: 10,
-  paddingBottom: 12,
-  backgroundColor: Colors.Background,
-},
-
-tabs: {
-  flexDirection: "row",
-  backgroundColor: "#1C1C1E",
-  borderRadius: 30,
-  padding: 4,
-  justifyContent: "space-between",
-
-  // 🔥 Flotante con sombra
-  shadowColor: "#000",
-  shadowOpacity: 0.25,
-  shadowRadius: 6,
-  shadowOffset: { width: 0, height: 3 },
-  elevation: 6,
-},
-
-
   tabButton: {
     flex: 1,
     alignItems: "center",
     paddingVertical: 10,
     marginHorizontal: 4,
     borderRadius: 20,
-    backgroundColor: "transparent",
   },
-
-  activeTabButton: {
-    backgroundColor: Colors.iconActive, // pill resaltado
+  activeTabButton: { backgroundColor: Colors.iconActive },
+  tabText: { color: Colors.menuText, fontSize: 14, fontWeight: "500" },
+  activeTabText: { color: "#000", fontWeight: "700" },
+  scrollContent: { paddingBottom: 120, paddingHorizontal: 12 },
+  scrollContentDesktop: { paddingBottom: 40, paddingHorizontal: 20 },
+  columnsWrapper: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
   },
-
-  tabText: {
-    color: Colors.menuText,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-
-  activeTabText: {
-    color: "#000",
-    fontWeight: "700",
-  },
-
-  // Scroll content
-  scrollContent: {
-    paddingBottom: 100, // más espacio para no tapar el FAB
-  },
-  scrollContentDesktop: {
-    paddingHorizontal: 20,
-  },
-
-  // Card de pedidos
-  card: {
+  column: {
+    flex: 1,
+    minWidth: 280,
+    maxWidth: 420,
     backgroundColor: Colors.activeMenuBackground,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    gap: 8,
-  },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: Colors.normalText,
-  },
-  cardBody: {
-    marginBottom: 12,
-  },
-  cardLabel: {
-    fontWeight: "600",
-    color: Colors.menuText,
-  },
-  cardText: {
-    color: Colors.normalText,
-    marginBottom: 6,
-    fontSize: 14,
-  },
-
-  // Chat button
-  chatButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: Colors.iconActive,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
     borderRadius: 12,
-    alignSelf: "flex-start",
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#ffffff06",
   },
-  chatText: {
-    color: "#000",
-    fontWeight: "600",
-    fontSize: 14,
+  columnSpacing: { marginRight: 18 },
+  columnTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.activeMenuText,
+    marginBottom: 12,
+    marginLeft: 4,
   },
-
-  // Floating Action Button
+  columnInner: { paddingTop: 6 },
   fab: {
     position: "absolute",
     bottom: 24,
@@ -267,14 +217,6 @@ tabs: {
     height: 60,
     borderRadius: 30,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOpacity: 0.4,
-    shadowRadius: 5,
-    elevation: 6,
   },
-  fabGradient: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  fabGradient: { flex: 1, justifyContent: "center", alignItems: "center" },
 });

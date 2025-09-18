@@ -1,30 +1,53 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Dimensions,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+// src/modules/users/delivery/screens/DisponiblesScreen.tsx
+import React, { useEffect, useState } from "react";
+import { StyleSheet, FlatList, View } from "react-native";
 import { Colors } from "@/constans/colors";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
-
-const TABS = ["Disponibles", "Tomados", "Por recoger"];
-const { width } = Dimensions.get("window");
-const isLargeScreen = width > 768;
+import ServiceCard from "../components/ServiceCard";
+import { useAuth } from "@/providers/AuthProvider";
+import { fetchServices } from "@/services/services";
+import { Service } from "@/models/service";
 
 export default function DisponiblesScreen() {
-  return(
-    <View><Text style={styles.Text}>Disponibles Screen</Text></View>
-  )
+  const { session } = useAuth();
+  const [pedidos, setPedidos] = useState<Service[]>([]);
+
+  useEffect(() => {
+    if (!session) return;
+
+    const load = async () => {
+      try {
+        const data = await fetchServices(session.access_token);
+        // ⚡ Filtrar solo los "disponibles"
+        const disponibles = data.filter((s) => s.status === "disponible");
+        console.log("Servicios disponibles:", disponibles);
+        setPedidos(disponibles);
+      } catch (err) {
+        console.error("❌ Error cargando servicios disponibles:", err);
+      }
+    };
+
+    load();
+  }, [session]);
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        data={pedidos}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <ServiceCard
+            pedido={item}
+            onPress={() => console.log("Card seleccionada:", item.id)}
+          />
+        )}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
 }
 
-//styles
 const styles = StyleSheet.create({
-  Text: {
-    color: Colors.menuText,
-  },
+  container: { flex: 1, backgroundColor: Colors.Background },
+  listContent: { paddingBottom: 80 },
 });

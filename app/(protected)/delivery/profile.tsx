@@ -19,7 +19,7 @@ export default function ProfileScreen() {
   const user = session?.user;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
       {/* ✅ Header inteligente (logo o flecha según ruta) */}
       <Header />
 
