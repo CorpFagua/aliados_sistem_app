@@ -37,9 +37,6 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
   if (!session) return alert("Debes estar autenticado");
 
   const createdAt = new Date();
-  const expectedAt = prepTime
-    ? new Date(createdAt.getTime() + Number(prepTime) * 60_000) // ⏳ sumamos minutos
-    : null;
 
   const newService: Service = {
     id: "",
@@ -49,14 +46,14 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
     payment,
     amount: Number(amount),
     createdAt,
-    expectedAt, // 👈 mandamos el timestamp
+    prepTime: Number(prepTime),
   };
 
   const payload = toServicePayload(newService);
 
   try {
     const data = await createService(payload, session.access_token);
-    console.log("✅ Servicio creado:", data);
+    console.log("✅ Servicio creado:", payload);
     if (onSuccess) onSuccess(data);
     onClose();
 

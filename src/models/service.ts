@@ -35,7 +35,8 @@ export interface ServicePayload {
   store_id?: string | null;
   branch_id?: string | null;
   zone_id?: string | null;
-  expected_at?: number | null; // timestamp (epoch millis) cuando mandamos
+  expected_at?: Date | null; // timestamp (epoch millis) cuando mandamos
+  prep_time?: number | null; // minutos solicitados
 }
 
 export interface ServiceResponse {
@@ -109,9 +110,7 @@ export function toServicePayload(service: Service): ServicePayload {
     total_to_collect: service.amount,
     price: service.price,
     pickup_address: service.pickup,
-    expected_at: service.prepTime
-      ? new Date(service.createdAt.getTime() + service.prepTime * 60_000).getTime()
-      : null,
+    prep_time: service.prepTime,
     store_id: service.storeId,
     branch_id: service.branchId,
     zone_id: service.zoneId,

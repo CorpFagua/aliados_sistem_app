@@ -1,11 +1,11 @@
 // src/modules/users/delivery/screens/EnRutaScreen.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { StyleSheet, View, FlatList } from "react-native";
 import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { fetchServices } from "@/services/services";
+import { fetchServices, updateServiceStatus } from "@/services/services";
 import { Service } from "@/models/service";
-import ServiceCard from "../components/ServiceCard";
+import OrderRow from "../components/OrderRow";
 import OrderDetailModal from "../components/ServiceDetailModal";
 
 export default function EnRutaScreen() {
@@ -13,22 +13,22 @@ export default function EnRutaScreen() {
   const [pedidos, setPedidos] = useState<Service[]>([]);
   const [selectedPedido, setSelectedPedido] = useState<Service | null>(null);
 
-  useEffect(() => {
+  // 🔄 función para cargar pedidos (memoizada con useCallback)
+  const loadPedidos = useCallback(async () => {
     if (!session) return;
-
-    const load = async () => {
-      try {
-        const data = await fetchServices(session.access_token);
-        // ⚡ Filtrar solo los "en_ruta"
-        const enRuta = data.filter((s) => s.status === "en_ruta");
-        setPedidos(enRuta);
-      } catch (err) {
-        console.error("❌ Error cargando servicios en ruta:", err);
-      }
-    };
-
-    load();
+    try {
+      const data = await fetchServices(session.access_token);
+      const enRuta = data.filter((s) => s.status === "en_ruta");
+      setPedidos(enRuta);
+    } catch (err) {
+      console.error("❌ Error cargando servicios en ruta:", err);
+    }
   }, [session]);
+
+  // cargar al montar
+  useEffect(() => {
+    loadPedidos();
+  }, [loadPedidos]);
 
   return (
     <View style={styles.container}>
@@ -36,7 +36,22 @@ export default function EnRutaScreen() {
         data={pedidos}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <ServiceCard pedido={item} onPress={() => setSelectedPedido(item)} />
+          <OrderRow
+            pedido={item}
+            onPress={() => setSelectedPedido(item)}
+            leftEnabled
+            leftLabel="Entregado"
+            leftColor={Colors.success}
+            onLeftAction={async (p) => {
+              console.log("✔️ Pedido entregado:", p.id);
+              await updateServiceStatus(p.id, "entregado", session.access_token);
+
+              // 🔄 recargar lista después de actualizar
+              await loadPedidos();
+
+              return true;
+            }}
+          />
         )}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}

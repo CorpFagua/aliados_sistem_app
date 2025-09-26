@@ -29,7 +29,7 @@ export default function DeliveryHome() {
   const { width } = useWindowDimensions();
   const isLargeScreen = width > 768;
 
-  const [activeSection, setActiveSection] = useState("home");
+  const [activeSection, setActiveSection] = useState("disponibles");
 
   const renderContent = () => {
     switch (activeSection) {

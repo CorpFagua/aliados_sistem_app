@@ -60,7 +60,7 @@ export default function OrderDetailModal({ visible, onClose, pedido, onTransfer 
                 size={22}
                 color={Colors.gradientStart}
               />
-              <Text style={styles.modalTitle}>{pedido.storeId || "Sin tienda"}</Text>
+              <Text style={styles.modalTitle}>{pedido.storeName || "Sin tienda"}</Text>
             </View>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={Colors.normalText} />

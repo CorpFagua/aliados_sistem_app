@@ -4,12 +4,14 @@ import { Stack } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { useColorScheme, Platform, KeyboardAvoidingView } from "react-native"
 import AuthProvider from "@/providers/AuthProvider"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
 
 export default function RootLayout() {
   const colorScheme = useColorScheme()
 
   return (
     <AuthProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -30,6 +32,7 @@ export default function RootLayout() {
           <StatusBar style="light" />
         </KeyboardAvoidingView>
       </ThemeProvider>
+      </GestureHandlerRootView>
     </AuthProvider>
   )
 }

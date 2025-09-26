@@ -22,4 +22,11 @@ export const Colors = {
   gradientEnd: "#2563EB",        // Azul intenso
   gradientAltStart: "#FFD60A",   // Amarillo Uber
   gradientAltEnd: "#FF00FF",     // Fucsia vibrante
+
+
+  // Alertas
+success: "#00FF75",   // Verde neón para acciones positivas
+warning: "#FFD60A",   // Amarillo brillante para alertas
+error: "#FF3B30",     // Rojo para errores
+
 };

@@ -17,7 +17,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { fetchServices } from "@/services/services";
 import { Service } from "@/models/service"; // 👈 usamos nuestro modelo tipado
 
-const TABS = ["Disponibles", "Tomados", "Por recoger"];
+const TABS = ["Disponibles", "Tomados", "En ruta"];
 
 export default function HomeScreen() {
   const { width } = useWindowDimensions();
@@ -35,7 +35,7 @@ export default function HomeScreen() {
   const [pedidos, setPedidos] = useState<Record<string, Service[]>>({
     Disponibles: [],
     Tomados: [],
-    "Por recoger": [],
+    "En ruta": [],
   });
 
   // ⚡ Traer servicios del backend
@@ -49,7 +49,7 @@ export default function HomeScreen() {
         const grouped: Record<string, Service[]> = {
           Disponibles: data.filter((s) => s.status === "disponible"),
           Tomados: data.filter((s) => s.status === "asignado"),
-          "Por recoger": data.filter((s) => s.status === "en_ruta"),
+          "En ruta": data.filter((s) => s.status === "en_ruta"),
         };
 
         setPedidos(grouped);
@@ -152,7 +152,7 @@ export default function HomeScreen() {
               const grouped: Record<string, Service[]> = {
                 Disponibles: data.filter((s) => s.status === "disponible"),
                 Tomados: data.filter((s) => s.status === "asignado"),
-                "Por recoger": data.filter((s) => s.status === "en_ruta"),
+                "En ruta": data.filter((s) => s.status === "en_ruta"),
               };
               setPedidos(grouped);
             });

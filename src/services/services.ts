@@ -36,3 +36,27 @@ export async function fetchServices(token: string): Promise<Service[]> {
     throw err;
   }
 }
+
+export async function updateServiceStatus(
+  serviceId: string,
+  status: "disponible" | "asignado" | "en_ruta" | "entregado" | "cancelado" | "rechazado",
+  token: string,
+  deliveryId?: string
+): Promise<Service> {
+  try {
+    const res = await axios.patch<ServiceResponse>(
+      `${API_URL}/services/${serviceId}/status`,
+      { status, deliveryId }, // 👈 se manda si aplica
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    return toService(res.data); // ⚡ devuelve el servicio actualizado
+  } catch (err: any) {
+    console.error("❌ Error updating service status:", err.response?.data || err.message);
+    throw err;
+  }
+}
+
+
+
