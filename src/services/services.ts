@@ -1,7 +1,6 @@
-import axios from "axios";
+// src/services/services.ts
+import { api, authHeaders } from "../lib/api";
 import { Service, ServicePayload, ServiceResponse, toService } from "@/models/service";
-
-const API_URL = "http://localhost:3000/api";
 
 // Crear un servicio (envía DTO y devuelve modelo del front)
 export async function createService(
@@ -9,8 +8,8 @@ export async function createService(
   token: string
 ): Promise<Service> {
   try {
-    const res = await axios.post<ServiceResponse>(`${API_URL}/services`, payload, {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await api.post<ServiceResponse>("/services", payload, {
+      headers: authHeaders(token),
     });
     return toService(res.data);
   } catch (err: any) {
@@ -22,12 +21,12 @@ export async function createService(
 // Obtener lista de servicios
 export async function fetchServices(token: string): Promise<Service[]> {
   try {
-    const res = await axios.get(`${API_URL}/services`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await api.get<ServiceResponse[]>("/services", {
+      headers: authHeaders(token),
     });
 
     // ⚡ Aseguramos que siempre sea un array
-    const raw = Array.isArray(res.data) ? res.data : res.data.data;
+    const raw = Array.isArray(res.data) ? res.data : (res.data as any).data;
 
     // ⚡ Transformamos DTO -> Modelo interno
     return raw.map(toService);
@@ -37,6 +36,7 @@ export async function fetchServices(token: string): Promise<Service[]> {
   }
 }
 
+// Actualizar estado de un servicio
 export async function updateServiceStatus(
   serviceId: string,
   status: "disponible" | "asignado" | "en_ruta" | "entregado" | "cancelado" | "rechazado",
@@ -44,11 +44,11 @@ export async function updateServiceStatus(
   deliveryId?: string
 ): Promise<Service> {
   try {
-    const res = await axios.patch<ServiceResponse>(
-      `${API_URL}/services/${serviceId}/status`,
-      { status, deliveryId }, // 👈 se manda si aplica
+    const res = await api.patch<ServiceResponse>(
+      `/services/${serviceId}/status`,
+      { status, deliveryId },
       {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       }
     );
     return toService(res.data); // ⚡ devuelve el servicio actualizado
@@ -57,6 +57,3 @@ export async function updateServiceStatus(
     throw err;
   }
 }
-
-
-

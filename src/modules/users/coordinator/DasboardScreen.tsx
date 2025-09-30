@@ -1,4 +1,4 @@
-// src/screens/DashboardScreen.tsx
+
 import { useState } from "react";
 import { View, StyleSheet, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -12,7 +12,7 @@ import ManagementScreen from "./screens/ManagementScreen";
 import NotificationsScreen from "./screens/NotificationsScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import AnalyticsScreen from "./screens/AnalyticsScreen";
-import CreateServiceScreen from "./screens/CreateServiceScreen";
+import HistorialScreen from "./screens/HistorialScreen";
 
 const mobileMenuItems = [
   { id: "home", label: "Home", icon: "home-outline" as const },
@@ -25,7 +25,7 @@ const desktopMenuItems = [
   { id: "orders", label: "Pedidos", icon: "cube-outline" as const },
   { id: "management", label: "Gestión", icon: "settings-outline" as const },
   { id: "analytics", label: "Analíticas", icon: "bar-chart-outline" as const },
-  { id: "createService", label: "Crear servicio", icon: "add-circle-outline" as const },
+  { id: "historial", label: "Historial", icon: "time-outline" as const },
 ];
 
 export default function DashboardScreen() {
@@ -46,8 +46,8 @@ export default function DashboardScreen() {
         return <ProfileScreen />;
       case "analytics":
         return <AnalyticsScreen />;
-      case "createService":
-        return <CreateServiceScreen />;
+      case "historial":
+        return <HistorialScreen />;
       default:
         return <HomeScreen />;
     }
@@ -94,6 +94,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+    
   },
 });
