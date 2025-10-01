@@ -44,16 +44,43 @@ export async function updateServiceStatus(
   deliveryId?: string
 ): Promise<Service> {
   try {
-    const res = await api.patch<ServiceResponse>(
+    const res = await api.patch<{ ok: boolean; data: ServiceResponse }>(
       `/services/${serviceId}/status`,
       { status, deliveryId },
       {
         headers: authHeaders(token),
       }
     );
-    return toService(res.data); // ⚡ devuelve el servicio actualizado
+
+    if (!res.data.ok) throw res.data;
+
+    return toService(res.data.data); // ✅ usar el `data` interno
   } catch (err: any) {
     console.error("❌ Error updating service status:", err.response?.data || err.message);
+    throw err;
+  }
+}
+
+// --- Asignar zona a un servicio ---
+export async function assignZoneToService(
+  serviceId: string,
+  zoneId: string,
+  token: string
+): Promise<Service> {
+  try {
+    const res = await api.patch<{ ok: boolean; data: ServiceResponse }>(
+      `/services/${serviceId}/assign-zone`,
+      { zoneId },
+      {
+        headers: authHeaders(token),
+      }
+    );
+
+    if (!res.data.ok) throw res.data;
+
+    return toService(res.data.data); // ✅ usar el `data` interno
+  } catch (err: any) {
+    console.error("❌ Error asignando zona al servicio:", err.response?.data || err.message);
     throw err;
   }
 }

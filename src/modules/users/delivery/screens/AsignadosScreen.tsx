@@ -7,11 +7,13 @@ import { fetchServices, updateServiceStatus } from "@/services/services";
 import { Service } from "@/models/service";
 import OrderRow from "../components/OrderRow";
 import OrderDetailModal from "../components/ServiceDetailModal";
+import AssignZoneModal from "../components/AssignZoneModal";
 
 export default function AsignadosScreen() {
   const { session } = useAuth();
   const [pedidos, setPedidos] = useState<Service[]>([]);
   const [selectedPedido, setSelectedPedido] = useState<Service | null>(null);
+  const [assigning, setAssigning] = useState<Service | null>(null);
 
   // 🔄 función para cargar servicios asignados
   const loadPedidos = useCallback(async () => {
@@ -42,11 +44,9 @@ export default function AsignadosScreen() {
             leftEnabled
             leftLabel="Recogiendo"
             leftColor="#2563EB"
-            onLeftAction={async (p) => {
-              console.log("✔️ Pedido en ruta:", p.id);
-              await updateServiceStatus(p.id, "en_ruta", session.access_token);
-              await loadPedidos(); // 🔄 refresca la lista después
-              return true;
+            // 📌 Ahora solo abre el modal
+            onLeftAction={() => {
+              setAssigning(item);
             }}
           />
         )}
@@ -54,12 +54,34 @@ export default function AsignadosScreen() {
         showsVerticalScrollIndicator={false}
       />
 
+      {/* 📌 Modal detalle pedido */}
       <OrderDetailModal
         visible={!!selectedPedido}
         pedido={selectedPedido}
         onClose={() => setSelectedPedido(null)}
         onTransfer={() => {
           console.log("Transferir pedido:", selectedPedido?.id);
+        }}
+      />
+
+      {/* 📌 Modal asignar zona */}
+      <AssignZoneModal
+        visible={!!assigning}
+        service={assigning}
+        token={session?.access_token || ""}
+        onClose={() => setAssigning(null)}
+        onAssigned={async (updated) => {
+          console.log("✅ Zona asignada:", updated);
+
+          // ✅ una vez asignada la zona, cambiamos el estado del pedido
+          await updateServiceStatus(
+            updated.id,
+            "en_ruta",
+            session?.access_token || ""
+          );
+
+          await loadPedidos();
+          setAssigning(null);
         }}
       />
     </View>

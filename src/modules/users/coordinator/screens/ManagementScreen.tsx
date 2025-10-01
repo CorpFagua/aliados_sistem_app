@@ -3,6 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-nati
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import ZonesScreen from "./management/ZonesScreen"; // 👈 tu componente de Zonas
+import StorePricesScreen from "./management/ZonesPriceScreen";
+import { useAuth } from "@/providers/AuthProvider";
+
+
+
 
 const managementOptions = [
   {
@@ -34,41 +39,48 @@ const managementOptions = [
 export default function ManagementScreen() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
 
-  const renderModule = () => {
-    switch (activeModule) {
-      case "zones":
-        return <ZonesScreen />;
-      // aquí más adelante agregas Tiendas, Domiciliarios, Precios...
-      default:
-        return (
-          <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-            <Text style={styles.title}>Gestión del Coordinador</Text>
-            <Text style={styles.subtitle}>
-              Selecciona un módulo para administrar la información
-            </Text>
+  const {session} = useAuth();
 
-            <View style={styles.cardsContainer}>
-              {managementOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={styles.card}
-                  activeOpacity={0.9}
-                  onPress={() => setActiveModule(option.id)}
-                >
-                  <Ionicons
-                    name={option.icon as any}
-                    size={32}
-                    color={Colors.activeMenuText}
-                  />
-                  <Text style={styles.cardTitle}>{option.label}</Text>
-                  <Text style={styles.cardDescription}>{option.description}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        );
-    }
-  };
+  const renderModule = () => {
+  switch (activeModule) {
+    case "zones":
+      return <ZonesScreen />;
+    case "prices":
+      return <StorePricesScreen token={session?.access_token} />;
+    // más adelante puedes agregar:
+    // case "stores": return <StoresScreen />;
+    // case "deliveries": return <DeliveriesScreen />;
+    default:
+      return (
+        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.title}>Gestión del Coordinador</Text>
+          <Text style={styles.subtitle}>
+            Selecciona un módulo para administrar la información
+          </Text>
+
+          <View style={styles.cardsContainer}>
+            {managementOptions.map((option) => (
+              <TouchableOpacity
+                key={option.id}
+                style={styles.card}
+                activeOpacity={0.9}
+                onPress={() => setActiveModule(option.id)}
+              >
+                <Ionicons
+                  name={option.icon as any}
+                  size={32}
+                  color={Colors.activeMenuText}
+                />
+                <Text style={styles.cardTitle}>{option.label}</Text>
+                <Text style={styles.cardDescription}>{option.description}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+      );
+  }
+};
+
 
   return (
     <View style={{ flex: 1 }}>
