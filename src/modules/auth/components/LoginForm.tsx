@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from "react-native"
 import { useAuth } from "@/providers/AuthProvider"
+import Toast from 'react-native-toast-message'; // 👈 Importar Toast
 
 export default function LoginForm() {
   const { login } = useAuth()
@@ -9,13 +10,47 @@ export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
 
   const handleLogin = async () => {
-    if (!email || !password) return;
+    // 1. Manejo de campos vacíos
+    if (!email || !password) {
+        Toast.show({
+            type: 'error',
+            text1: 'Campos requeridos',
+            text2: 'Por favor, introduce tu correo y contraseña.',
+            position: 'top',
+        });
+        return;
+    }
+
     setIsLoading(true);
     try {
       await login(email, password);
+      // Opcional: Mostrar un Toast de éxito (aunque la redirección es suficiente)
+      // Toast.show({
+      //    type: 'success',
+      //    text1: '¡Bienvenido!',
+      //    text2: 'Has iniciado sesión correctamente.',
+      // });
+    } catch (error: any) {
+      // 2. Mostrar Toast en caso de error
+      let errorMessage = 'Error de inicio de sesión. Inténtalo de nuevo.';
+      
+      // Intentar obtener un mensaje de error más específico
+      if (error.message) {
+        // En tu AuthProvider estás propagando el error con .message
+        // por ejemplo: "Invalid login credentials", "Usuario inactivo"
+        errorMessage = error.message; 
+      }
+      
+      Toast.show({
+        type: 'error',
+        text1: 'Error al Ingresar',
+        text2: errorMessage,
+        position: 'top',
+      });
+
     } finally {
       setIsLoading(false);
-      setPassword("");
+      setPassword(""); // Limpiar la contraseña en ambos casos (éxito o error)
     }
   }
 
@@ -66,7 +101,9 @@ export default function LoginForm() {
   )
 }
 
+// ... (El resto de tus estilos StyleSheet.create se mantiene igual)
 const styles = StyleSheet.create({
+  // ... (tus estilos existentes)
   content: {
     alignItems: "center",
     justifyContent: "center",

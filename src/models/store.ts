@@ -42,8 +42,8 @@ export interface StoreResponse {
 // Payload para crear/editar
 export interface StorePayload {
   name: string;
-  admin_id: string;
-  branch_id: string;
+  admin_id?: string;
+  branch_id?: string;
   type: "credito" | "efectivo";
 }
 

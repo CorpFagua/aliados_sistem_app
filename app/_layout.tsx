@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar"
 import { useColorScheme, Platform, KeyboardAvoidingView } from "react-native"
 import AuthProvider from "@/providers/AuthProvider"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
+import Toast from "react-native-toast-message"
 
 export default function RootLayout() {
   const colorScheme = useColorScheme()
@@ -30,6 +31,7 @@ export default function RootLayout() {
             
           </Stack>
           <StatusBar style="light" />
+          <Toast />
         </KeyboardAvoidingView>
       </ThemeProvider>
       </GestureHandlerRootView>

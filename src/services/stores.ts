@@ -49,3 +49,10 @@ export async function deleteStore(id: string, token: string): Promise<Store> {
   });
   return toStore(res.data.data as StoreResponse);
 }
+
+// Obtener una tienda con sus perfiles (admin y coordinador)
+
+export async function fetchStoreWithProfiles(id: string, token: string): Promise<Store> {
+  const res = await api.get(`/stores/${id}/details`, { headers: authHeaders(token) });
+  return toStore(res.data.data as StoreResponse);
+}

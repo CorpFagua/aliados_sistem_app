@@ -5,6 +5,7 @@ import { Colors } from "@/constans/colors";
 import ZonesScreen from "./management/ZonesScreen"; // 👈 tu componente de Zonas
 import StorePricesScreen from "./management/ZonesPriceScreen";
 import { useAuth } from "@/providers/AuthProvider";
+import StoresScreen from "./management/StoresScreen";
 
 
 
@@ -48,7 +49,7 @@ export default function ManagementScreen() {
     case "prices":
       return <StorePricesScreen token={session?.access_token} />;
     // más adelante puedes agregar:
-    // case "stores": return <StoresScreen />;
+    case "stores": return <StoresScreen />;
     // case "deliveries": return <DeliveriesScreen />;
     default:
       return (
