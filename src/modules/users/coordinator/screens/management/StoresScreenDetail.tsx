@@ -204,6 +204,7 @@ export default function StoreDetailScreen({
       <UserFormModal
         visible={showUserForm}
         storeId={store.id}
+        role="store"
         onClose={() => setShowUserForm(false)}
         onSave={() => {
           setShowUserForm(false);

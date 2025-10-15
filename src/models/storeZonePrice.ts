@@ -5,6 +5,7 @@ export interface StoreZonePrice {
   storeId: string;
   zoneId: string;
   price: number;
+  price_delivery: number;
   createdAt: string;
   zone?: {
     id: string;
@@ -20,6 +21,7 @@ export interface StoreZonePriceResponse {
   store_id: string;
   zone_id: string;
   price: number;
+  price_delivery: number;
   created_at: string;
   zone?: {
     id: string;
@@ -34,6 +36,7 @@ export interface StoreZonePricePayload {
   store_id: string;
   zone_id: string;
   price: number;
+  price_delivery: number; 
 }
 
 // Mapper para transformar snake_case → camelCase
@@ -43,6 +46,7 @@ export function toStoreZonePrice(r: StoreZonePriceResponse): StoreZonePrice {
     storeId: r.store_id,
     zoneId: r.zone_id,
     price: r.price,
+    price_delivery: r.price_delivery,
     createdAt: r.created_at,
     zone: r.zone
       ? {

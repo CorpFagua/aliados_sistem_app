@@ -74,7 +74,9 @@ export default function StoreZonePricesModal({
             <View style={styles.header}>
               <Text style={styles.title}>Precios de {store.name}</Text>
               <View style={styles.headerActions}>
-                <TouchableOpacity onPress={() => setShowForm({ visible: true })}>
+                <TouchableOpacity
+                  onPress={() => setShowForm({ visible: true })}
+                >
                   <Ionicons
                     name="add-circle"
                     size={26}
@@ -87,41 +89,96 @@ export default function StoreZonePricesModal({
               </View>
             </View>
 
+            {/* Encabezado tipo tabla */}
+            <View style={styles.tableHeader}>
+              <Text style={[styles.headerCell, { flex: 1.8 }]}>Zona</Text>
+              <Text
+                style={[styles.headerCell, { flex: 1.2, textAlign: "center" }]}
+              >
+                Tienda
+              </Text>
+              <Text
+                style={[styles.headerCell, { flex: 1.2, textAlign: "center" }]}
+              >
+                Domicilio
+              </Text>
+              <Text
+                style={[styles.headerCell, { flex: 0.8, textAlign: "center" }]}
+              >
+                Acciones
+              </Text>
+            </View>
+
             {/* Lista */}
             <FlatList
               data={prices}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <View style={styles.row}>
-                  <View style={{ flex: 1 }}>
+                <View style={styles.tableRow}>
+                  {/* Zona */}
+                  <View style={[styles.cell, { flex: 1.8 }]}>
                     <Text style={styles.zoneName}>
                       {item.zone?.name ?? "Zona desconocida"}
                     </Text>
-                    <Text style={styles.zoneSubtext}>ID: {item.zone?.id}</Text>
                   </View>
-                  <Text style={styles.rowPrice}>${item.price}</Text>
-                  <TouchableOpacity
-                    style={styles.iconButton}
-                    onPress={() =>
-                      setShowForm({ visible: true, editing: item })
-                    }
+
+                  {/* Precio tienda */}
+                  <View style={[styles.cell, { flex: 1.2 }]}>
+                    <Text
+                      style={[
+                        styles.priceValue,
+                        { color: "#FFD43B", textAlign: "center" },
+                      ]}
+                    >
+                      ${item.price.toFixed(2)}
+                    </Text>
+                  </View>
+
+                  {/* Precio domiciliario */}
+                  <View style={[styles.cell, { flex: 1.2 }]}>
+                    <Text
+                      style={[
+                        styles.priceValue,
+                        { color: "#3B82F6", textAlign: "center" },
+                      ]}
+                    >
+                      ${item.price_delivery?.toFixed(2) ?? "0.00"}
+                    </Text>
+                  </View>
+
+                  {/* Acciones */}
+                  <View
+                    style={[styles.cell, styles.actionsCell, { flex: 0.8 }]}
                   >
-                    <Ionicons
-                      name="create-outline"
-                      size={20}
-                      color={Colors.activeMenuText}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.iconButton}
-                    onPress={() => handleDelete(item.id)}
-                  >
-                    <Ionicons
-                      name="trash-outline"
-                      size={20}
-                      color={Colors.error}
-                    />
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.iconButton,
+                        { backgroundColor: "#FFD43B20" },
+                      ]}
+                      onPress={() =>
+                        setShowForm({ visible: true, editing: item })
+                      }
+                    >
+                      <Ionicons
+                        name="create-outline"
+                        size={18}
+                        color="#FFD43B"
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.iconButton,
+                        { backgroundColor: "#EF444420" },
+                      ]}
+                      onPress={() => handleDelete(item.id)}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={18}
+                        color="#EF4444"
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
               ListEmptyComponent={
@@ -171,7 +228,7 @@ export default function StoreZonePricesModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    backgroundColor: "rgba(0,0,0,0.85)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -184,7 +241,6 @@ const styles = StyleSheet.create({
   },
   cardWrapperLarge: {
     width: 550,
-    maxWidth: "92%",
   },
   card: {
     backgroundColor: Colors.activeMenuBackground,
@@ -196,7 +252,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 16,
   },
   headerActions: {
     flexDirection: "row",
@@ -213,35 +269,58 @@ const styles = StyleSheet.create({
     color: Colors.normalText,
     flex: 1,
   },
-  row: {
+
+  /** ---- TABLA DE ZONA ---- **/
+  tableHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderColor: "#2A2A2A",
+    backgroundColor: "#1E1E1E",
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+  },
+  headerCell: {
+    color: Colors.menuText,
+    fontSize: 13,
+    fontWeight: "600",
+    textTransform: "uppercase",
+  },
+  tableRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
+    justifyContent: "space-between",
+    backgroundColor: "#1A1A1A",
     borderBottomWidth: 1,
-    borderColor: Colors.Border,
+    borderColor: "#2A2A2A",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  cell: {
+    justifyContent: "center",
   },
   zoneName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
-    color: Colors.normalText,
+    color: "#fff",
   },
-  zoneSubtext: {
-    fontSize: 12,
-    color: Colors.menuText,
-  },
-  rowPrice: {
-    width: 80,
-    textAlign: "right",
-    color: Colors.activeMenuText,
+  priceValue: {
+    fontSize: 14,
     fontWeight: "700",
-    fontSize: 15,
+  },
+  actionsCell: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
   },
   iconButton: {
-    marginLeft: 8,
     padding: 6,
     borderRadius: 8,
-    backgroundColor: Colors.Background,
   },
+
+  /** ---- Vacío ---- **/
   emptyContainer: {
     marginTop: 40,
     alignItems: "center",

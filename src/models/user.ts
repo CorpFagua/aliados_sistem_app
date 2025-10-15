@@ -1,10 +1,11 @@
 // --- Modelo interno del front ---
+export type Role = "super_admin" | "coordinator" | "store" | "delivery" | "user";
 export interface User {
   id: string;
   name: string;
   phone?: string | null;
   address?: string | null;
-  role: "super_admin" | "coordinator" | "store" | "delivery" | "user";
+  role: Role;
   isActive: boolean;
   branchId?: string | null;
   storeId?: string | null;
@@ -19,7 +20,7 @@ export interface UserPayload {
   password: string;
   phone?: string;
   address?: string;
-  role: "super_admin" | "coordinator" | "store" | "delivery" | "user";
+  role: Role;
   branch_id?: string | null;
   store_id?: string | null;
   isActive?: boolean;

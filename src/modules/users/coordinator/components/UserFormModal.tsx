@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { createUser } from "@/services/users";
 import { useAuth } from "@/providers/AuthProvider";
+import { Role } from "@/models/user";
 import Toast from "react-native-toast-message";
 
 const { width } = Dimensions.get("window");
@@ -21,11 +22,12 @@ const { width } = Dimensions.get("window");
 interface Props {
   visible: boolean;
   storeId: string;
+  role:Role;
   onClose: () => void;
   onSave: () => void;
 }
 
-export default function UserFormModal({ visible, storeId, onClose, onSave }: Props) {
+export default function UserFormModal({ visible, storeId,role, onClose, onSave }: Props) {
   const { session } = useAuth();
   const token = session?.access_token || "";
 
@@ -38,7 +40,7 @@ export default function UserFormModal({ visible, storeId, onClose, onSave }: Pro
   });
 
   const [loading, setLoading] = useState(false);
-  const role = "store";
+
 
   const handleChange = (key: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));

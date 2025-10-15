@@ -37,13 +37,16 @@ export default function ZonePriceForm({
 }: Props) {
   const [zones, setZones] = useState<Zone[]>([]);
   const [zoneId, setZoneId] = useState(editing?.zoneId || "");
-  const [price, setPrice] = useState(editing?.price.toString() || "");
+  const [price, setPrice] = useState(editing?.price?.toString() || "");
+  const [priceDelivery, setPriceDelivery] = useState(
+    editing?.price_delivery?.toString() || ""
+  );
 
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<{ label: string; value: string }[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [allZonesAdded, setAllZonesAdded] = useState(false);
-  const [loading, setLoading] = useState(true); // 👈 estado de carga
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
@@ -69,7 +72,7 @@ export default function ZonePriceForm({
       } catch (e) {
         setErrorMessage("Error al cargar datos. Intenta nuevamente.");
       } finally {
-        setLoading(false); // 👈 termina el loading
+        setLoading(false);
       }
     };
 
@@ -78,20 +81,25 @@ export default function ZonePriceForm({
 
   const handleSave = async () => {
     try {
-      if (!zoneId || !price) {
-        setErrorMessage("Debes seleccionar una zona y un precio válido.");
+      if (!zoneId || !price || !priceDelivery) {
+        setErrorMessage("Debes completar todos los campos requeridos.");
         return;
       }
 
       if (editing) {
         await updateStoreZonePrice(
           editing.id,
-          { price: Number(price) },
+          { price: Number(price), price_delivery: Number(priceDelivery) },
           token
         );
       } else {
         await createStoreZonePrice(
-          { store_id: store.id, zone_id: zoneId, price: Number(price) },
+          {
+            store_id: store.id,
+            zone_id: zoneId,
+            price: Number(price),
+            price_delivery: Number(priceDelivery),
+          },
           token
         );
       }
@@ -118,7 +126,6 @@ export default function ZonePriceForm({
             {editing ? "Editar precio" : "Agregar precio"}
           </Text>
 
-          {/* Loading */}
           {loading ? (
             <View style={{ alignItems: "center", marginVertical: 20 }}>
               <ActivityIndicator size="large" color={Colors.gradientStart} />
@@ -149,40 +156,42 @@ export default function ZonePriceForm({
                 </>
               ) : (
                 <>
-                  {/* Dropdown */}
-                  <Text style={styles.label}>Zona</Text>
-                  <DropDownPicker
-                    open={open}
-                    value={zoneId}
-                    items={items}
-                    setOpen={setOpen}
-                    setValue={setZoneId}
-                    setItems={setItems}
-                    placeholder="Selecciona una zona..."
-                    style={styles.dropdown}
-                    dropDownContainerStyle={styles.dropdownContainer}
-                    placeholderStyle={styles.placeholder}
-                    textStyle={styles.dropdownText}
-                    listItemLabelStyle={styles.dropdownItem}
-                    selectedItemLabelStyle={styles.selectedItem}
-                    ArrowDownIconComponent={() => (
-                      <Ionicons
-                        name="chevron-down"
-                        size={20}
-                        color={Colors.normalText}
+                  {!editing && (
+                    <>
+                      <Text style={styles.label}>Zona</Text>
+                      <DropDownPicker
+                        open={open}
+                        value={zoneId}
+                        items={items}
+                        setOpen={setOpen}
+                        setValue={setZoneId}
+                        setItems={setItems}
+                        placeholder="Selecciona una zona..."
+                        style={styles.dropdown}
+                        dropDownContainerStyle={styles.dropdownContainer}
+                        placeholderStyle={styles.placeholder}
+                        textStyle={styles.dropdownText}
+                        listItemLabelStyle={styles.dropdownItem}
+                        selectedItemLabelStyle={styles.selectedItem}
+                        ArrowDownIconComponent={() => (
+                          <Ionicons
+                            name="chevron-down"
+                            size={20}
+                            color={Colors.normalText}
+                          />
+                        )}
+                        ArrowUpIconComponent={() => (
+                          <Ionicons
+                            name="chevron-up"
+                            size={20}
+                            color={Colors.normalText}
+                          />
+                        )}
                       />
-                    )}
-                    ArrowUpIconComponent={() => (
-                      <Ionicons
-                        name="chevron-up"
-                        size={20}
-                        color={Colors.normalText}
-                      />
-                    )}
-                  />
+                    </>
+                  )}
 
-                  {/* Precio */}
-                  <Text style={styles.label}>Precio</Text>
+                  <Text style={styles.label}>Precio base</Text>
                   <TextInput
                     value={price}
                     onChangeText={setPrice}
@@ -192,7 +201,16 @@ export default function ZonePriceForm({
                     placeholderTextColor={Colors.menuText}
                   />
 
-                  {/* Botones */}
+                  <Text style={styles.label}>Precio delivery</Text>
+                  <TextInput
+                    value={priceDelivery}
+                    onChangeText={setPriceDelivery}
+                    keyboardType="numeric"
+                    style={styles.input}
+                    placeholder="0.00"
+                    placeholderTextColor={Colors.menuText}
+                  />
+
                   <View style={styles.actions}>
                     <TouchableOpacity style={styles.cancel} onPress={onClose}>
                       <Text style={styles.cancelText}>Cancelar</Text>
@@ -282,7 +300,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#121212",
     borderRadius: 12,
     padding: 12,
-    marginBottom: 16,
+    marginBottom: 10,
     color: Colors.normalText,
     borderWidth: 1,
     borderColor: Colors.Border,

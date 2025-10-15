@@ -1,14 +1,18 @@
 import { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import ZonesScreen from "./management/ZonesScreen"; // 👈 tu componente de Zonas
 import StorePricesScreen from "./management/ZonesPriceScreen";
 import { useAuth } from "@/providers/AuthProvider";
 import StoresScreen from "./management/StoresScreen";
-
-
-
+import DeliveriesScreen from "./management/DeliveriesScreen";
 
 const managementOptions = [
   {
@@ -40,55 +44,64 @@ const managementOptions = [
 export default function ManagementScreen() {
   const [activeModule, setActiveModule] = useState<string | null>(null);
 
-  const {session} = useAuth();
+  const { session } = useAuth();
 
   const renderModule = () => {
-  switch (activeModule) {
-    case "zones":
-      return <ZonesScreen />;
-    case "prices":
-      return <StorePricesScreen token={session?.access_token} />;
-    // más adelante puedes agregar:
-    case "stores": return <StoresScreen />;
-    // case "deliveries": return <DeliveriesScreen />;
-    default:
-      return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.title}>Gestión del Coordinador</Text>
-          <Text style={styles.subtitle}>
-            Selecciona un módulo para administrar la información
-          </Text>
+    switch (activeModule) {
+      case "zones":
+        return <ZonesScreen />;
+      case "prices":
+        return <StorePricesScreen token={session?.access_token} />;
+      // más adelante puedes agregar:
+      case "stores":
+        return <StoresScreen />;
+      case "deliveries":
+        return <DeliveriesScreen />;
+      default:
+        return (
+          <ScrollView
+            style={styles.container}
+            contentContainerStyle={styles.scrollContent}
+          >
+            <Text style={styles.title}>Gestión del Coordinador</Text>
+            <Text style={styles.subtitle}>
+              Selecciona un módulo para administrar la información
+            </Text>
 
-          <View style={styles.cardsContainer}>
-            {managementOptions.map((option) => (
-              <TouchableOpacity
-                key={option.id}
-                style={styles.card}
-                activeOpacity={0.9}
-                onPress={() => setActiveModule(option.id)}
-              >
-                <Ionicons
-                  name={option.icon as any}
-                  size={32}
-                  color={Colors.activeMenuText}
-                />
-                <Text style={styles.cardTitle}>{option.label}</Text>
-                <Text style={styles.cardDescription}>{option.description}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-      );
-  }
-};
-
+            <View style={styles.cardsContainer}>
+              {managementOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.id}
+                  style={styles.card}
+                  activeOpacity={0.9}
+                  onPress={() => setActiveModule(option.id)}
+                >
+                  <Ionicons
+                    name={option.icon as any}
+                    size={32}
+                    color={Colors.activeMenuText}
+                  />
+                  <Text style={styles.cardTitle}>{option.label}</Text>
+                  <Text style={styles.cardDescription}>
+                    {option.description}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        );
+    }
+  };
 
   return (
     <View style={{ flex: 1 }}>
       {activeModule ? (
         <View style={{ flex: 1 }}>
           {/* Botón de volver */}
-          <TouchableOpacity style={styles.backButton} onPress={() => setActiveModule(null)}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setActiveModule(null)}
+          >
             <Ionicons name="arrow-back" size={22} color={Colors.normalText} />
             <Text style={styles.backText}>Volver</Text>
           </TouchableOpacity>
