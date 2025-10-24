@@ -39,6 +39,10 @@ export interface ServicePayload {
   prep_time?: number | null; // minutos solicitados
 }
 
+export interface ServicePayloadAdmin extends ServicePayload {
+  store_id: string;
+}
+
 export interface ServiceResponse {
   id: string;
   delivery_address: string;

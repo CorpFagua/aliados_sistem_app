@@ -11,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { LinearGradient } from "expo-linear-gradient";
 import ServiceFormModal from "../components/ServiceFormModalCoordinator";
-import StoreOrderCard from "../components/StoreOrderCard";
+import CoordinatorOrderCard from "../components/CoordiatorOrderCard";
 import OrderDetailModal from "../components/OrderDetailModal";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchServices } from "@/services/services";
@@ -92,7 +92,7 @@ export default function HomeScreen() {
       >
         {isMobile &&
           pedidos[activeTab].map((pedido) => (
-            <StoreOrderCard
+            <CoordinatorOrderCard
               key={pedido.id}
               pedido={pedido}
               onPress={() => setSelectedOrder(pedido)}
@@ -110,7 +110,7 @@ export default function HomeScreen() {
                 <Text style={styles.columnTitle}>{tab}</Text>
                 <View style={styles.columnInner}>
                   {pedidos[tab].map((pedido) => (
-                    <StoreOrderCard
+                    <CoordinatorOrderCard
                       key={pedido.id}
                       pedido={pedido}
                       onPress={() => setSelectedOrder(pedido)}

@@ -11,7 +11,7 @@ interface Props {
   showCreatedAt?: boolean;
 }
 
-export default function StoreOrderCard({ pedido, onPress, showCreatedAt = false }: Props) {
+export default function CoordinatorOrderCard({ pedido, onPress, showCreatedAt = false }: Props) {
   const statusColors: Record<string, string> = {
     disponible: Colors.gradientStart,
     asignado: Colors.iconActive,

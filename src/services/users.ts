@@ -51,6 +51,7 @@ export async function fetchUserById(id: string, token: string): Promise<User> {
 // ✅ Actualizar usuario
 export async function updateUser(id: string, payload: Partial<UserPayload>, token: string): Promise<User> {
   try {
+    console.log("Updating user with payload:", payload);
     const res = await api.patch<{ ok: boolean; data: UserResponse }>(
       `/users/${id}`,
       payload,

@@ -23,6 +23,16 @@ export default function DeliveryFormModal({ visible, onClose, onSave, initialDat
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
 
+  // 🔹 Función para limpiar el formulario
+  const resetForm = () => {
+    setName("");
+    setEmail("");
+    setPassword("");
+    setPhone("");
+    setAddress("");
+  };
+
+  // 🔹 Cargar datos iniciales o limpiar si no hay
   useEffect(() => {
     if (initialData) {
       setName(initialData.name || "");
@@ -31,17 +41,20 @@ export default function DeliveryFormModal({ visible, onClose, onSave, initialDat
       setAddress(initialData.address || "");
       setPassword("");
     } else {
-      setName("");
-      setEmail("");
-      setPhone("");
-      setAddress("");
-      setPassword("");
+      resetForm();
     }
-  }, [initialData]);
+  }, [initialData, visible]);
 
   const handleSubmit = () => {
     if (!name || (!initialData && (!email || !password))) return;
     onSave({ name, email, password, phone, address });
+    resetForm(); // 🔹 Limpiar después de guardar
+    onClose();   // 🔹 Cerrar modal después de guardar
+  };
+
+  const handleCancel = () => {
+    resetForm(); // 🔹 Limpiar campos al cancelar
+    onClose();   // 🔹 Cerrar modal
   };
 
   return (
@@ -98,7 +111,7 @@ export default function DeliveryFormModal({ visible, onClose, onSave, initialDat
           />
 
           <View style={styles.footer}>
-            <TouchableOpacity onPress={onClose} style={[styles.btn, styles.cancel]}>
+            <TouchableOpacity onPress={handleCancel} style={[styles.btn, styles.cancel]}>
               <Text style={styles.btnText}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleSubmit} style={[styles.btn, styles.save]}>
