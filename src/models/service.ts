@@ -14,16 +14,18 @@ export interface Service {
   createdAt: Date;
   status?: "disponible" | "asignado" | "en_ruta" | "entregado" | "cancelado";
   pickup?: string;
-  assignedDelivery?: string | null;
-  storeId?: string | null;
-  storeName?: string | null; // 👈 agregado
+
+  // --- Relaciones e IDs ---
+  assignedDelivery?: string | null;         // id del domiciliario
+  assignedDeliveryName?: string | null;     // nombre del domiciliario
+  storeId?: string | null;                  // id de la tienda
+  storeName?: string | null;                // nombre de la tienda
   branchId?: string | null;
-  zoneId?: string | null;
+  zoneId?: string | null;                   // id de la zona
+  zoneName?: string | null;                 // nombre de la zona
 }
 
-
-
-
+// --- Payloads para envío al backend ---
 export interface ServicePayload {
   delivery_address: string;
   client_phone: string;
@@ -35,7 +37,7 @@ export interface ServicePayload {
   store_id?: string | null;
   branch_id?: string | null;
   zone_id?: string | null;
-  expected_at?: Date | null; // timestamp (epoch millis) cuando mandamos
+  expected_at?: Date | null; // timestamp (epoch millis)
   prep_time?: number | null; // minutos solicitados
 }
 
@@ -43,6 +45,7 @@ export interface ServicePayloadAdmin extends ServicePayload {
   store_id: string;
 }
 
+// --- Respuesta del backend ---
 export interface ServiceResponse {
   id: string;
   delivery_address: string;
@@ -65,16 +68,24 @@ export interface ServiceResponse {
   trayecto_at?: string | null;
   finalized_at?: string | null;
 
-  // 👇 relación anidada opcional
   store?: {
+    id: string;
+    name: string;
+  } | null;
+
+  zone?: {
+    id: string;
+    name: string;
+  } | null;
+
+  profiles?: {
     id: string;
     name: string;
   } | null;
 }
 
 
-
-// --- Mappers (transformadores) ---
+// --- Mappers ---
 export function toService(dto: ServiceResponse): Service {
   const expectedDate = dto.expected_at ? new Date(dto.expected_at) : null;
   const createdDate = new Date(dto.created_at);
@@ -96,15 +107,17 @@ export function toService(dto: ServiceResponse): Service {
     status: dto.status as Service["status"],
     pickup: dto.pickup_address ?? undefined,
     assignedDelivery: dto.assigned_delivery ?? null,
+    assignedDeliveryName: dto.profiles?.name ?? null, // 👈 viene de la relación "profiles"
     storeId: dto.store_id ?? null,
-    storeName: dto.store?.name ?? null, // 👈 mapeo directo
+    storeName: dto.store?.name ?? null,
     branchId: dto.branch_id ?? null,
     zoneId: dto.zone_id ?? null,
+    zoneName: dto.zone?.name ?? null,
   };
 }
 
 
-
+// --- Mapper inverso ---
 export function toServicePayload(service: Service): ServicePayload {
   return {
     delivery_address: service.destination,
@@ -120,5 +133,3 @@ export function toServicePayload(service: Service): ServicePayload {
     zone_id: service.zoneId,
   };
 }
-
-

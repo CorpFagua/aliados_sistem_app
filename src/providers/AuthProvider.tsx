@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { signIn, signOut, signUp, getSession, onAuthStateChange } from "@/services/auth";
 import { fetchCurrentUser } from "@/services/profile";
 
-type UserRole = "coordinator" | "superadmin" | "delivery" | "store" | "client" | null;
+type UserRole = "coordinator" | "super_admin" | "delivery" | "store" | "client" | null;
 
 type AuthContextType = {
   loading: boolean;
@@ -41,8 +41,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       case "coordinator":
         router.replace("/(protected)/(coordinator)");
         break;
-      case "superadmin":
-        router.replace("/(protected)/superadmin");
+      case "super_admin":
+        router.replace("/(protected)/super_admin");
         break;
       case "delivery":
         router.replace("/(protected)/delivery");

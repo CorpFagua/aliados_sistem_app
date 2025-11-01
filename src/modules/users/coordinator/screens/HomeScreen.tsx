@@ -15,7 +15,7 @@ import CoordinatorOrderCard from "../components/CoordiatorOrderCard";
 import OrderDetailModal from "../components/OrderDetailModal";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchServices } from "@/services/services";
-import { Service } from "@/models/service"; 
+import { Service } from "@/models/service";
 
 const TABS = ["Disponibles", "Tomados", "En ruta"];
 
@@ -70,10 +70,18 @@ export default function HomeScreen() {
             {TABS.map((tab) => (
               <TouchableOpacity
                 key={tab}
-                style={[styles.tabButton, activeTab === tab && styles.activeTabButton]}
+                style={[
+                  styles.tabButton,
+                  activeTab === tab && styles.activeTabButton,
+                ]}
                 onPress={() => setActiveTab(tab)}
               >
-                <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === tab && styles.activeTabText,
+                  ]}
+                >
                   {tab}
                 </Text>
               </TouchableOpacity>
@@ -96,7 +104,6 @@ export default function HomeScreen() {
               key={pedido.id}
               pedido={pedido}
               onPress={() => setSelectedOrder(pedido)}
-              showCreatedAt
             />
           ))}
 
@@ -105,7 +112,10 @@ export default function HomeScreen() {
             {TABS.map((tab, idx) => (
               <View
                 key={tab}
-                style={[styles.column, idx < TABS.length - 1 && styles.columnSpacing]}
+                style={[
+                  styles.column,
+                  idx < TABS.length - 1 && styles.columnSpacing,
+                ]}
               >
                 <Text style={styles.columnTitle}>{tab}</Text>
                 <View style={styles.columnInner}>
@@ -114,7 +124,6 @@ export default function HomeScreen() {
                       key={pedido.id}
                       pedido={pedido}
                       onPress={() => setSelectedOrder(pedido)}
-                      showCreatedAt
                     />
                   ))}
                 </View>
@@ -129,6 +138,18 @@ export default function HomeScreen() {
         visible={!!selectedOrder}
         pedido={selectedOrder}
         onClose={() => setSelectedOrder(null)}
+        onRefresh={() => {
+          if (session) {
+            fetchServices(session.access_token).then((data) => {
+              const grouped = {
+                Disponibles: data.filter((s) => s.status === "disponible"),
+                Tomados: data.filter((s) => s.status === "asignado"),
+                "En ruta": data.filter((s) => s.status === "en_ruta"),
+              };
+              setPedidos(grouped);
+            });
+          }
+        }}
       />
 
       {/* Botón FAB */}

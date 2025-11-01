@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
-import { createService } from "@/services/services";
+import { createService, updateServiceData } from "@/services/services";
 import { fetchStores } from "@/services/stores";
 import { Service, toServicePayload } from "@/models/service";
 import { useAuth } from "@/providers/AuthProvider";
@@ -24,12 +24,14 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onSuccess?: (data: any) => void;
+  editing?: Service | null; // ✅ soporte modo edición
 }
 
 export default function ServiceFormModal({
   visible,
   onClose,
   onSuccess,
+  editing = null,
 }: Props) {
   const [destination, setDestination] = useState("");
   const [phone, setPhone] = useState("");
@@ -38,20 +40,26 @@ export default function ServiceFormModal({
   const [amount, setAmount] = useState("");
   const [prepTime, setPrepTime] = useState("");
   const [storeQuery, setStoreQuery] = useState("");
-  const [selectedStore, setSelectedStore] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-  const [storeResults, setStoreResults] = useState<
-    { id: string; name: string }[]
-  >([]);
+  const [selectedStore, setSelectedStore] = useState<{ id: string; name: string } | null>(null);
+  const [storeResults, setStoreResults] = useState<{ id: string; name: string }[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
 
   const { session, role } = useAuth();
 
+  // ✅ precarga datos si editing tiene un servicio
   useEffect(() => {
-    if (!visible) {
-      // Reset on close
+    if (visible && editing) {
+      setDestination(editing.destination || "");
+      setPhone(editing.phone || "");
+      setNotes(editing.notes || "");
+      setPayment(editing.payment || "efectivo");
+      setAmount(editing.amount?.toString() || "");
+      setPrepTime(editing.prepTime?.toString() || "");
+      if (editing.storeId && editing.storeName) {
+        setSelectedStore({ id: editing.storeId, name: editing.storeName });
+      }
+    } else if (!visible) {
+      // Reset al cerrar
       setDestination("");
       setPhone("");
       setNotes("");
@@ -61,7 +69,7 @@ export default function ServiceFormModal({
       setStoreQuery("");
       setSelectedStore(null);
     }
-  }, [visible]);
+  }, [visible, editing]);
 
   const handleSearchStores = async (query: string) => {
     setStoreQuery(query);
@@ -87,56 +95,66 @@ export default function ServiceFormModal({
   const handleSubmit = async () => {
     if (!session) return alert("Debes estar autenticado");
 
-    const createdAt = new Date();
-    const newService: Service = {
-      id: "",
+    const payloadBase = {
       destination,
       phone,
       notes,
       payment,
       amount: Number(amount),
-      createdAt,
-      prepTime: Number(prepTime),
-      storeId: selectedStore?.id ?? undefined,
+      prep_time: Number(prepTime),
+      store_id: selectedStore?.id,
     };
 
-    // Si el usuario es coordinador → usa ServicePayloadAdmin
-    const payload =
-      role === "coordinator" ||  role === "superadmin"
-        ? ({
-            ...toServicePayload(newService),
-            store_id: selectedStore?.id,
-          } as ServicePayloadAdmin)
-        : toServicePayload(newService);
-
     try {
-      const data = await createService(payload, session.access_token);
-      console.log("✅ Servicio creado:", payload);
-      if (onSuccess) onSuccess(data);
+      if (editing) {
+        // ✅ modo edición
+        const updated = await updateServiceData(editing.id, payloadBase, session.access_token);
+        console.log("✅ Servicio actualizado:", updated);
+        onSuccess?.(updated);
+      } else {
+        // ✅ modo creación
+        const createdAt = new Date();
+        const newService: Service = {
+          id: "",
+          destination,
+          phone,
+          notes,
+          payment,
+          amount: Number(amount),
+          createdAt,
+          prepTime: Number(prepTime),
+          storeId: selectedStore?.id ?? undefined,
+        };
+
+        const payload =
+          role === "coordinator" || role === "super_admin"
+            ? ({
+                ...toServicePayload(newService),
+                store_id: selectedStore?.id,
+              } as ServicePayloadAdmin)
+            : toServicePayload(newService);
+
+        const data = await createService(payload, session.access_token);
+        console.log("✅ Servicio creado:", payload);
+        onSuccess?.(data);
+      }
+
       onClose();
     } catch (err) {
-      alert("❌ Error creando el servicio");
+      alert(`❌ Error ${editing ? "actualizando" : "creando"} el servicio`);
       console.error(err);
     }
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View
-          style={[styles.cardWrapper, isLargeScreen && styles.cardWrapperLarge]}
-        >
+        <View style={[styles.cardWrapper, isLargeScreen && styles.cardWrapperLarge]}>
           <View style={styles.card}>
-            <Text style={styles.title}>Crear Servicio</Text>
+            <Text style={styles.title}>{editing ? "Editar Servicio" : "Crear Servicio"}</Text>
             <Text style={styles.subtitle}>Aliados Express</Text>
 
-            {/* Campo de búsqueda de tienda (solo coordinador / admin) */}
-            {(role === "coordinator" || role === "superadmin") && (
+            {(role === "coordinator" || role === "super_admin") && (
               <>
                 <Text style={styles.label}>Seleccionar tienda</Text>
                 <View style={styles.inputIcon}>
@@ -158,11 +176,7 @@ export default function ServiceFormModal({
                   />
                   {selectedStore && (
                     <TouchableOpacity onPress={() => setSelectedStore(null)}>
-                      <Ionicons
-                        name="close-circle"
-                        size={18}
-                        color={Colors.menuText}
-                      />
+                      <Ionicons name="close-circle" size={18} color={Colors.menuText} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -272,7 +286,9 @@ export default function ServiceFormModal({
             />
 
             <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-              <Text style={styles.buttonText}>Crear servicio</Text>
+              <Text style={styles.buttonText}>
+                {editing ? "Actualizar servicio" : "Crear servicio"}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.cancelButton} onPress={onClose}>

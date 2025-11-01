@@ -1,6 +1,6 @@
 // src/services/services.ts
 import { api, authHeaders } from "../lib/api";
-import { Service, ServicePayload, ServiceResponse, toService } from "@/models/service";
+import { Service, ServicePayload, ServiceResponse, toService ,toServicePayload} from "@/models/service";
 
 // Crear un servicio (envía DTO y devuelve modelo del front)
 export async function createService(
@@ -81,6 +81,38 @@ export async function assignZoneToService(
     return toService(res.data.data); // ✅ usar el `data` interno
   } catch (err: any) {
     console.error("❌ Error asignando zona al servicio:", err.response?.data || err.message);
+    throw err;
+  }
+}
+
+// --- Editar datos básicos de un servicio ---
+export async function updateServiceData(
+  serviceId: string,
+  service: Partial<Service>, // el objeto editable del front
+  token: string
+): Promise<Service> {
+  try {
+    // 🧩 Convertir de Service → ServicePayload
+    const payload = toServicePayload(service as Service);
+
+    // 🧹 Quitar undefined (solo dejar campos modificados)
+    const cleanedPayload = Object.fromEntries(
+      Object.entries(payload).filter(([_, v]) => v !== undefined)
+    );
+
+    const res = await api.patch<{ ok: boolean; data: ServiceResponse }>(
+      `/services/${serviceId}`,
+      cleanedPayload,
+      {
+        headers: authHeaders(token),
+      }
+    );
+
+    if (!res.data.ok) throw res.data;
+
+    return toService(res.data.data);
+  } catch (err: any) {
+    console.error("❌ Error actualizando servicio:", err.response?.data || err.message);
     throw err;
   }
 }

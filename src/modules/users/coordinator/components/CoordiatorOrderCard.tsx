@@ -1,91 +1,84 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Colors } from "@/constans/colors";
-import { Service } from "@/models/service"; // 👈 importa tu modelo tipado
+import { Service } from "@/models/service";
 
 interface Props {
   pedido: Service;
   onPress: () => void;
-  showCreatedAt?: boolean;
 }
 
-export default function CoordinatorOrderCard({ pedido, onPress, showCreatedAt = false }: Props) {
-  const statusColors: Record<string, string> = {
-    disponible: Colors.gradientStart,
-    asignado: Colors.iconActive,
-    en_ruta: Colors.activeMenuText,
-    entregado: "#4CAF50",
-    cancelado: "#FF3B30",
+export default function CoordinatorOrderCard({ pedido, onPress }: Props) {
+  // 🕒 Calcular minutos desde creación
+  const elapsedMinutes = useMemo(() => {
+    const diffMs = Date.now() - new Date(pedido.createdAt).getTime();
+    return Math.floor(diffMs / 60000);
+  }, [pedido.createdAt]);
+
+  // 🚦 Semáforo visual
+  const getTimeColor = () => {
+    if (elapsedMinutes < 10) return "#4CAF50"; // verde
+    if (elapsedMinutes < 20) return "#FFC107"; // amarillo
+    return "#F44336"; // rojo
   };
 
   return (
-    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={{ marginBottom: 16 }}>
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={{ marginBottom: 14 }}>
       <View style={styles.card}>
-        {/* ✨ Overlay con brillos */}
+        {/* ✨ Brillo sutil */}
         <LinearGradient
-          colors={["rgba(0,0,0,0.25)", "transparent", "rgba(255,255,255,0.08)"]}
+          colors={["rgba(255,255,255,0.05)", "transparent", "rgba(0,0,0,0.15)"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.highlightOverlay}
+          style={StyleSheet.absoluteFillObject}
         />
 
-        {/* Contenido */}
-        <View>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Servicio #{pedido.id}</Text>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: (statusColors[pedido.status] || Colors.menuText) + "20" },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusText,
-                  { color: statusColors[pedido.status] || Colors.normalText },
-                ]}
-              >
-                {pedido.status}
-              </Text>
-            </View>
-          </View>
+        {/* Header con tienda y tiempo */}
+        <View style={styles.headerRow}>
+          <Text style={styles.storeName}>{pedido.storeName || "Tienda desconocida"}</Text>
 
-          <View style={styles.cardBody}>
-            <Text style={styles.infoText} numberOfLines={2}>
-              <Ionicons name="location-outline" size={14} color={Colors.menuText} />{" "}
-              {pedido.destination || "Sin dirección"}
+          <View style={[styles.timeBadge, { backgroundColor: getTimeColor() + "22" }]}>
+            <Ionicons name="time-outline" size={14} color={getTimeColor()} />
+            <Text style={[styles.timeText, { color: getTimeColor() }]}>
+              {elapsedMinutes} min
             </Text>
-
-            {pedido.phone && (
-              <Text style={styles.infoText}>
-                <Ionicons name="call-outline" size={14} color={Colors.menuText} /> {pedido.phone}
-              </Text>
-            )}
-
-            <Text style={styles.priceText}>
-              <Ionicons name="cash-outline" size={14} color={Colors.menuText} /> $
-              {pedido.amount && pedido.amount > 0
-                ? pedido.amount.toLocaleString()
-                : "sin monto"}
-            </Text>
-
-            {pedido.zoneId && (
-              <View style={styles.zoneBadge}>
-                <Ionicons name="map-outline" size={12} color={Colors.menuText} />
-                <Text style={styles.zoneText}>{pedido.zoneId}</Text>
-              </View>
-            )}
-
-            {showCreatedAt && (
-              <Text style={styles.createdAt}>
-                <Ionicons name="time-outline" size={12} color={Colors.menuText} />{" "}
-                {pedido.createdAt.toLocaleString()}
-              </Text>
-            )}
           </View>
         </View>
+
+        {/* Dirección */}
+        <Text style={styles.destinationText} numberOfLines={2}>
+          <Ionicons name="location-outline" size={14} color={Colors.menuText} />{" "}
+          {pedido.destination || "Sin dirección"}
+        </Text>
+
+        {/* Info de zona y domiciliario */}
+        <View style={styles.infoRow}>
+          <View style={styles.infoBadge}>
+            <Ionicons name="map-outline" size={13} color={Colors.menuText} />
+            <Text style={styles.infoText}>
+              {pedido.zoneName ? pedido.zoneName : "Sin zona"}
+            </Text>
+          </View>
+
+          <View style={styles.infoBadge}>
+            <Ionicons name="person-outline" size={13} color={Colors.menuText} />
+            <Text style={styles.infoText}>
+              {pedido.assignedDeliveryName
+                ? pedido.assignedDeliveryName
+                : "Sin domiciliario"}
+            </Text>
+          </View>
+        </View>
+
+        {/* Monto */}
+        {pedido.amount > 0 && (
+          <Text style={styles.amountText}>
+            <Ionicons name="cash-outline" size={14} color={Colors.gradientStart} /> $
+            {pedido.amount.toLocaleString()}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -95,74 +88,60 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.activeMenuBackground,
     borderRadius: 16,
-    padding: 16,
-    overflow: "hidden",
-    position: "relative",
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
     shadowColor: "#000",
-    shadowOffset: { width: -4, height: 6 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.4,
     shadowRadius: 8,
-    elevation: 6,
-    borderRightWidth: 1,
-    borderTopWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
+    elevation: 4,
   },
-  highlightOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 16,
-  },
-  cardHeader: {
+  headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 6,
   },
-  cardTitle: {
+  storeName: {
     fontSize: 15,
     fontWeight: "700",
     color: Colors.normalText,
   },
-  cardBody: {
-    gap: 6,
+  timeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    gap: 4,
   },
-  infoText: {
+  timeText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  destinationText: {
     fontSize: 14,
     color: Colors.normalText,
+    marginBottom: 6,
   },
-  priceText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: Colors.gradientStart,
-    marginTop: 4,
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 4,
   },
-  createdAt: {
-    fontSize: 12,
-    color: Colors.menuText,
-    marginTop: 6,
-  },
-  zoneBadge: {
+  infoBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    alignSelf: "flex-start",
-    backgroundColor: Colors.Border,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginTop: 6,
   },
-  zoneText: {
-    fontSize: 12,
+  infoText: {
+    fontSize: 13,
     color: Colors.menuText,
   },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 13,
+  amountText: {
+    fontSize: 14,
     fontWeight: "600",
-    textTransform: "capitalize",
+    color: Colors.gradientStart,
+    marginTop: 4,
   },
 });
