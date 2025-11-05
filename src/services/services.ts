@@ -1,4 +1,5 @@
 // src/services/services.ts
+import { clearChatMessages } from "@/lib/chatStorage";
 import { api, authHeaders } from "../lib/api";
 import { Service, ServicePayload, ServiceResponse, toService ,toServicePayload} from "@/models/service";
 
@@ -53,7 +54,9 @@ export async function updateServiceStatus(
     );
 
     if (!res.data.ok) throw res.data;
-
+    if (res.data.ok && status === "entregado") {
+      clearChatMessages(serviceId);
+    }
     return toService(res.data.data); // ✅ usar el `data` interno
   } catch (err: any) {
     console.error("❌ Error updating service status:", err.response?.data || err.message);

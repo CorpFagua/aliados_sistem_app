@@ -3,6 +3,7 @@ import { Session } from "@supabase/supabase-js";
 import { router } from "expo-router";
 import { signIn, signOut, signUp, getSession, onAuthStateChange } from "@/services/auth";
 import { fetchCurrentUser } from "@/services/profile";
+import { User } from "@/models/user";
 
 type UserRole = "coordinator" | "super_admin" | "delivery" | "store" | "client" | null;
 
@@ -10,7 +11,7 @@ type AuthContextType = {
   loading: boolean;
   session: Session | null;
   role: UserRole;
-  profile: any | null;
+  profile: User | null;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;

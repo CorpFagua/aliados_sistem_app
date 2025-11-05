@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Modal,
   View,
@@ -9,9 +9,13 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
-
+import ChatModal from "@/components/ChatModal";
+import { useAuth } from "@/providers/AuthProvider";''
 export default function OrderDetailModal({ visible, onClose, pedido }) {
   if (!pedido) return null;
+
+  const [chatVisible, setChatVisible] = useState(false);
+  const { session, profile } = useAuth();
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -33,7 +37,10 @@ export default function OrderDetailModal({ visible, onClose, pedido }) {
           </View>
 
           {/* Body */}
-          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.modalBody}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.infoRow}>
               <Ionicons name="map-outline" size={18} color={Colors.menuText} />
               <Text style={styles.infoText}>
@@ -43,7 +50,11 @@ export default function OrderDetailModal({ visible, onClose, pedido }) {
             </View>
 
             <View style={styles.infoRow}>
-              <Ionicons name="location-outline" size={18} color={Colors.menuText} />
+              <Ionicons
+                name="location-outline"
+                size={18}
+                color={Colors.menuText}
+              />
               <Text style={styles.infoText}>
                 <Text style={styles.label}>Destino: </Text>
                 {pedido.destination}
@@ -60,7 +71,11 @@ export default function OrderDetailModal({ visible, onClose, pedido }) {
 
             {pedido.pickup && (
               <View style={styles.infoRow}>
-                <Ionicons name="business-outline" size={18} color={Colors.menuText} />
+                <Ionicons
+                  name="business-outline"
+                  size={18}
+                  color={Colors.menuText}
+                />
                 <Text style={styles.infoText}>
                   <Text style={styles.label}>Dirección recogida: </Text>
                   {pedido.pickup}
@@ -70,7 +85,11 @@ export default function OrderDetailModal({ visible, onClose, pedido }) {
 
             {pedido.notes ? (
               <View style={styles.notesBox}>
-                <Ionicons name="document-text-outline" size={18} color={Colors.gradientEnd} />
+                <Ionicons
+                  name="document-text-outline"
+                  size={18}
+                  color={Colors.gradientEnd}
+                />
                 <Text style={styles.notesText}>{pedido.notes}</Text>
               </View>
             ) : (
@@ -81,10 +100,25 @@ export default function OrderDetailModal({ visible, onClose, pedido }) {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.price}>$ {pedido.price}</Text>
-            <TouchableOpacity style={styles.actionBtn}>
-              <Ionicons name="chatbubble-ellipses-outline" size={18} color="#000" />
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => setChatVisible(true)}
+            >
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={18}
+                color="#000"
+              />
               <Text style={styles.actionText}>Chatear</Text>
             </TouchableOpacity>
+
+            <ChatModal
+              visible={chatVisible}
+              onClose={() => setChatVisible(false)}
+              serviceId={pedido.id}
+              token={session.access_token}
+              userId={profile.id}
+            />
           </View>
         </View>
       </View>

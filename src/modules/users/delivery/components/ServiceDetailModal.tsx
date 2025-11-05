@@ -1,5 +1,5 @@
 // src/modules/users/delivery/components/OrderDetailModal.tsx
-import React from "react";
+import React, { useState } from "react";
 import {
   Modal,
   View,
@@ -11,14 +11,20 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { Service } from "@/models/service";
+import { useAuth } from "@/providers/AuthProvider";
+import ChatModal from "@/components/ChatModal";
 
 // ⏱ función para calcular tiempos
 function calcularEstadoTiempo(createdAt: Date, prepTime: number) {
   const now = new Date();
   const esperado = new Date(createdAt.getTime() + prepTime * 60000);
 
-  const minutosTranscurridos = Math.floor((now.getTime() - createdAt.getTime()) / 60000);
-  const minutosRestantes = Math.floor((esperado.getTime() - now.getTime()) / 60000);
+  const minutosTranscurridos = Math.floor(
+    (now.getTime() - createdAt.getTime()) / 60000
+  );
+  const minutosRestantes = Math.floor(
+    (esperado.getTime() - now.getTime()) / 60000
+  );
 
   let estado: "ok" | "critico" | "vencido" = "ok";
   if (minutosRestantes <= 0) estado = "vencido";
@@ -34,19 +40,25 @@ interface Props {
   onTransfer?: () => void;
 }
 
-export default function OrderDetailModal({ visible, onClose, pedido, onTransfer }: Props) {
+export default function OrderDetailModal({
+  visible,
+  onClose,
+  pedido,
+  onTransfer,
+}: Props) {
   if (!pedido) return null;
 
-  const { minutosTranscurridos, minutosRestantes, estado } = calcularEstadoTiempo(
-    pedido.createdAt,
-    pedido.prepTime
-  );
+  const { minutosTranscurridos, minutosRestantes, estado } =
+    calcularEstadoTiempo(pedido.createdAt, pedido.prepTime);
 
   const tiempoColors = {
     ok: "#4CAF50",
     critico: "#FFC107",
     vencido: "#FF3B30",
   };
+
+  const { session, profile } = useAuth();
+  const [chatVisible, setChatVisible] = useState(false);
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -60,7 +72,9 @@ export default function OrderDetailModal({ visible, onClose, pedido, onTransfer 
                 size={22}
                 color={Colors.gradientStart}
               />
-              <Text style={styles.modalTitle}>{pedido.storeName || "Sin tienda"}</Text>
+              <Text style={styles.modalTitle}>
+                {pedido.storeName || "Sin tienda"}
+              </Text>
             </View>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={Colors.normalText} />
@@ -68,7 +82,10 @@ export default function OrderDetailModal({ visible, onClose, pedido, onTransfer 
           </View>
 
           {/* Body */}
-          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.modalBody}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.infoRow}>
               <Ionicons name="map-outline" size={18} color={Colors.menuText} />
               <Text style={styles.infoText}>
@@ -78,7 +95,11 @@ export default function OrderDetailModal({ visible, onClose, pedido, onTransfer 
             </View>
 
             <View style={styles.infoRow}>
-              <Ionicons name="location-outline" size={18} color={Colors.menuText} />
+              <Ionicons
+                name="location-outline"
+                size={18}
+                color={Colors.menuText}
+              />
               <Text style={styles.infoText}>
                 <Text style={styles.label}>Destino: </Text>
                 {pedido.destination}
@@ -95,7 +116,11 @@ export default function OrderDetailModal({ visible, onClose, pedido, onTransfer 
 
             {pedido.pickup && (
               <View style={styles.infoRow}>
-                <Ionicons name="business-outline" size={18} color={Colors.menuText} />
+                <Ionicons
+                  name="business-outline"
+                  size={18}
+                  color={Colors.menuText}
+                />
                 <Text style={styles.infoText}>
                   <Text style={styles.label}>Dirección recogida: </Text>
                   {pedido.pickup}
@@ -146,13 +171,32 @@ export default function OrderDetailModal({ visible, onClose, pedido, onTransfer 
             </Text>
 
             <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.actionBtn}>
-                <Ionicons name="chatbubble-ellipses-outline" size={18} color="#000" />
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => setChatVisible(true)}
+              >
+                <Ionicons
+                  name="chatbubble-ellipses-outline"
+                  size={18}
+                  color="#000"
+                />
                 <Text style={styles.actionText}>Chatear</Text>
               </TouchableOpacity>
 
+              <ChatModal
+                visible={chatVisible}
+                onClose={() => setChatVisible(false)}
+                serviceId={pedido.id}
+                token={session.access_token}
+                userId={profile.id}
+              />
+
               <TouchableOpacity style={styles.transferBtn} onPress={onTransfer}>
-                <Ionicons name="swap-horizontal-outline" size={18} color="#fff" />
+                <Ionicons
+                  name="swap-horizontal-outline"
+                  size={18}
+                  color="#fff"
+                />
                 <Text style={styles.transferText}>Transferir a</Text>
               </TouchableOpacity>
             </View>

@@ -15,6 +15,7 @@ import AssignDeliveryModal from "./AssignDeliveryModal";
 import AssignZoneModal from "./AssignZoneModal";
 import ServiceFormModal from "./ServiceFormModalCoordinator"; // 🟢 Import agregado
 import { Service } from "@/models/service";
+import ChatModal from "@/components/ChatModal";
 
 interface Props {
   visible: boolean;
@@ -23,11 +24,17 @@ interface Props {
   onRefresh?: () => void;
 }
 
-export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }: Props) {
+export default function OrderDetailModal({
+  visible,
+  onClose,
+  pedido,
+  onRefresh,
+}: Props) {
   const { session } = useAuth();
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showZoneModal, setShowZoneModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false); // 🟢 Modal de edición
+  const [showChatModal, setShowChatModal] = useState(false); // 🟢 Modal de chat
 
   if (!pedido) return null;
 
@@ -135,7 +142,11 @@ export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }
 
             {/* 🟢 Botón Editar */}
             <TouchableOpacity onPress={() => setShowEditModal(true)}>
-              <Ionicons name="create-outline" size={22} color={Colors.gradientStart} />
+              <Ionicons
+                name="create-outline"
+                size={22}
+                color={Colors.gradientStart}
+              />
             </TouchableOpacity>
 
             <TouchableOpacity onPress={onClose}>
@@ -144,9 +155,16 @@ export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }
           </View>
 
           {/* BODY */}
-          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.modalBody}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.infoRow}>
-              <Ionicons name="alert-circle-outline" size={18} color={Colors.menuText} />
+              <Ionicons
+                name="alert-circle-outline"
+                size={18}
+                color={Colors.menuText}
+              />
               <Text style={styles.infoText}>
                 <Text style={styles.label}>Estado: </Text>
                 {pedido.status?.toUpperCase()}
@@ -154,7 +172,11 @@ export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }
             </View>
 
             <View style={styles.infoRow}>
-              <Ionicons name="location-outline" size={18} color={Colors.menuText} />
+              <Ionicons
+                name="location-outline"
+                size={18}
+                color={Colors.menuText}
+              />
               <Text style={styles.infoText}>
                 <Text style={styles.label}>Entrega: </Text>
                 {pedido.destination || "Sin dirección"}
@@ -162,7 +184,11 @@ export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }
             </View>
 
             <View style={styles.infoRow}>
-              <Ionicons name="bicycle-outline" size={18} color={Colors.menuText} />
+              <Ionicons
+                name="bicycle-outline"
+                size={18}
+                color={Colors.menuText}
+              />
               <Text style={styles.infoText}>
                 <Text style={styles.label}>Domiciliario: </Text>
                 {pedido.assignedDeliveryName || "Sin asignar"}
@@ -198,7 +224,11 @@ export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }
                 <View style={styles.separator} />
                 <Text style={styles.sectionTitle}>Notas</Text>
                 <View style={styles.notesBox}>
-                  <Ionicons name="document-text-outline" size={18} color={Colors.menuText} />
+                  <Ionicons
+                    name="document-text-outline"
+                    size={18}
+                    color={Colors.menuText}
+                  />
                   <Text style={styles.notesText}>{pedido.notes}</Text>
                 </View>
               </>
@@ -211,12 +241,26 @@ export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }
             <View style={styles.actionRow}>
               {renderActionButton()}
 
+
+              {/* 🟢 BOTÓN CHAT */}
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#FFD54F" }]}
+                onPress={() => setShowChatModal(true)}
+              >
+                <Ionicons name="chatbubbles-outline" size={18} color="#000" />
+                <Text style={styles.actionText}>Ver chat</Text>
+              </TouchableOpacity>
+
               {pedido.status === "disponible" && (
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: "#ff4444" }]}
                   onPress={handleReject}
                 >
-                  <Ionicons name="close-circle-outline" size={18} color="#000" />
+                  <Ionicons
+                    name="close-circle-outline"
+                    size={18}
+                    color="#000"
+                  />
                   <Text style={styles.actionText}>Cancelar</Text>
                 </TouchableOpacity>
               )}
@@ -256,6 +300,14 @@ export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }
               onRefresh?.();
             }}
           />
+
+          <ChatModal
+            visible={showChatModal}
+            serviceId={pedido.id}
+            token={session.access_token}
+            userId={session.user.id}
+            onClose={() => setShowChatModal(false)}
+          />
         </View>
       </View>
     </Modal>
@@ -287,10 +339,20 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
   modalTitle: { fontSize: 18, fontWeight: "700", color: Colors.normalText },
   modalBody: { marginBottom: 16 },
-  infoRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
   infoText: { color: Colors.normalText, fontSize: 14, flexShrink: 1 },
   label: { fontWeight: "600", color: Colors.menuText },
-  sectionTitle: { fontSize: 15, fontWeight: "700", color: Colors.normalText, marginBottom: 8 },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: Colors.normalText,
+    marginBottom: 8,
+  },
   separator: { height: 1, backgroundColor: Colors.Border, marginVertical: 10 },
   notesBox: {
     flexDirection: "row",
