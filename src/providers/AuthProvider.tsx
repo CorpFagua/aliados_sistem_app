@@ -3,9 +3,9 @@ import { Session } from "@supabase/supabase-js";
 import { router } from "expo-router";
 import { signIn, signOut, signUp, getSession, onAuthStateChange } from "@/services/auth";
 import { fetchCurrentUser } from "@/services/profile";
-import { User } from "@/models/user";
+import { User ,Role} from "@/models/user";
 
-type UserRole = "coordinator" | "super_admin" | "delivery" | "store" | "client" | null;
+type UserRole = Role
 
 type AuthContextType = {
   loading: boolean;
@@ -113,6 +113,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           const active = profileData.isActive ?? false;
           setRole(userRole);
           setIsActive(active);
+          console.log("Auth state changed. User role:", userRole, "Active:", active);
 
           if (!active) {
             await logout();

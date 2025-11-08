@@ -1,5 +1,5 @@
 // --- Modelo interno del front ---
-export type Role = "super_admin" | "coordinator" | "store" | "delivery" | "user";
+export type Role = "super_admin" | "coordinator" | "store" | "delivery" | "user"| "client";
 export interface User {
   id: string;
   name: string;
