@@ -3,15 +3,14 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native
 import { Stack } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { useColorScheme, Platform, KeyboardAvoidingView } from "react-native"
-import AuthProvider, { useAuth } from "@/providers/AuthProvider"
+import AuthProvider from "@/providers/AuthProvider"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import Toast from "react-native-toast-message"
-import { useNotifications } from "@/hooks/useNotifications"
+
 
 function AppContent() {
   const colorScheme = useColorScheme();
-  const { session } = useAuth(); // ✅ Ahora sí está dentro del Provider
-  useNotifications(session?.access_token, !!session?.access_token);
+
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

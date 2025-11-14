@@ -1,11 +1,21 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import { Session } from "@supabase/supabase-js";
 import { router } from "expo-router";
-import { signIn, signOut, signUp, getSession, onAuthStateChange } from "@/services/auth";
-import { fetchCurrentUser } from "@/services/profile";
-import { User ,Role} from "@/models/user";
 
-type UserRole = Role
+import {
+  signIn,
+  signOut,
+  signUp,
+  getSession,
+  onAuthStateChange,
+} from "@/services/auth";
+
+import { fetchCurrentUser } from "@/services/profile";
+import { usePushRegistration } from "@/hooks/usePushNotifications";
+
+import { User, Role } from "@/models/user";
+
+type UserRole = Role;
 
 type AuthContextType = {
   loading: boolean;
@@ -34,9 +44,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<UserRole>(null);
   const [isActive, setIsActive] = useState(false);
-  const [profile, setProfile] = useState<any | null>(null);
+  const [profile, setProfile] = useState<User | null>(null);
 
-  // ✅ Redirección centralizada según rol
+  /**
+   * 🔀 Redirige según el rol del usuario
+   */
   const redirectByRole = (role: UserRole) => {
     switch (role) {
       case "coordinator":
@@ -60,26 +72,34 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     }
   };
 
-  // 🚀 Inicializar sesión y cargar perfil completo
+  /**
+   * 🚀 Carga inicial:
+   *  - Obtiene sesión si existe
+   *  - Carga perfil del backend
+   *  - Redirige
+   */
   useEffect(() => {
     const initSession = async () => {
       try {
         const { data } = await getSession();
         const currentSession = data.session ?? null;
+
         setSession(currentSession);
 
+        // Si hay usuario cargamos perfil
         if (currentSession?.user) {
           const token = currentSession.access_token;
 
-          // Obtener perfil completo desde backend
           const profileData = await fetchCurrentUser(token);
           setProfile(profileData);
 
           const userRole = profileData.role ?? null;
           const active = profileData.isActive ?? false;
+
           setRole(userRole);
           setIsActive(active);
 
+          // ❌ Si el usuario está inactivo → forzar logout
           if (!active) {
             await logout();
             router.replace("/(auth)/login");
@@ -90,6 +110,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         } else {
           router.replace("/(auth)/login");
         }
+
       } catch (error: any) {
         console.error("Error cargando sesión:", error.message);
         router.replace("/(auth)/login");
@@ -100,32 +121,35 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
     initSession();
 
-    // 🔄 Listener de cambios de sesión (login/logout)
+    /**
+     * 🔄 Listener:
+     *  - Detecta login/logout automáticamente
+     *  - Actualiza perfil y estado
+     */
     const { data: subscription } = onAuthStateChange(async (newSession) => {
       setSession(newSession);
+
       if (newSession?.user) {
         try {
           const token = newSession.access_token;
           const profileData = await fetchCurrentUser(token);
+
           setProfile(profileData);
+          setRole(profileData.role);
+          setIsActive(profileData.isActive);
 
-          const userRole = profileData.role ?? null;
-          const active = profileData.isActive ?? false;
-          setRole(userRole);
-          setIsActive(active);
-          console.log("Auth state changed. User role:", userRole, "Active:", active);
-
-          if (!active) {
+          if (!profileData.isActive) {
             await logout();
             router.replace("/(auth)/login");
             return;
           }
 
-          redirectByRole(userRole);
+          redirectByRole(profileData.role);
         } catch (err: any) {
           console.error("Error actualizando sesión:", err.message);
           router.replace("/(auth)/login");
         }
+
       } else {
         setRole(null);
         setProfile(null);
@@ -134,12 +158,19 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       }
     });
 
-    return () => {
-      subscription?.subscription?.unsubscribe();
-    };
+    return () => subscription?.subscription?.unsubscribe();
+
   }, []);
 
-  // 🧩 Login
+  /**
+   * 🔔 Registrar notificaciones push
+   *    → Se ejecuta SOLO cuando `session.user` cambia
+   */
+  usePushRegistration(session);
+
+  /**
+   * 🧩 Login
+   */
   const login = async (email: string, password: string) => {
     try {
       const { error, data } = await signIn(email, password);
@@ -147,6 +178,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
       if (data?.session?.access_token) {
         const profileData = await fetchCurrentUser(data.session.access_token);
+
         setProfile(profileData);
         setRole(profileData.role ?? null);
         setIsActive(profileData.isActive ?? false);
@@ -164,25 +196,40 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     }
   };
 
-  // 🧩 Registro
+  /**
+   * 🧩 Registro
+   */
   const register = async (email: string, password: string) => {
     const { error } = await signUp(email, password);
     if (error) throw error;
   };
 
-  // 🧩 Logout
+  /**
+   * 🧩 Logout
+   */
   const logout = async () => {
     const { error } = await signOut();
     if (error) throw error;
+
     setProfile(null);
     setRole(null);
     setIsActive(false);
+
     router.replace("/(auth)/login");
   };
 
   return (
     <AuthContext.Provider
-      value={{ loading, session, role, profile, login, register, logout, isActive }}
+      value={{
+        loading,
+        session,
+        role,
+        profile,
+        login,
+        register,
+        logout,
+        isActive,
+      }}
     >
       {children}
     </AuthContext.Provider>
