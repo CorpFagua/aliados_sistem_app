@@ -12,6 +12,7 @@ import {
 
 import { fetchCurrentUser } from "@/services/profile";
 import { usePushRegistration } from "@/hooks/usePushNotifications";
+import { unregisterAllPushTokens } from "@/services/notifications";
 
 import { User, Role } from "@/models/user";
 
@@ -208,13 +209,43 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
    * 🧩 Logout
    */
   const logout = async () => {
-    const { error } = await signOut();
-    if (error) throw error;
+    console.log(`\n🔐 [AUTH] Iniciando logout...`);
+    
+    // Guardar el access_token antes de limpiarlo
+    const currentAccessToken = session?.access_token;
+    
+    try {
+      // Eliminar todos los tokens de notificaciones antes de cerrar sesión
+      if (currentAccessToken) {
+        console.log(`📲 [AUTH] Eliminando tokens de notificaciones...`);
+        console.log(`🔑 [AUTH] Access Token disponible: ${currentAccessToken.substring(0, 20)}...`);
+        try {
+          await unregisterAllPushTokens(currentAccessToken);
+          console.log(`✅ [AUTH] Tokens de notificaciones eliminados`);
+        } catch (notifErr: any) {
+          console.warn(`⚠️  [AUTH] No se pudieron eliminar tokens (continuando con logout):`, notifErr.message);
+          // Continuar con el logout aunque falle la eliminación de tokens
+        }
+      } else {
+        console.warn(`⚠️  [AUTH] No hay access_token disponible para eliminar notificaciones`);
+      }
+    } catch (err) {
+      console.error(`❌ [AUTH] Error inesperado eliminando tokens de notificaciones:`, err);
+    }
 
+    console.log(`🔑 [AUTH] Cerrando sesión en Supabase...`);
+    const { error } = await signOut();
+    if (error) {
+      console.error(`❌ [AUTH] Error en signOut:`, error);
+      throw error;
+    }
+
+    console.log(`🧹 [AUTH] Limpiando estado local...`);
     setProfile(null);
     setRole(null);
     setIsActive(false);
 
+    console.log(`📍 [AUTH] Redirigiendo a login...\n`);
     router.replace("/(auth)/login");
   };
 

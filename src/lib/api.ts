@@ -9,5 +9,11 @@ export const api = axios.create({
 
 // Helper para headers con token
 export function authHeaders(token: string) {
-  return { Authorization: `Bearer ${token}` };
+  if (!token) {
+    console.warn(`⚠️  [API] authHeaders: No hay token disponible`);
+  }
+  return { 
+    "Authorization": `Bearer ${token}`,
+    "Content-Type": "application/json"
+  };
 }
