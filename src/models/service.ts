@@ -24,6 +24,9 @@ export interface Service {
   // Paquetería
   pickup?: string | null;                    // pickup_address
 
+  // Tipo de servicio
+  typeId?: ServiceTypeId | null;             // tipo de servicio (domicilio, paquetería)
+
   // Relaciones
   assignedDelivery?: string | null;
   assignedDeliveryName?: string | null;
@@ -139,6 +142,8 @@ export interface ServiceResponse {
   trayecto_at?: string | null;
   finalized_at?: string | null;
 
+  type_id?: string | null;  // tipo de servicio (domicilio, paquetería_aliados, paquetería_coordinadora)
+
   store?: {
     id: string;
     name: string;
@@ -184,6 +189,8 @@ export function toService(dto: ServiceResponse): Service {
     status: dto.status as Service["status"],
 
     pickup: dto.pickup_address ?? null,
+
+    typeId: (dto.type_id as ServiceTypeId) ?? null,
 
     assignedDelivery: dto.assigned_delivery ?? null,
     assignedDeliveryName: dto.profiles?.name ?? null,

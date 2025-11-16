@@ -4,6 +4,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Colors } from "@/constans/colors";
 import { Service } from "@/models/service";
+import {
+  getServiceType,
+  getServiceTypeColor,
+  getServiceTypeLabel,
+  getServiceTypeIcon,
+} from "@/utils/serviceTypeUtils";
 
 interface Props {
   pedido: Service;
@@ -24,6 +30,12 @@ export default function CoordinatorOrderCard({ pedido, onPress }: Props) {
     return "#F44336"; // rojo
   };
 
+  // 📦 Tipo de servicio
+  const serviceType = useMemo(() => getServiceType(pedido), [pedido.typeId, pedido.pickup]);
+  const serviceTypeColor = getServiceTypeColor(serviceType);
+  const serviceTypeLabel = getServiceTypeLabel(serviceType);
+  const serviceTypeIcon = getServiceTypeIcon(serviceType);
+
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={{ marginBottom: 14 }}>
       <View style={styles.card}>
@@ -35,9 +47,37 @@ export default function CoordinatorOrderCard({ pedido, onPress }: Props) {
           style={StyleSheet.absoluteFillObject}
         />
 
-        {/* Header con tienda y tiempo */}
+        {/* Header con tienda/recogida, tipo de servicio y tiempo */}
         <View style={styles.headerRow}>
-          <Text style={styles.storeName}>{pedido.storeName || "Tienda desconocida"}</Text>
+          <View style={styles.leftHeader}>
+            {serviceType === "paqueteria" ? (
+              // Para paquetería mostrar dirección de recogida y últimos 4 dígitos del ID
+              <>
+                <View style={styles.paqueteriaHeader}>
+                  <Text style={styles.storeName} numberOfLines={1}>
+                    {pedido.pickup || "Sin recogida"}
+                  </Text>
+                  <Text style={styles.idBadge}>#{pedido.id.slice(-4)}</Text>
+                </View>
+              </>
+            ) : (
+              // Para domicilio mostrar nombre de tienda normalmente
+              <Text style={styles.storeName}>{pedido.storeName || "Tienda desconocida"}</Text>
+            )}
+
+            {/* Badge de tipo de servicio */}
+            <View
+              style={[
+                styles.serviceTypeBadge,
+                { backgroundColor: serviceTypeColor + "22", borderColor: serviceTypeColor + "55" },
+              ]}
+            >
+              <Ionicons name={serviceTypeIcon} size={12} color={serviceTypeColor} />
+              <Text style={[styles.serviceTypeText, { color: serviceTypeColor }]}>
+                {serviceTypeLabel}
+              </Text>
+            </View>
+          </View>
 
           <View style={[styles.timeBadge, { backgroundColor: getTimeColor() + "22" }]}>
             <Ionicons name="time-outline" size={14} color={getTimeColor()} />
@@ -53,24 +93,26 @@ export default function CoordinatorOrderCard({ pedido, onPress }: Props) {
           {pedido.destination || "Sin dirección"}
         </Text>
 
-        {/* Info de zona y domiciliario */}
-        <View style={styles.infoRow}>
-          <View style={styles.infoBadge}>
-            <Ionicons name="map-outline" size={13} color={Colors.menuText} />
-            <Text style={styles.infoText}>
-              {pedido.zoneName ? pedido.zoneName : "Sin zona"}
-            </Text>
-          </View>
+        {/* Info de zona y domiciliario - solo mostrar en domicilios */}
+        {serviceType !== "paqueteria" && (
+          <View style={styles.infoRow}>
+            <View style={styles.infoBadge}>
+              <Ionicons name="map-outline" size={13} color={Colors.menuText} />
+              <Text style={styles.infoText}>
+                {pedido.zoneName ? pedido.zoneName : "Sin zona"}
+              </Text>
+            </View>
 
-          <View style={styles.infoBadge}>
-            <Ionicons name="person-outline" size={13} color={Colors.menuText} />
-            <Text style={styles.infoText}>
-              {pedido.assignedDeliveryName
-                ? pedido.assignedDeliveryName
-                : "Sin domiciliario"}
-            </Text>
+            <View style={styles.infoBadge}>
+              <Ionicons name="person-outline" size={13} color={Colors.menuText} />
+              <Text style={styles.infoText}>
+                {pedido.assignedDeliveryName
+                  ? pedido.assignedDeliveryName
+                  : "Sin domiciliario"}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Monto */}
         {pedido.amount > 0 && (
@@ -99,13 +141,47 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: 6,
+    gap: 8,
+  },
+  leftHeader: {
+    flex: 1,
+    gap: 4,
   },
   storeName: {
     fontSize: 15,
     fontWeight: "700",
     color: Colors.normalText,
+  },
+  paqueteriaHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  idBadge: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: Colors.gradientStart,
+    backgroundColor: Colors.gradientStart + "15",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  serviceTypeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    gap: 4,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+  },
+  serviceTypeText: {
+    fontSize: 11,
+    fontWeight: "600",
   },
   timeBadge: {
     flexDirection: "row",
@@ -114,6 +190,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     gap: 4,
+    minWidth: 70,
+    justifyContent: "center",
   },
   timeText: {
     fontSize: 13,

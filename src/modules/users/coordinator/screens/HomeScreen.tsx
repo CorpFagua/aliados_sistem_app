@@ -16,8 +16,10 @@ import OrderDetailModal from "../components/OrderDetailModal";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchServices } from "@/services/services";
 import { Service } from "@/models/service";
+import { filterServicesByType } from "@/utils/serviceTypeUtils";
 
 const TABS = ["Disponibles", "Tomados", "En ruta"];
+const SERVICE_TYPE_FILTERS = ["Todos", "Domicilios", "Paquetería"];
 
 export default function HomeScreen() {
   const { width } = useWindowDimensions();
@@ -28,6 +30,7 @@ export default function HomeScreen() {
   const { session } = useAuth();
 
   const [activeTab, setActiveTab] = useState("Disponibles");
+  const [activeServiceTypeFilter, setActiveServiceTypeFilter] = useState("Todos");
   const [selectedOrder, setSelectedOrder] = useState<Service | null>(null);
   const [showForm, setShowForm] = useState(false);
 
@@ -61,9 +64,20 @@ export default function HomeScreen() {
     loadServices();
   }, [session]);
 
+  // 🔄 Aplicar filtro de tipo de servicio
+  const getFilteredPedidos = (tab: string): Service[] => {
+    const tabPedidos = pedidos[tab] || [];
+    const filterTypeMap: Record<string, "todos" | "domicilio" | "paqueteria"> = {
+      Todos: "todos",
+      Domicilios: "domicilio",
+      Paquetería: "paqueteria",
+    };
+    return filterServicesByType(tabPedidos, filterTypeMap[activeServiceTypeFilter]);
+  };
+
   return (
     <View style={styles.container}>
-      {/* Tabs móviles */}
+      {/* Tabs de estado (Disponibles, Tomados, En ruta) - solo mobile */}
       {isMobile && (
         <View style={styles.tabsWrapper}>
           <View style={styles.tabs}>
@@ -90,6 +104,37 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Tabs de tipo de servicio (Todos, Domicilios, Paquetería) */}
+      <View style={styles.serviceTypeFiltersWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.serviceTypeFilters}
+        >
+          {SERVICE_TYPE_FILTERS.map((filter) => (
+            <TouchableOpacity
+              key={filter}
+              style={[
+                styles.serviceTypeFilterButton,
+                activeServiceTypeFilter === filter &&
+                  styles.activeServiceTypeFilterButton,
+              ]}
+              onPress={() => setActiveServiceTypeFilter(filter)}
+            >
+              <Text
+                style={[
+                  styles.serviceTypeFilterText,
+                  activeServiceTypeFilter === filter &&
+                    styles.activeServiceTypeFilterText,
+                ]}
+              >
+                {filter}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       {/* Listado */}
       <ScrollView
         contentContainerStyle={[
@@ -99,7 +144,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {isMobile &&
-          pedidos[activeTab].map((pedido) => (
+          getFilteredPedidos(activeTab).map((pedido) => (
             <CoordinatorOrderCard
               key={pedido.id}
               pedido={pedido}
@@ -119,7 +164,7 @@ export default function HomeScreen() {
               >
                 <Text style={styles.columnTitle}>{tab}</Text>
                 <View style={styles.columnInner}>
-                  {pedidos[tab].map((pedido) => (
+                  {getFilteredPedidos(tab).map((pedido) => (
                     <CoordinatorOrderCard
                       key={pedido.id}
                       pedido={pedido}
@@ -204,6 +249,31 @@ const styles = StyleSheet.create({
   activeTabButton: { backgroundColor: Colors.iconActive },
   tabText: { color: Colors.menuText, fontSize: 14, fontWeight: "500" },
   activeTabText: { color: "#000", fontWeight: "700" },
+  serviceTypeFiltersWrapper: { paddingHorizontal: 12, paddingVertical: 8 },
+  serviceTypeFilters: {
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  serviceTypeFilterButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  activeServiceTypeFilterButton: {
+    backgroundColor: Colors.iconActive,
+    borderColor: Colors.iconActive,
+  },
+  serviceTypeFilterText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.menuText,
+  },
+  activeServiceTypeFilterText: {
+    color: "#000",
+  },
   scrollContent: { paddingBottom: 120, paddingHorizontal: 12 },
   scrollContentDesktop: { paddingBottom: 40, paddingHorizontal: 20 },
   columnsWrapper: {

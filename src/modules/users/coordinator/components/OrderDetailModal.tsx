@@ -16,6 +16,7 @@ import AssignZoneModal from "./AssignZoneModal";
 import ServiceFormModal from "./ServiceFormModalCoordinator"; // 🟢 Import agregado
 import { Service } from "@/models/service";
 import ChatModal from "@/components/ChatModal";
+import { getServiceType } from "@/utils/serviceTypeUtils";
 
 interface Props {
   visible: boolean;
@@ -37,6 +38,9 @@ export default function OrderDetailModal({
   const [showChatModal, setShowChatModal] = useState(false); // 🟢 Modal de chat
 
   if (!pedido) return null;
+
+  // Obtener tipo de servicio
+  const serviceType = getServiceType(pedido);
 
   // --- Maneja rechazo del pedido ---
   const handleReject = async () => {
@@ -84,6 +88,35 @@ export default function OrderDetailModal({
 
   // --- Renderiza el botón principal según estado ---
   const renderActionButton = () => {
+    if (serviceType === "paqueteria") {
+      // Paquetería tiene flujo diferente
+      if (pedido.status === "disponible") {
+        return (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: Colors.gradientStart }]}
+            onPress={() => setShowZoneModal(true)}
+          >
+            <Ionicons name="checkmark-circle-outline" size={18} color="#000" />
+            <Text style={styles.actionText}>Confirmar recogida</Text>
+          </TouchableOpacity>
+        );
+      }
+
+      if (pedido.status === "asignado") {
+        return (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: "#4CAF50" }]}
+            onPress={handleMarkDelivered}
+          >
+            <Ionicons name="checkmark-done-outline" size={18} color="#000" />
+            <Text style={styles.actionText}>Entregado</Text>
+          </TouchableOpacity>
+        );
+      }
+      return null;
+    }
+
+    // Domicilio tiene flujo original
     if (pedido.status === "disponible") {
       return (
         <TouchableOpacity
@@ -131,13 +164,16 @@ export default function OrderDetailModal({
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
               <Ionicons
-                name="storefront-outline"
+                name={serviceType === "paqueteria" ? "cube-outline" : "storefront-outline"}
                 size={22}
                 color={Colors.gradientStart}
               />
-              <Text style={styles.modalTitle}>
-                {pedido.storeName || "Tienda desconocida"}
-              </Text>
+              <View style={styles.headerContent}>
+                <Text style={styles.modalTitle}>
+                  {serviceType === "paqueteria" ? pedido.pickup || "Recogida" : pedido.storeName || "Tienda desconocida"}
+                </Text>
+                <Text style={styles.modalSubtitle}>ID: {pedido.id}</Text>
+              </View>
             </View>
 
             {/* 🟢 Botón Editar */}
@@ -183,25 +219,43 @@ export default function OrderDetailModal({
               </Text>
             </View>
 
-            <View style={styles.infoRow}>
-              <Ionicons
-                name="bicycle-outline"
-                size={18}
-                color={Colors.menuText}
-              />
-              <Text style={styles.infoText}>
-                <Text style={styles.label}>Domiciliario: </Text>
-                {pedido.assignedDeliveryName || "Sin asignar"}
-              </Text>
-            </View>
+            {serviceType === "paqueteria" && pedido.pickup && (
+              <View style={styles.infoRow}>
+                <Ionicons
+                  name="cube-outline"
+                  size={18}
+                  color={Colors.menuText}
+                />
+                <Text style={styles.infoText}>
+                  <Text style={styles.label}>Recogida: </Text>
+                  {pedido.pickup}
+                </Text>
+              </View>
+            )}
 
-            <View style={styles.infoRow}>
-              <Ionicons name="map-outline" size={18} color={Colors.menuText} />
-              <Text style={styles.infoText}>
-                <Text style={styles.label}>Zona: </Text>
-                {pedido.zoneName || "No asignada"}
-              </Text>
-            </View>
+            {serviceType !== "paqueteria" && (
+              <>
+                <View style={styles.infoRow}>
+                  <Ionicons
+                    name="bicycle-outline"
+                    size={18}
+                    color={Colors.menuText}
+                  />
+                  <Text style={styles.infoText}>
+                    <Text style={styles.label}>Domiciliario: </Text>
+                    {pedido.assignedDeliveryName || "Sin asignar"}
+                  </Text>
+                </View>
+
+                <View style={styles.infoRow}>
+                  <Ionicons name="map-outline" size={18} color={Colors.menuText} />
+                  <Text style={styles.infoText}>
+                    <Text style={styles.label}>Zona: </Text>
+                    {pedido.zoneName || "No asignada"}
+                  </Text>
+                </View>
+              </>
+            )}
 
             <View style={styles.infoRow}>
               <Ionicons name="call-outline" size={18} color={Colors.menuText} />
@@ -337,7 +391,9 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerContent: { flex: 1, justifyContent: "center" },
   modalTitle: { fontSize: 18, fontWeight: "700", color: Colors.normalText },
+  modalSubtitle: { fontSize: 12, color: Colors.menuText, marginTop: 2 },
   modalBody: { marginBottom: 16 },
   infoRow: {
     flexDirection: "row",
