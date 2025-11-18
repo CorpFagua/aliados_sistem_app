@@ -51,8 +51,21 @@ export async function deleteStore(id: string, token: string): Promise<Store> {
 }
 
 // Obtener una tienda con sus perfiles (admin y coordinador)
-
 export async function fetchStoreWithProfiles(id: string, token: string): Promise<Store> {
   const res = await api.get(`/stores/${id}/details`, { headers: authHeaders(token) });
   return toStore(res.data.data as StoreResponse);
+}
+
+// 🟢 Obtener perfiles de tipo "store" (nuevos usuarios tienda)
+export async function fetchStoreProfiles(token: string): Promise<Array<{ id: string; name: string; store_id: string }>> {
+  try {
+    const res = await api.get("/users/stores", { headers: authHeaders(token) });
+    const profiles = res.data.data || res.data;
+    return Array.isArray(profiles) 
+      ? profiles.map((p: any) => ({ id: p.id, name: p.name, store_id: p.store_id }))
+      : [];
+  } catch (err) {
+    console.error("Error fetching store profiles:", err);
+    return [];
+  }
 }

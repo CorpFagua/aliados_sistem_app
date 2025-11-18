@@ -170,7 +170,7 @@ export default function OrderDetailModal({
               />
               <View style={styles.headerContent}>
                 <Text style={styles.modalTitle}>
-                  {serviceType === "paqueteria" ? pedido.pickup || "Recogida" : pedido.storeName || "Tienda desconocida"}
+                  {serviceType === "paqueteria" ? pedido.pickup || "Recogida" : pedido.profileStoreName || "Tienda desconocida"}
                 </Text>
                 <Text style={styles.modalSubtitle}>ID: {pedido.id}</Text>
               </View>

@@ -31,8 +31,11 @@ export interface Service {
   assignedDelivery?: string | null;
   assignedDeliveryName?: string | null;
 
-  storeId?: string | null;
-  storeName?: string | null;
+  storeId?: string | null;                   // ID de la tienda (para precios)
+  storeName?: string | null;                 // Nombre de la tienda
+
+  profileStoreId?: string | null;            // ID del perfil (usuario) tienda
+  profileStoreName?: string | null;          // Nombre del perfil (usuario) tienda 🟢
 
   branchId?: string | null;
   zoneId?: string | null;
@@ -58,6 +61,7 @@ export interface ServicePayload {
   store_id?: string | null;
   branch_id?: string | null;
   zone_id?: string | null;
+  profile_store_id?: string | null;  // 🟢 Nuevo campo
 
   expected_at?: Date | null;   // programados
   prep_time?: number | null;   // minutos
@@ -88,7 +92,8 @@ export interface ServiceAdminPayload {
   type_id: ServiceTypeId;           // tipo de servicio
 
   branch_id?: string;               // sucursal (obtenida del usuario si no se proporciona)
-  store_id?: string;                // tienda (requerida para domicilio)
+  store_id?: string;                // tienda (para obtener precios)
+  profile_store_id?: string;        // 🟢 perfil (usuario) que solicita el servicio
 
   delivery_address: string;         // destino (requerido)
   pickup_address?: string | null;   // origen (para paquetería)
@@ -131,6 +136,7 @@ export interface ServiceResponse {
   assigned_delivery?: string | null;
 
   store_id?: string | null;
+  profile_store_id?: string | null;
   branch_id?: string | null;
   zone_id?: string | null;
 
@@ -145,6 +151,11 @@ export interface ServiceResponse {
   type_id?: string | null;  // tipo de servicio (domicilio, paquetería_aliados, paquetería_coordinadora)
 
   store?: {
+    id: string;
+    name: string;
+  } | null;
+
+  profile_store?: {
     id: string;
     name: string;
   } | null;
@@ -198,6 +209,9 @@ export function toService(dto: ServiceResponse): Service {
     storeId: dto.store_id ?? null,
     storeName: dto.store?.name ?? null,
 
+    profileStoreId: dto.profile_store_id ?? null,
+    profileStoreName: dto.profile_store?.name ?? null,  // 🟢 Nombre del perfil tienda
+
     branchId: dto.branch_id ?? null,
 
     zoneId: dto.zone_id ?? null,
@@ -227,5 +241,6 @@ export function toServicePayload(service: Service): ServicePayload {
     store_id: service.storeId ?? null,
     branch_id: service.branchId ?? null,
     zone_id: service.zoneId ?? null,
+    profile_store_id: service.profileStoreId ?? null,  // 🟢 Agregar profile_store_id
   };
 }

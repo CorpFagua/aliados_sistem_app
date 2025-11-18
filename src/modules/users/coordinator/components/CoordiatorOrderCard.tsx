@@ -61,8 +61,8 @@ export default function CoordinatorOrderCard({ pedido, onPress }: Props) {
                 </View>
               </>
             ) : (
-              // Para domicilio mostrar nombre de tienda normalmente
-              <Text style={styles.storeName}>{pedido.storeName || "Tienda desconocida"}</Text>
+              // Para domicilio mostrar nombre del perfil tienda (tienda norte, tienda sur, etc)
+              <Text style={styles.storeName}>{pedido.profileStoreName || "Tienda desconocida"}</Text>
             )}
 
             {/* Badge de tipo de servicio */}

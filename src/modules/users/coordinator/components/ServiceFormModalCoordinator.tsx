@@ -16,7 +16,7 @@ import { TabsNavigation, TabType } from "./TabsNavigation";
 import { DomiciliosForm } from "./forms/DomiciliosForm";
 import { AliadosForm } from "./forms/AliadosForm";
 import { CoordinadoraForm } from "./forms/CoordinadoraForm";
-import { useStoreSearch } from "../hooks/useStoreSearch";
+import { useProfileStoreSearch } from "../hooks/useProfileStoreSearch";
 import { useFormState } from "../hooks/useFormState";
 import { adminCreateService } from "@/services/services.admin";
 import type { ServiceFormModalProps } from "./types";
@@ -40,13 +40,13 @@ export default function ServiceFormModal({
 
   // Custom hooks para manejar estado
   const formState = useFormState();
-  const storeSearch = useStoreSearch(session?.access_token || "");
+  const profileStoreSearch = useProfileStoreSearch(session?.access_token || "");
 
   // Limpiar formulario cuando el modal se cierre
   useEffect(() => {
     if (!visible) {
       formState.reset();
-      storeSearch.reset();
+      profileStoreSearch.reset();
       setError(null);
       setIsLoading(false);
     }
@@ -61,7 +61,7 @@ export default function ServiceFormModal({
     if (!formState.phone?.trim()) return "Teléfono requerido";
     if (!formState.payment) return "Método de pago requerido";
     if (!formState.amount) return "Monto requerido";
-    if (!storeSearch.selectedStore?.id) return "Tienda requerida";
+    if (!profileStoreSearch.selectedProfileStore?.id) return "Tienda requerida";
     if (!formState.prepTime) return "Tiempo de preparación requerido";
     return null;
   };
@@ -121,7 +121,7 @@ export default function ServiceFormModal({
       if (activeTab === "domicilios") {
         payload = {
           type_id: "domicilio",
-          store_id: storeSearch.selectedStore!.id,
+          profile_store_id: profileStoreSearch.selectedProfileStore!.id,
           delivery_address: formState.destination,
           client_phone: formState.phone,
           payment_method: formState.payment as any,
@@ -167,7 +167,7 @@ export default function ServiceFormModal({
 
       // Limpiar y cerrar
       formState.reset();
-      storeSearch.reset();
+      profileStoreSearch.reset();
       onClose();
     } catch (err: any) {
       const errorMsg =
@@ -183,9 +183,9 @@ export default function ServiceFormModal({
     }
   };
 
-  const handleStoreSelect = (store: { id: string; name: string }) => {
-    storeSearch.setSelectedStore(store);
-    storeSearch.setStoreQuery("");
+  const handleProfileStoreSelect = (profileStore: { id: string; name: string; store_id: string }) => {
+    profileStoreSearch.setSelectedProfileStore(profileStore);
+    profileStoreSearch.setProfileQuery("");
   };
 
   return (
@@ -224,13 +224,13 @@ export default function ServiceFormModal({
                   amount={formState.amount}
                   onPaymentChange={formState.setPayment}
                   onAmountChange={formState.setAmount}
-                  storeQuery={storeSearch.storeQuery}
-                  selectedStore={storeSearch.selectedStore}
-                  storeResults={storeSearch.storeResults}
-                  loadingStores={storeSearch.loadingStores}
-                  onStoreSearch={storeSearch.handleSearchStores}
-                  onStoreSelect={handleStoreSelect}
-                  onStoreClear={() => storeSearch.setSelectedStore(null)}
+                  storeQuery={profileStoreSearch.profileQuery}
+                  selectedStore={profileStoreSearch.selectedProfileStore}
+                  storeResults={profileStoreSearch.profileResults}
+                  loadingStores={profileStoreSearch.loadingProfiles}
+                  onStoreSearch={profileStoreSearch.handleSearchProfileStores}
+                  onStoreSelect={handleProfileStoreSelect}
+                  onStoreClear={() => profileStoreSearch.setSelectedProfileStore(null)}
                   showStoreSelector={role === "coordinator" || role === "super_admin"}
                   focusedField={focusedField}
                   onFocus={(fieldKey) => setFocusedField(fieldKey)}
