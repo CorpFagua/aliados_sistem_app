@@ -8,12 +8,14 @@ interface DomiciliosFormProps {
   // Campos principales
   destination: string;
   phone: string;
+  clientName: string;
   notes: string;
   prepTime: string;
 
   // Métodos de actualización
   onDestinationChange: (value: string) => void;
   onPhoneChange: (value: string) => void;
+  onClientNameChange: (value: string) => void;
   onNotesChange: (value: string) => void;
   onPrepTimeChange: (value: string) => void;
 
@@ -42,10 +44,12 @@ interface DomiciliosFormProps {
 export const DomiciliosForm: React.FC<DomiciliosFormProps> = ({
   destination,
   phone,
+  clientName,
   notes,
   prepTime,
   onDestinationChange,
   onPhoneChange,
+  onClientNameChange,
   onNotesChange,
   onPrepTimeChange,
   payment,
@@ -102,6 +106,18 @@ export const DomiciliosForm: React.FC<DomiciliosFormProps> = ({
         value={phone}
         onChange={onPhoneChange}
         fieldKey="phone"
+        focusedField={focusedField}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      />
+
+      <FormInputField
+        label="Nombre del cliente"
+        iconName="person-outline"
+        placeholder="Juan Pérez"
+        value={clientName}
+        onChange={onClientNameChange}
+        fieldKey="clientName"
         focusedField={focusedField}
         onFocus={onFocus}
         onBlur={onBlur}

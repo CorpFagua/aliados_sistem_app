@@ -4,10 +4,10 @@ export interface UseFormStateReturn {
   // Estados comunes
   destination: string;
   phone: string;
+  clientName: string;
   notes: string;
   payment: string;
   amount: string;
-  name: string;
 
   // Estados específicos domicilios
   prepTime: string;
@@ -15,6 +15,7 @@ export interface UseFormStateReturn {
   // Estados específicos aliados
   pickupAddress: string;
   aliadosPrice: string;
+  aliadosPriceDeliverySrv: string;
 
   // Estados específicos coordinadora
   guideId: string;
@@ -22,13 +23,14 @@ export interface UseFormStateReturn {
   // Métodos actualizadores
   setDestination: (value: string) => void;
   setPhone: (value: string) => void;
+  setClientName: (value: string) => void;
   setNotes: (value: string) => void;
   setPayment: (value: string) => void;
   setAmount: (value: string) => void;
-  setName: (value: string) => void;
   setPrepTime: (value: string) => void;
   setPickupAddress: (value: string) => void;
   setAliadosPrice: (value: string) => void;
+  setAliadosPriceDeliverySrv: (value: string) => void;
   setGuideId: (value: string) => void;
 
   // Reset para limpiar formularios
@@ -38,48 +40,52 @@ export interface UseFormStateReturn {
 export const useFormState = (): UseFormStateReturn => {
   const [destination, setDestination] = useState("");
   const [phone, setPhone] = useState("");
+  const [clientName, setClientName] = useState("");
   const [notes, setNotes] = useState("");
   const [payment, setPayment] = useState<string>("efectivo");
   const [amount, setAmount] = useState("");
-  const [name, setName] = useState("");
   const [prepTime, setPrepTime] = useState("");
   const [pickupAddress, setPickupAddress] = useState("");
   const [aliadosPrice, setAliadosPrice] = useState("");
+  const [aliadosPriceDeliverySrv, setAliadosPriceDeliverySrv] = useState("");
   const [guideId, setGuideId] = useState("");
 
   const reset = () => {
     setDestination("");
     setPhone("");
+    setClientName("");
     setNotes("");
     setPayment("efectivo");
     setAmount("");
-    setName("");
     setPrepTime("");
     setPickupAddress("");
     setAliadosPrice("");
+    setAliadosPriceDeliverySrv("");
     setGuideId("");
   };
 
   return {
     destination,
     phone,
+    clientName,
     notes,
     payment,
     amount,
-    name,
     prepTime,
     pickupAddress,
     aliadosPrice,
+    aliadosPriceDeliverySrv,
     guideId,
     setDestination,
     setPhone,
+    setClientName,
     setNotes,
     setPayment,
     setAmount,
-    setName,
     setPrepTime,
     setPickupAddress,
     setAliadosPrice,
+    setAliadosPriceDeliverySrv,
     setGuideId,
     reset,
   };

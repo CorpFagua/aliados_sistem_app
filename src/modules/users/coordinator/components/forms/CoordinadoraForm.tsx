@@ -7,15 +7,15 @@ interface CoordinadoraFormProps {
   // Campos principales
   guideId: string;
   destination: string;
-  name: string;
   phone: string;
+  clientName: string;
   notes: string;
 
   // Métodos de actualización
   onGuideIdChange: (value: string) => void;
   onDestinationChange: (value: string) => void;
-  onNameChange: (value: string) => void;
   onPhoneChange: (value: string) => void;
+  onClientNameChange: (value: string) => void;
   onNotesChange: (value: string) => void;
 
   // Pago
@@ -33,13 +33,13 @@ interface CoordinadoraFormProps {
 export const CoordinadoraForm: React.FC<CoordinadoraFormProps> = ({
   guideId,
   destination,
-  name,
   phone,
+  clientName,
   notes,
   onGuideIdChange,
   onDestinationChange,
-  onNameChange,
   onPhoneChange,
+  onClientNameChange,
   onNotesChange,
   payment,
   amount,
@@ -79,8 +79,8 @@ export const CoordinadoraForm: React.FC<CoordinadoraFormProps> = ({
         label="Nombre del cliente"
         iconName="person-outline"
         placeholder="María Gómez"
-        value={name}
-        onChange={onNameChange}
+        value={clientName}
+        onChange={onClientNameChange}
         fieldKey="clientNameCoord"
         focusedField={focusedField}
         onFocus={onFocus}

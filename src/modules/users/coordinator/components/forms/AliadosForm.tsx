@@ -7,18 +7,20 @@ interface AliadosFormProps {
   // Campos principales
   pickupAddress: string;
   destination: string;
-  name: string;
   phone: string;
+  clientName: string;
   notes: string;
   aliadosPrice: string;
+  aliadosPriceDeliverySrv: string;
 
   // Métodos de actualización
   onPickupAddressChange: (value: string) => void;
   onDestinationChange: (value: string) => void;
-  onNameChange: (value: string) => void;
   onPhoneChange: (value: string) => void;
+  onClientNameChange: (value: string) => void;
   onNotesChange: (value: string) => void;
   onAliadosPriceChange: (value: string) => void;
+  onAliadosPriceDeliverySrvChange: (value: string) => void;
 
   // Pago
   payment: string;
@@ -35,16 +37,18 @@ interface AliadosFormProps {
 export const AliadosForm: React.FC<AliadosFormProps> = ({
   pickupAddress,
   destination,
-  name,
   phone,
+  clientName,
   notes,
   aliadosPrice,
+  aliadosPriceDeliverySrv,
   onPickupAddressChange,
   onDestinationChange,
-  onNameChange,
   onPhoneChange,
+  onClientNameChange,
   onNotesChange,
   onAliadosPriceChange,
+  onAliadosPriceDeliverySrvChange,
   payment,
   amount,
   onPaymentChange,
@@ -80,24 +84,24 @@ export const AliadosForm: React.FC<AliadosFormProps> = ({
       />
 
       <FormInputField
-        label="Nombre del cliente"
-        iconName="person-outline"
-        placeholder="Juan Pérez"
-        value={name}
-        onChange={onNameChange}
-        fieldKey="clientNameAliado"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
-      />
-
-      <FormInputField
         label="Teléfono del cliente"
         iconName="call-outline"
         placeholder="3009876543"
         value={phone}
         onChange={onPhoneChange}
         fieldKey="clientPhoneAliado"
+        focusedField={focusedField}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      />
+
+      <FormInputField
+        label="Nombre del cliente"
+        iconName="person-outline"
+        placeholder="Juan Pérez"
+        value={clientName}
+        onChange={onClientNameChange}
+        fieldKey="clientNameAliado"
         focusedField={focusedField}
         onFocus={onFocus}
         onBlur={onBlur}
@@ -134,6 +138,19 @@ export const AliadosForm: React.FC<AliadosFormProps> = ({
         value={aliadosPrice}
         onChange={onAliadosPriceChange}
         fieldKey="aliadosPrice"
+        focusedField={focusedField}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      />
+
+      <FormInputField
+        label="Precio para domiciliario"
+        iconName="cash-outline"
+        placeholder="2000"
+        keyboardType="numeric"
+        value={aliadosPriceDeliverySrv}
+        onChange={onAliadosPriceDeliverySrvChange}
+        fieldKey="aliadosPriceDeliverySrv"
         focusedField={focusedField}
         onFocus={onFocus}
         onBlur={onBlur}

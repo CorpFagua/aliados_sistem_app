@@ -7,10 +7,12 @@ export interface Service {
   // Datos base
   destination: string;                       // delivery_address
   phone: string;                             // client_phone
+  clientName?: string | null;                // client_name
   notes?: string;
   payment: "efectivo" | "transferencia" | "tarjeta";
   amount: number;                            // total_to_collect
   price?: number;                            // price
+  priceDeliverySrv?: number;                 // price_delivery_srv (para domiciliarios)
   isPaid?: boolean;
 
   // Tiempos
@@ -49,12 +51,14 @@ export interface Service {
 export interface ServicePayload {
   delivery_address: string;
   client_phone: string;
+  client_name?: string | null;              // nombre del cliente
   notes?: string;
 
   payment_method: "efectivo" | "transferencia" | "tarjeta";
 
   total_to_collect: number;
   price?: number;
+  price_delivery_srv?: number;               // precio para domiciliario
 
   pickup_address?: string;
 
@@ -99,12 +103,14 @@ export interface ServiceAdminPayload {
   pickup_address?: string | null;   // origen (para paquetería)
 
   client_phone?: string | null;
+  client_name?: string | null;      // nombre del cliente
   notes?: string | null;
 
   payment_method: "efectivo" | "transferencia" | "tarjeta";
 
   total_to_collect?: number | null; // monto recoger (domicilio)
   price?: number | null;            // costo servicio (paquetería)
+  price_delivery_srv?: number | null; // precio para domiciliario
   
   prep_time?: number | null;        // tiempo de preparación (domicilio)
   guide_number?: string | null;     // número de guía (para paqueteria_coordinadora)
@@ -121,12 +127,14 @@ export interface ServiceResponse {
 
   delivery_address: string;
   client_phone: string;
+  client_name?: string | null;
   notes?: string;
 
   payment_method: string;
   total_to_collect: number;
 
   price?: number;
+  price_delivery_srv?: number;
   is_paid: boolean;
 
   pickup_address?: string;
@@ -227,12 +235,14 @@ export function toServicePayload(service: Service): ServicePayload {
   return {
     delivery_address: service.destination,
     client_phone: service.phone,
+    client_name: service.clientName ?? null,
 
     notes: service.notes,
     payment_method: service.payment,
 
     total_to_collect: service.amount,
     price: service.price,
+    price_delivery_srv: service.priceDeliverySrv ?? undefined,
 
     pickup_address: service.pickup ?? undefined,
 

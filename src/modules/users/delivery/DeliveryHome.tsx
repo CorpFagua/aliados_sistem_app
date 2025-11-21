@@ -8,14 +8,13 @@ import { Colors } from "@/constans/colors";
 
 // Pantallas
 import DisponiblesScreen from "./screens/DisponiblesScreen";
-import NotificationsScreen from "./screens/NotificationsScreen";
 import AsignadosScreen from "./screens/AsignadosScreen";
 import EnRutaScreen from "./screens/EnRutaScreen";
 
 const mobileMenuItems = [
   { id: "disponibles", label: "Disponibles", icon: "list-outline" as const },
   { id: "asignados", label: "Asignados", icon: "storefront-outline" as const },
-  { id: "en-camino", label: "En camino", icon: "flash-outline" as const },
+  { id: "en-camino", label: "En Ruta", icon: "flash-outline" as const },
 ];
 
 // const desktopMenuItems = [

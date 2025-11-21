@@ -13,6 +13,8 @@ import NotificationsScreen from "./screens/NotificationsScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import AnalyticsScreen from "./screens/AnalyticsScreen";
 import HistorialScreen from "./screens/HistorialScreen";
+import PaymentRequestsScreen from "./screens/PaymentRequestsScreen";
+import StoreDebtScreen from "./screens/StoreDebtScreen";
 
 const mobileMenuItems = [
   { id: "home", label: "Home", icon: "home-outline" as const },
@@ -25,7 +27,10 @@ const desktopMenuItems = [
   { id: "orders", label: "Pedidos", icon: "cube-outline" as const },
   { id: "management", label: "Gestión", icon: "settings-outline" as const },
   { id: "analytics", label: "Analíticas", icon: "bar-chart-outline" as const },
+  { id: "payments", label: "Pagos", icon: "card-outline" as const },
+  { id: "debt", label: "Deuda", icon: "alert-circle-outline" as const },
   { id: "historial", label: "Historial", icon: "time-outline" as const },
+  { id: "profile", label: "Perfil", icon: "person-outline" as const },
 ];
 
 export default function DashboardScreen() {
@@ -46,6 +51,10 @@ export default function DashboardScreen() {
         return <ProfileScreen />;
       case "analytics":
         return <AnalyticsScreen />;
+      case "payments":
+        return <PaymentRequestsScreen />;
+      case "debt":
+        return <StoreDebtScreen />;
       case "historial":
         return <HistorialScreen />;
       default:

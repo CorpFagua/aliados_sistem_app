@@ -13,8 +13,6 @@ import NotificationsScreen from "./screens/NotificationsScreen";
 
 const mobileMenuItems = [
   { id: "home", label: "Home", icon: "home-outline" as const },
-  { id: "notifications", label: "Notificaciones", icon: "notifications-outline" as const },
-  { id: "profile", label: "Perfil", icon: "person-outline" as const },
 ];
 
 // const desktopMenuItems = [
@@ -34,11 +32,6 @@ export default function StoreHome() {
     switch (activeSection) {
       case "home":
         return <HomeScreen />;
-      case "notifications":
-        return <NotificationsScreen />;
-      case "profile":
-        return <ProfileScreen />;
- 
       default:
         return <HomeScreen />;
     }

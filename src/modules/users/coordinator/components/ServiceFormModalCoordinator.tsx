@@ -60,7 +60,8 @@ export default function ServiceFormModal({
     if (!formState.destination?.trim()) return "Dirección de entrega requerida";
     if (!formState.phone?.trim()) return "Teléfono requerido";
     if (!formState.payment) return "Método de pago requerido";
-    if (!formState.amount) return "Monto requerido";
+    // Solo pedir monto si el pago NO es transferencia
+    if (formState.payment !== "transferencia" && !formState.amount) return "Monto requerido";
     if (!profileStoreSearch.selectedProfileStore?.id) return "Tienda requerida";
     if (!formState.prepTime) return "Tiempo de preparación requerido";
     return null;
@@ -71,7 +72,8 @@ export default function ServiceFormModal({
     if (!formState.destination?.trim()) return "Dirección de entrega requerida";
     if (!formState.phone?.trim()) return "Teléfono requerido";
     if (!formState.payment) return "Método de pago requerido";
-    if (!formState.aliadosPrice) return "Precio requerido";
+    // Solo pedir precio si el pago NO es transferencia
+    if (formState.payment !== "transferencia" && !formState.aliadosPrice) return "Precio requerido";
     return null;
   };
 
@@ -124,8 +126,9 @@ export default function ServiceFormModal({
           profile_store_id: profileStoreSearch.selectedProfileStore!.id,
           delivery_address: formState.destination,
           client_phone: formState.phone,
+          client_name: formState.clientName || null,
           payment_method: formState.payment as any,
-          total_to_collect: parseInt(formState.amount) || 0,
+          total_to_collect: formState.payment === "transferencia" ? null : (parseInt(formState.amount) || 0),
           prep_time: parseInt(formState.prepTime) || 0,
           notes: formState.notes || null,
         };
@@ -135,8 +138,10 @@ export default function ServiceFormModal({
           delivery_address: formState.destination,
           pickup_address: formState.pickupAddress,
           client_phone: formState.phone,
+          client_name: formState.clientName || null,
           payment_method: formState.payment as any,
-          price: parseInt(formState.aliadosPrice) || 0,
+          price: formState.payment === "transferencia" ? null : (parseInt(formState.aliadosPrice) || 0),
+          price_delivery_srv: formState.aliadosPriceDeliverySrv ? parseInt(formState.aliadosPriceDeliverySrv) : undefined,
           notes: formState.notes || null,
         };
       } else {
@@ -145,6 +150,7 @@ export default function ServiceFormModal({
           type_id: "paqueteria_coordinadora",
           delivery_address: formState.destination,
           client_phone: formState.phone,
+          client_name: formState.clientName || null,
           payment_method: formState.payment as any,
           guide_number: formState.guideId || null,
           notes: formState.notes || null,
@@ -214,10 +220,12 @@ export default function ServiceFormModal({
                 <DomiciliosForm
                   destination={formState.destination}
                   phone={formState.phone}
+                  clientName={formState.clientName}
                   notes={formState.notes}
                   prepTime={formState.prepTime}
                   onDestinationChange={formState.setDestination}
                   onPhoneChange={formState.setPhone}
+                  onClientNameChange={formState.setClientName}
                   onNotesChange={formState.setNotes}
                   onPrepTimeChange={formState.setPrepTime}
                   payment={formState.payment}
@@ -243,16 +251,18 @@ export default function ServiceFormModal({
                 <AliadosForm
                   pickupAddress={formState.pickupAddress}
                   destination={formState.destination}
-                  name={formState.name}
                   phone={formState.phone}
+                  clientName={formState.clientName}
                   notes={formState.notes}
                   aliadosPrice={formState.aliadosPrice}
+                  aliadosPriceDeliverySrv={formState.aliadosPriceDeliverySrv}
                   onPickupAddressChange={formState.setPickupAddress}
                   onDestinationChange={formState.setDestination}
-                  onNameChange={formState.setName}
                   onPhoneChange={formState.setPhone}
+                  onClientNameChange={formState.setClientName}
                   onNotesChange={formState.setNotes}
                   onAliadosPriceChange={formState.setAliadosPrice}
+                  onAliadosPriceDeliverySrvChange={formState.setAliadosPriceDeliverySrv}
                   payment={formState.payment}
                   amount={formState.amount}
                   onPaymentChange={formState.setPayment}
@@ -268,13 +278,13 @@ export default function ServiceFormModal({
                 <CoordinadoraForm
                   guideId={formState.guideId}
                   destination={formState.destination}
-                  name={formState.name}
                   phone={formState.phone}
+                  clientName={formState.clientName}
                   notes={formState.notes}
                   onGuideIdChange={formState.setGuideId}
                   onDestinationChange={formState.setDestination}
-                  onNameChange={formState.setName}
                   onPhoneChange={formState.setPhone}
+                  onClientNameChange={formState.setClientName}
                   onNotesChange={formState.setNotes}
                   payment={formState.payment}
                   amount={formState.amount}

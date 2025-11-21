@@ -49,7 +49,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({
         ))}
       </View>
 
-      {payment === "efectivo" && (
+      {payment === "efectivo" || payment === "tarjeta" ? (
         <FormInputField
           label="Monto a recolectar"
           iconName="cash-outline"
@@ -62,7 +62,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({
           onFocus={onFocus}
           onBlur={onBlur}
         />
-      )}
+      ) : null}
     </>
   );
 };

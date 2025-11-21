@@ -26,6 +26,7 @@ interface Props {
 export default function ServiceFormModal({ visible, onClose, onSuccess }: Props) {
   const [destination, setDestination] = useState("");
   const [phone, setPhone] = useState("");
+  const [clientName, setClientName] = useState("");
   const [notes, setNotes] = useState("");
   const [payment, setPayment] = useState<Service["payment"]>("efectivo");
   const [amount, setAmount] = useState("");
@@ -42,9 +43,10 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
     id: "",
     destination,
     phone,
+    clientName,
     notes,
     payment,
-    amount: Number(amount),
+    amount: payment === "transferencia" ? 0 : Number(amount),
     createdAt,
     prepTime: Number(prepTime),
   };
@@ -60,6 +62,7 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
     // reset form
     setDestination("");
     setPhone("");
+    setClientName("");
     setNotes("");
     setPayment("efectivo");
     setAmount("");
@@ -106,6 +109,18 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
               />
             </View>
 
+            <Text style={styles.label}>Nombre del cliente</Text>
+            <View style={styles.inputIcon}>
+              <Ionicons name="person-outline" size={18} color={Colors.menuText} style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.inputFlex}
+                placeholder="Ej: Juan Pérez"
+                placeholderTextColor={Colors.menuText}
+                value={clientName}
+                onChangeText={setClientName}
+              />
+            </View>
+
             <Text style={styles.label}>Notas adicionales</Text>
             <TextInput
               style={[styles.input, { height: 80, textAlignVertical: "top" }]}
@@ -131,15 +146,19 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
               ))}
             </View>
 
-            <Text style={styles.label}>Monto a recolectar</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ej: 25000"
-              placeholderTextColor={Colors.menuText}
-              keyboardType="numeric"
-              value={amount}
-              onChangeText={setAmount}
-            />
+            {(payment === "efectivo" || payment === "tarjeta") && (
+              <>
+                <Text style={styles.label}>Monto a recolectar</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: 25000"
+                  placeholderTextColor={Colors.menuText}
+                  keyboardType="numeric"
+                  value={amount}
+                  onChangeText={setAmount}
+                />
+              </>
+            )}
 
             <Text style={styles.label}>Tiempo de llegada a la tienda (min)</Text>
             <TextInput
