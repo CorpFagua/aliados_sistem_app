@@ -11,7 +11,6 @@ import {
   RefreshControl,
   StyleSheet,
   Alert,
-  TouchableOpacity,
 } from "react-native";
 import { useAuth } from "../../../../providers/AuthProvider";
 import { useServiceHistory, ServiceHistoryFilters } from "../../../../hooks/useServiceHistory";
@@ -135,14 +134,12 @@ export default function CoordinatorHistoryScreen() {
         </Text>
       </View>
 
-      {/* Filtros FUERA del FlatList (no se cubren) */}
-      <View style={styles.filtersContainer}>
-        <HistoryFilters
-          onFiltersChange={handleFiltersChange}
-          onSearch={handleSearch}
-          loading={loading}
-        />
-      </View>
+      {/* Filtros */}
+      <HistoryFilters
+        onFiltersChange={handleFiltersChange}
+        onSearch={handleSearch}
+        loading={loading}
+      />
 
       {/* Lista de servicios */}
       {services.length === 0 ? (
@@ -169,42 +166,19 @@ export default function CoordinatorHistoryScreen() {
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
-            services.length > 0 ? (
-              <View style={styles.footerContainer}>
-                {loading && services.length > 0 ? (
-                  <View style={styles.footerLoader}>
-                    <ActivityIndicator color={Colors.activeMenuText} />
-                    <Text style={styles.footerText}>Cargando más...</Text>
-                  </View>
-                ) : services.length < total ? (
-                  <>
-                    <View style={styles.footerInfo}>
-                      <Text style={styles.footerCount}>
-                        Mostrando {services.length} de {total} servicios
-                      </Text>
-                      <Text style={styles.footerSubtext}>
-                        Scroll hacia abajo para cargar más
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.loadMoreBtn}
-                      onPress={handleLoadMore}
-                      disabled={loading}
-                    >
-                      <Text style={styles.loadMoreBtnText}>Cargar más</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <View style={styles.footerComplete}>
-                    <Text style={styles.footerCompleteText}>
-                      Todos los {total} servicios han sido cargados
-                    </Text>
-                  </View>
-                )}
+            loading && services.length > 0 ? (
+              <View style={styles.footerLoader}>
+                <ActivityIndicator color={Colors.activeMenuText} />
+                <Text style={styles.footerText}>Cargando más...</Text>
+              </View>
+            ) : services.length < total ? (
+              <View style={styles.footerInfo}>
+                <Text style={styles.footerText}>
+                  {services.length} de {total} servicios
+                </Text>
               </View>
             ) : null
           }
-          scrollEnabled={true}
         />
       )}
 
@@ -246,11 +220,6 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 13,
     color: Colors.menuText,
-  },
-
-  filtersContainer: {
-    backgroundColor: Colors.Background,
-    zIndex: 100,
   },
 
   loadingContainer: {
@@ -295,11 +264,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
 
-  footerContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-  },
-
   footerLoader: {
     flexDirection: "row",
     justifyContent: "center",
@@ -315,54 +279,11 @@ const styles = StyleSheet.create({
 
   footerInfo: {
     paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     alignItems: "center",
     backgroundColor: Colors.activeMenuBackground,
     borderRadius: 8,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.activeMenuText,
-  },
-
-  footerCount: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.normalText,
-    marginBottom: 4,
-  },
-
-  footerSubtext: {
-    fontSize: 12,
-    color: Colors.menuText,
-  },
-
-  loadMoreBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: Colors.activeMenuText,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-
-  loadMoreBtnText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.Background,
-  },
-
-  footerComplete: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    backgroundColor: "#E8F5E9",
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: "#4CAF50",
-  },
-
-  footerCompleteText: {
-    fontSize: 13,
-    color: "#2E7D32",
-    fontWeight: "500",
+    marginHorizontal: 16,
+    marginBottom: 20,
   },
 });
