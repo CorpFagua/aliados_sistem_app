@@ -1,291 +1,103 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  FlatList,
-  RefreshControl,
-  Modal,
-  TextInput,
-} from "react-native";
-import { useAuth } from "../../../../providers/AuthProvider";
-import { usePayments } from "../../../../hooks/usePayments";
+
+import React, { useEffect, useState } from "react";
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../../../constans/colors";
+import { fetchDeliveries } from "../../../../services/users";
+import { useAuth } from "../../../../providers/AuthProvider";
+import { useNavigation } from "@react-navigation/native";
+import DeliveryPaymentSummaryScreen from "./DeliveryPaymentSummaryScreen";
 
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(amount);
-};
-
-/**
- * CoordinatorPaymentRequestsScreen - Pantalla de solicitudes de pago pendientes
- */
 export default function CoordinatorPaymentRequestsScreen() {
   const { session } = useAuth();
-  const {
-    getPaymentRequests,
-    approvePaymentRequest,
-    rejectPaymentRequest,
-    loading,
-  } = usePayments(session?.access_token || null);
-
-  const [requests, setRequests] = useState<any[]>([]);
+  const [deliveries, setDeliveries] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
-  const [showApproveModal, setShowApproveModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [modalNotes, setModalNotes] = useState("");
-  const [approving, setApproving] = useState(false);
 
   useEffect(() => {
-    loadRequests();
+    loadDeliveries();
   }, [session]);
 
-  const loadRequests = async () => {
+  const loadDeliveries = async () => {
     if (!session?.access_token) return;
-
-    setRefreshing(true);
+    setLoading(true);
     try {
-      const data = await getPaymentRequests({
-        status: "pending",
-        limit: 100,
-      });
-      setRequests(data);
+      const data = await fetchDeliveries(session.access_token);
+      setDeliveries(data);
     } catch (err) {
-      Alert.alert("Error", "No se pudieron cargar las solicitudes");
+      setDeliveries([]);
     } finally {
+      setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const handleApprove = async () => {
-    if (!selectedRequest) return;
-
-    setApproving(true);
-    try {
-      await approvePaymentRequest(selectedRequest.id, modalNotes);
-      Alert.alert("Éxito", "Solicitud aprobada");
-      setShowApproveModal(false);
-      setModalNotes("");
-      setSelectedRequest(null);
-      loadRequests();
-    } catch (err) {
-      Alert.alert("Error", "No se pudo aprobar la solicitud");
-    } finally {
-      setApproving(false);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!selectedRequest) return;
-
-    setApproving(true);
-    try {
-      await rejectPaymentRequest(selectedRequest.id, modalNotes);
-      Alert.alert("Éxito", "Solicitud rechazada");
-      setShowRejectModal(false);
-      setModalNotes("");
-      setSelectedRequest(null);
-      loadRequests();
-    } catch (err) {
-      Alert.alert("Error", "No se pudo rechazar la solicitud");
-    } finally {
-      setApproving(false);
-    }
-  };
-
-  const renderRequestItem = ({ item }: { item: any }) => (
+  const navigation = useNavigation();
+    const [selectedDelivery, setSelectedDelivery] = useState(null);
+  const renderDeliveryCard = ({ item }) => (
     <TouchableOpacity
-      style={styles.requestCard}
-      onPress={() => setSelectedRequest(item)}
+      style={styles.card}
+      activeOpacity={0.9}
+      onPress={() => setSelectedDelivery(item)}
     >
-      <View style={styles.requestHeader}>
-        <View>
-          <Text style={styles.deliveryName}>Domiciliario</Text>
-          <Text style={styles.deliveryId}>{item.delivery_id}</Text>
-        </View>
-        <Text style={styles.amount}>{formatCurrency(item.amount)}</Text>
-      </View>
-
-      <View style={styles.requestBody}>
-        <View style={styles.statusRow}>
-          <Text style={styles.label}>Estado:</Text>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>Pendiente</Text>
+      <View style={styles.cardHeader}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Ionicons name="person-circle" size={38} color={item.isActive ? Colors.activeMenuText : Colors.menuText} style={{ marginRight: 10 }} />
+          <View>
+            <Text style={styles.name}>{item.name}</Text>
+            <Text style={styles.phone}>{item.phone || "Sin teléfono"}</Text>
           </View>
         </View>
-
-        <View style={styles.dateRow}>
-          <Text style={styles.label}>Solicitado:</Text>
-          <Text style={styles.date}>
-            {new Date(item.requested_at).toLocaleDateString("es-CO")}
-          </Text>
+        <View style={[styles.statusBadge, { backgroundColor: item.isActive ? Colors.success : Colors.error }] }>
+          <Text style={styles.statusText}>{item.isActive ? "Activo" : "Inactivo"}</Text>
         </View>
-
-        {item.notes && (
-          <View style={styles.notesRow}>
-            <Text style={styles.label}>Notas:</Text>
-            <Text style={styles.notes}>{item.notes}</Text>
-          </View>
-        )}
       </View>
-
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={[styles.button, styles.approveButton]}
-          onPress={() => {
-            setSelectedRequest(item);
-            setShowApproveModal(true);
-          }}
-        >
-          <Text style={styles.buttonText}>✓ Aprobar</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.button, styles.rejectButton]}
-          onPress={() => {
-            setSelectedRequest(item);
-            setShowRejectModal(true);
-          }}
-        >
-          <Text style={styles.buttonText}>✗ Rechazar</Text>
-        </TouchableOpacity>
+      <View style={styles.cardBody}>
+        <Text style={styles.label}>Registrado:</Text>
+        <Text style={styles.value}>{item.createdAt ? new Date(item.createdAt).toLocaleDateString("es-CO") : "-"}</Text>
       </View>
     </TouchableOpacity>
   );
 
-  if (loading && requests.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.activeMenuText} />
-        <Text style={styles.loadingText}>Cargando solicitudes...</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Solicitudes de Corte</Text>
-        <Text style={styles.headerSubtitle}>
-          {requests.length} solicitud{requests.length !== 1 ? "es" : ""} pendiente{requests.length !== 1 ? "s" : ""}
-        </Text>
-      </View>
-
-      {requests.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateIcon}>✓</Text>
-          <Text style={styles.emptyStateTitle}>Nada pendiente</Text>
-          <Text style={styles.emptyStateText}>
-            No hay solicitudes de corte pendientes de aprobar
-          </Text>
-        </View>
+      {selectedDelivery ? (
+        <>
+          <TouchableOpacity onPress={() => setSelectedDelivery(null)} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={20} color={Colors.activeMenuText} />
+            <Text style={styles.backButtonText}>Volver a la lista</Text>
+          </TouchableOpacity>
+          <DeliveryPaymentSummaryScreen delivery={selectedDelivery} />
+        </>
       ) : (
-        <FlatList
-          data={requests}
-          renderItem={renderRequestItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadRequests} />}
-        />
+        <>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Domiciliarios</Text>
+            <Text style={styles.headerSubtitle}>Total: {deliveries.length}</Text>
+          </View>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={Colors.activeMenuText} />
+              <Text style={styles.loadingText}>Cargando domiciliarios...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={deliveries}
+              renderItem={renderDeliveryCard}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadDeliveries(); }} />}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Ionicons name="checkmark-circle-outline" size={48} color={Colors.success} />
+                  <Text style={styles.emptyStateTitle}>No hay domiciliarios</Text>
+                  <Text style={styles.emptyStateText}>Aún no tienes domiciliarios registrados.</Text>
+                </View>
+              }
+            />
+          )}
+        </>
       )}
-
-      {/* Modal de Aprobación */}
-      <Modal visible={showApproveModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Aprobar Solicitud</Text>
-            <Text style={styles.modalSubtitle}>
-              ¿Aprobar solicitud por {formatCurrency(selectedRequest?.amount || 0)}?
-            </Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Notas (opcional)"
-              placeholderTextColor={Colors.menuText}
-              value={modalNotes}
-              onChangeText={setModalNotes}
-              multiline
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowApproveModal(false);
-                  setModalNotes("");
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                disabled={approving}
-                onPress={handleApprove}
-              >
-                {approving ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.confirmButtonText}>Aprobar</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Modal de Rechazo */}
-      <Modal visible={showRejectModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Rechazar Solicitud</Text>
-            <Text style={styles.modalSubtitle}>
-              Escribe el motivo del rechazo
-            </Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Motivo del rechazo"
-              placeholderTextColor={Colors.menuText}
-              value={modalNotes}
-              onChangeText={setModalNotes}
-              multiline
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowRejectModal(false);
-                  setModalNotes("");
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.rejectConfirmButton]}
-                disabled={approving}
-                onPress={handleReject}
-              >
-                {approving ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.confirmButtonText}>Rechazar</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -294,16 +106,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.Background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: Colors.menuText,
   },
   header: {
     backgroundColor: Colors.gradientStart,
@@ -326,100 +128,67 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  requestCard: {
+  card: {
     backgroundColor: Colors.activeMenuBackground,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.warning,
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  requestHeader: {
+  cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
+    alignItems: "center",
+    marginBottom: 10,
   },
-  deliveryName: {
-    fontSize: 14,
+  name: {
+    fontSize: 16,
     fontWeight: "bold",
     color: Colors.normalText,
   },
-  deliveryId: {
-    fontSize: 12,
+  phone: {
+    fontSize: 13,
     color: Colors.menuText,
     marginTop: 2,
   },
-  amount: {
-    fontSize: 16,
+  statusBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    alignSelf: "flex-start",
+  },
+  statusText: {
+    color: Colors.Background,
+    fontSize: 12,
     fontWeight: "bold",
-    color: Colors.activeMenuText,
   },
-  requestBody: {
-    marginBottom: 12,
-  },
-  statusRow: {
+  cardBody: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginTop: 6,
   },
   label: {
     fontSize: 12,
     color: Colors.menuText,
     marginRight: 8,
   },
-  statusBadge: {
-    backgroundColor: Colors.warning,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusText: {
-    color: Colors.Background,
-    fontSize: 11,
-    fontWeight: "bold",
-  },
-  dateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  date: {
-    fontSize: 12,
+  value: {
+    fontSize: 13,
     color: Colors.normalText,
   },
-  notesRow: {
-    flexDirection: "row",
-    marginBottom: 0,
-  },
-  notes: {
-    fontSize: 12,
-    color: Colors.normalText,
+  loadingContainer: {
     flex: 1,
-  },
-  actionButtons: {
-    flexDirection: "row",
-    gap: 8,
-    borderTopWidth: 1,
-    borderTopColor: Colors.Border,
-    paddingTop: 12,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
+    justifyContent: "center",
     alignItems: "center",
   },
-  approveButton: {
-    backgroundColor: Colors.success,
-  },
-  rejectButton: {
-    backgroundColor: Colors.error,
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "bold",
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: Colors.menuText,
   },
   emptyState: {
     flex: 1,
@@ -427,15 +196,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingBottom: 100,
   },
-  emptyStateIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
   emptyStateTitle: {
     fontSize: 16,
     fontWeight: "bold",
     color: Colors.normalText,
-    marginBottom: 8,
+    marginTop: 8,
+    marginBottom: 4,
   },
   emptyStateText: {
     fontSize: 13,
@@ -443,67 +209,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 32,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  modal: {
-    backgroundColor: Colors.activeMenuBackground,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 30,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: Colors.normalText,
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: Colors.menuText,
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     marginBottom: 16,
-  },
-  input: {
-    backgroundColor: Colors.Border,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: Colors.normalText,
-    fontSize: 13,
-    marginBottom: 16,
-    minHeight: 80,
-    textAlignVertical: "top",
+    backgroundColor: 'transparent',
   },
-  modalButtons: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  cancelButton: {
-    backgroundColor: Colors.Border,
-  },
-  cancelButtonText: {
-    color: Colors.menuText,
-    fontSize: 13,
-    fontWeight: "bold",
-  },
-  confirmButton: {
-    backgroundColor: Colors.success,
-  },
-  rejectConfirmButton: {
-    backgroundColor: Colors.error,
-  },
-  confirmButtonText: {
-    color: "white",
-    fontSize: 13,
-    fontWeight: "bold",
+  backButtonText: {
+    color: Colors.activeMenuText,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
 });

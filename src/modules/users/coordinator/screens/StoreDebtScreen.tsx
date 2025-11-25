@@ -4,248 +4,83 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   StyleSheet,
   FlatList,
   RefreshControl,
-  Modal,
 } from "react-native";
 import { useAuth } from "../../../../providers/AuthProvider";
-import { usePayments } from "../../../../hooks/usePayments";
 import { Colors } from "../../../../constans/colors";
-
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(amount);
-};
+import { fetchStores } from "../../../../services/stores";
+import { Ionicons } from "@expo/vector-icons";
+import StorePaymentSummaryScreen from "./StorePaymentSummaryScreen";
 
 /**
  * CoordinatorStoreDebtScreen - Pantalla de deuda de tiendas
  */
 export default function CoordinatorStoreDebtScreen() {
   const { session } = useAuth();
-  const {
-    getStorePaymentRecords,
-    markStorePaymentRecordAsPaid,
-    loading,
-  } = usePayments(session?.access_token || null);
 
-  const [records, setRecords] = useState<any[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [marking, setMarking] = useState(false);
+  const [stores, setStores] = useState<any[]>([]);
+  const [loadingStores, setLoadingStores] = useState(true);
+  const [refreshingStores, setRefreshingStores] = useState(false);
 
-  useEffect(() => {
-    loadRecords();
-  }, [session]);
+  const [selectedStore, setSelectedStore] = useState<any | null>(null);
 
-  const loadRecords = async () => {
+  useEffect(() => { loadStores(); }, [session]);
+
+  const loadStores = async () => {
     if (!session?.access_token) return;
-
-    setRefreshing(true);
+    setLoadingStores(true);
     try {
-      const data = await getStorePaymentRecords({ limit: 100 });
-      setRecords(Array.isArray(data) ? data : []);
+      const data = await fetchStores(session.access_token);
+      setStores(Array.isArray(data) ? data : []);
     } catch (err) {
-      Alert.alert("Error", "No se pudieron cargar los registros");
-      setRecords([]);
+      setStores([]);
     } finally {
-      setRefreshing(false);
+      setLoadingStores(false);
+      setRefreshingStores(false);
     }
   };
 
-  const handleMarkAsPaid = async () => {
-    if (!selectedRecord) return;
+  
 
-    setMarking(true);
-    try {
-      await markStorePaymentRecordAsPaid(selectedRecord.id);
-      Alert.alert("Éxito", "Deuda marcada como pagada");
-      setShowConfirmModal(false);
-      setSelectedRecord(null);
-      loadRecords();
-    } catch (err) {
-      Alert.alert("Error", "No se pudo marcar como pagada");
-    } finally {
-      setMarking(false);
-    }
-  };
-
-  const renderRecordItem = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.recordCard}
-      onPress={() => setSelectedRecord(item)}
-    >
+  const renderStoreItem = ({ item }: { item: any }) => (
+    <TouchableOpacity style={styles.recordCard} onPress={() => { setSelectedStore(item); }}>
       <View style={styles.recordHeader}>
         <View>
-          <Text style={styles.storeName}>Tienda</Text>
-          <Text style={styles.storeId}>{item.store_id}</Text>
+          <Text style={styles.storeName}>{item.name}</Text>
+          <Text style={styles.storeId}>{item.id}</Text>
         </View>
         <View style={styles.statusContainer}>
-          <View
-            style={[
-              styles.statusBadge,
-              {
-                backgroundColor:
-                  item.status === "paid"
-                    ? Colors.success
-                    : item.status === "partial"
-                    ? Colors.warning
-                    : Colors.error,
-              },
-            ]}
-          >
-            <Text style={styles.statusText}>
-              {item.status === "paid"
-                ? "Pagado"
-                : item.status === "partial"
-                ? "Parcial"
-                : "Pendiente"}
-            </Text>
-          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.menuText} />
         </View>
       </View>
-
       <View style={styles.recordBody}>
-        <View style={styles.amountRow}>
-          <Text style={styles.label}>Período:</Text>
-          <Text style={styles.period}>{item.period}</Text>
-        </View>
-
-        <View style={styles.amountRow}>
-          <Text style={styles.label}>Cobrado:</Text>
-          <Text style={styles.amount}>{formatCurrency(item.total_charged)}</Text>
-        </View>
-
-        <View style={styles.amountRow}>
-          <Text style={styles.label}>Pagado:</Text>
-          <Text style={styles.amount}>{formatCurrency(item.total_paid)}</Text>
-        </View>
-
-        <View style={styles.pendingRow}>
-          <Text style={styles.label}>Pendiente:</Text>
-          <Text style={styles.pendingAmount}>
-            {formatCurrency(item.total_pending)}
-          </Text>
-        </View>
+        <Text style={styles.label}>{item.address || ''}</Text>
       </View>
-
-      {item.status !== "paid" && (
-        <View style={styles.actionContainer}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => {
-              setSelectedRecord(item);
-              setShowConfirmModal(true);
-            }}
-          >
-            <Text style={styles.actionButtonText}>
-              ✓ Marcar como pagado
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </TouchableOpacity>
   );
 
-  if (loading && records.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.activeMenuText} />
-        <Text style={styles.loadingText}>Cargando registros...</Text>
-      </View>
-    );
-  }
-
-  // Calular totales
-  const totalCharged = (records || []).reduce((sum, r) => sum + (r?.total_charged || 0), 0);
-  const totalPaid = (records || []).reduce((sum, r) => sum + (r?.total_paid || 0), 0);
-  const totalPending = (records || []).reduce((sum, r) => sum + (r?.total_pending || 0), 0);
+  if (loadingStores) return (
+    <View style={styles.loadingContainer}><ActivityIndicator size="large" color={Colors.activeMenuText} /><Text style={styles.loadingText}>Cargando tiendas...</Text></View>
+  );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Deuda de Tiendas</Text>
-        <Text style={styles.headerSubtitle}>
-          {records.length} registro{records.length !== 1 ? "s" : ""}
-        </Text>
-      </View>
-
-      {/* Resumen */}
-      <View style={styles.summaryContainer}>
-        <View style={[styles.summaryCard, { borderLeftColor: Colors.error }]}>
-          <Text style={styles.summaryLabel}>Total Cobrado</Text>
-          <Text style={styles.summaryValue}>{formatCurrency(totalCharged)}</Text>
-        </View>
-
-        <View style={[styles.summaryCard, { borderLeftColor: Colors.success }]}>
-          <Text style={styles.summaryLabel}>Total Pagado</Text>
-          <Text style={styles.summaryValue}>{formatCurrency(totalPaid)}</Text>
-        </View>
-
-        <View style={[styles.summaryCard, { borderLeftColor: Colors.warning }]}>
-          <Text style={styles.summaryLabel}>Pendiente</Text>
-          <Text style={styles.summaryValue}>{formatCurrency(totalPending)}</Text>
-        </View>
-      </View>
-
-      {records.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateIcon}>📊</Text>
-          <Text style={styles.emptyStateTitle}>Sin registros</Text>
-          <Text style={styles.emptyStateText}>
-            No hay deudas de tiendas registradas
-          </Text>
-        </View>
+      {selectedStore ? (
+        <>
+          <StorePaymentSummaryScreen store={selectedStore} onClose={() => setSelectedStore(null)} />
+        </>
       ) : (
-        <FlatList
-          data={records}
-          renderItem={renderRecordItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadRecords} />}
-        />
-      )}
-
-      {/* Modal de confirmación */}
-      <Modal visible={showConfirmModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Confirmar Pago</Text>
-            <Text style={styles.modalText}>
-              ¿Marcar como pagada la deuda de {formatCurrency(selectedRecord?.total_pending || 0)}?
-            </Text>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowConfirmModal(false);
-                  setSelectedRecord(null);
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                disabled={marking}
-                onPress={handleMarkAsPaid}
-              >
-                {marking ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.confirmButtonText}>Confirmar</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+        <>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Tiendas</Text>
+            <Text style={styles.headerSubtitle}>{stores.length} tienda{stores.length !== 1 ? 's' : ''}</Text>
           </View>
-        </View>
-      </Modal>
+
+          <FlatList data={stores} renderItem={renderStoreItem} keyExtractor={(i)=>i.id} contentContainerStyle={styles.listContent} refreshControl={<RefreshControl refreshing={refreshingStores} onRefresh={()=>{ setRefreshingStores(true); loadStores(); }} />} ListEmptyComponent={<Text style={styles.emptyStateText}>No hay tiendas.</Text>} />
+        </>
+      )}
     </View>
   );
 }
@@ -307,20 +142,21 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 20,
   },
   recordCard: {
     backgroundColor: Colors.activeMenuBackground,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: 14,
+    marginBottom: 16,
     borderLeftWidth: 4,
     borderLeftColor: Colors.warning,
   },
   recordHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     marginBottom: 12,
   },
   storeName: {
@@ -347,7 +183,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   recordBody: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   amountRow: {
     flexDirection: "row",
@@ -468,5 +304,110 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 12,
     fontWeight: "bold",
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+  },
+  backButtonText: {
+    color: Colors.activeMenuText,
+    marginLeft: 8,
+    fontWeight: '600',
+  },
+  tabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    gap: 8,
+    marginBottom: 8,
+  },
+  tabButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.activeMenuBackground,
+  },
+  tabActive: {
+    backgroundColor: Colors.gradientStart,
+  },
+  tabText: {
+    color: Colors.menuText,
+  },
+  tabTextActive: {
+    color: Colors.Background,
+    fontWeight: '700',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    gap: 8,
+    marginBottom: 8,
+  },
+  dateInputTouchable: {
+    flex: 1,
+    backgroundColor: Colors.activeMenuBackground,
+    padding: 10,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dateInputText: {
+    color: Colors.menuText,
+  },
+  selectRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  payBtn: {
+    backgroundColor: Colors.warning,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  serviceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: Colors.activeMenuBackground,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  serviceTitle: {
+    color: Colors.normalText,
+    fontWeight: '600',
+  },
+  serviceDetail: {
+    color: Colors.menuText,
+    fontSize: 12,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.Border,
+  },
+  methodBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: Colors.activeMenuBackground,
+    borderRadius: 8,
+  },
+  methodBtnActive: {
+    backgroundColor: Colors.gradientStart,
+  },
+  input: {
+    width: '100%',
+    backgroundColor: Colors.activeMenuBackground,
+    padding: 10,
+    borderRadius: 8,
+    color: Colors.menuText,
+    marginBottom: 12,
   },
 });

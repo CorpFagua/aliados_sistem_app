@@ -7,26 +7,26 @@ export const Colors = {
   tabBarBorder: "#2A2A2A",
 
   // Texto
-  menuText: "#9E9E9E",           // Gris medio para texto inactivo
-  activeMenuText: "#FFD60A",     // Amarillo brillante (Uber usa este tono)
-  tabText: "#9E9E9E",
-  activeTabText: "#00FF75",      // Verde neón para resaltar tab activo
+  menuText: "#A8A8A8",           // Gris medio para texto inactivo (ligeramente más suave)
+  activeMenuText: "#F4C542",     // Amarillo cálido, color principal (no tan brillante)
+  tabText: "#A8A8A8",
+  activeTabText: "#F4C542",      // Mantener amarillo para tab activo (más discreto)
   normalText: "#FFFFFF",         // Texto principal blanco
 
   // Iconos
-  iconDefault: "#9E9E9E",        // Gris medio
-  iconActive: "#FFD60A",         // Amarillo Uber
+  iconDefault: "#A8A8A8",        // Gris medio
+  iconActive: "#F4C542",         // Amarillo cálido
 
-  // Gradientes (opcional, si quieres darle vida a botones/headers)
-  gradientStart: "#00FF75",      // Verde neón
-  gradientEnd: "#2563EB",        // Azul intenso
-  gradientAltStart: "#FFD60A",   // Amarillo Uber
-  gradientAltEnd: "#FF00FF",     // Fucsia vibrante
+  // Gradientes (suaves, basados en amarillo / naranja)
+  gradientStart: "#FFD36E",      // Amarillo suave
+  gradientEnd: "#FFB347",        // Naranja cálido
+  gradientAltStart: "#F4C542",   // Amarillo cálido
+  gradientAltEnd: "#E89B2C",     // Marrón-anaranjado suave
 
 
   // Alertas
-success: "#00FF75",   // Verde neón para acciones positivas
-warning: "#FFD60A",   // Amarillo brillante para alertas
-error: "#FF3B30",     // Rojo para errores
+  success: "#28A745",   // Verde moderado para acciones positivas
+  warning: "#F4C542",   // Amarillo cálido para alertas
+  error: "#FF3B30",     // Rojo para errores
 
 };
