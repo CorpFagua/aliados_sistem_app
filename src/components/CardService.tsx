@@ -1,9 +1,10 @@
 /**
- * CardService - Card para mostrar resumen de un servicio en el historial
+ * CardService - Tarjeta minimalista para historial
+ * Muestra: Tienda, ID, Estado, Fecha, Domiciliario, Tipo y Pago
  */
 
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
 import { Colors } from "../constans/colors";
 import { ServiceHistorySummary } from "../hooks/useServiceHistory";
 
@@ -11,6 +12,9 @@ interface CardServiceProps {
   service: ServiceHistorySummary;
   onPress: () => void;
 }
+
+const { width: screenWidth } = Dimensions.get("window");
+const isLargeScreen = screenWidth > 600;
 
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat("es-CO", {
@@ -68,79 +72,38 @@ const getStatusLabel = (status: string): string => {
 };
 
 export default function CardService({ service, onPress }: CardServiceProps) {
-  // Guard clauses para datos nulos
-  const storeName = service.store?.name || "Tienda sin nombre";
-  const zoneName = service.zone?.name || "Zona no asignada";
-  const deliveryName = service.delivery?.name || "Domiciliario";
   const typeName = service.type?.name || "Domicilio";
+  const profileStoreName = service.profileStore?.name || "Sucursal";
+  const deliveryName = service.delivery?.name || "Sin asignar";
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      {/* Header con tienda y estado */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.storeName}>{storeName}</Text>
-          <Text style={styles.serviceId}>ID: {service.id.slice(-8)}</Text>
-          <Text style={styles.date}>{formatDate(service.createdAt)}</Text>
-        </View>
-
-        <View style={styles.statusBadge}>
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: getStatusColor(service.status) },
-            ]}
-          />
-          <Text style={styles.statusLabel}>{getStatusLabel(service.status)}</Text>
-        </View>
-      </View>
-
-      {/* Información del cliente y dirección */}
-      <View style={styles.clientInfo}>
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>👤 Cliente:</Text>
-          <Text style={styles.value}>{service.clientName || "Cliente desconocido"}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>📍 Entrega:</Text>
-          <Text style={[styles.value, styles.address]} numberOfLines={1}>
-            {service.deliveryAddress || "Dirección no disponible"}
-          </Text>
-        </View>
-        {service.zone && (
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>🗺️ Zona:</Text>
-            <Text style={styles.value}>{zoneName}</Text>
+    <View style={styles.cardWrapper}>
+      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+        {/* Header Minimalista */}
+        <View style={styles.topRow}>
+          <View style={styles.titleSection}>
+            <Text style={styles.storeName}>{profileStoreName}</Text>
+            <Text style={styles.serviceId}>#{service.id.slice(-6)}</Text>
           </View>
-        )}
-      </View>
 
-      {/* Información de precios y pago */}
-      <View style={styles.priceSection}>
-        <View style={styles.priceRow}>
-          <Text style={styles.priceLabel}>Precio Servicio:</Text>
-          <Text style={styles.priceValue}>{formatCurrency(service.price || 0)}</Text>
-        </View>
-
-        {service.delivery && (
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Ganancia Domiciliario:</Text>
-            <Text style={[styles.priceValue, { color: "#10B981" }]}>
-              {formatCurrency(service.priceDelivery || 0)}
-            </Text>
+          <View style={styles.statusBadge}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: getStatusColor(service.status) },
+              ]}
+            />
+            <Text style={styles.statusLabel}>{getStatusLabel(service.status)}</Text>
           </View>
-        )}
-
-        <View style={styles.priceRow}>
-          <Text style={styles.priceLabel}>Cobrado a Tienda:</Text>
-          <Text style={[styles.priceValue, { color: "#3B82F6" }]}>
-            {formatCurrency(service.storeCharge || 0)}
-          </Text>
         </View>
-      </View>
 
-      {/* Footer con tipo de servicio y pago */}
-      <View style={styles.footer}>
+        {/* Info Esencial */}
+        <View style={styles.essentialInfo}>
+          <Text style={styles.dateText}>{formatDate(service.createdAt)}</Text>
+          <Text style={styles.deliveryText}>Por: {deliveryName}</Text>
+        </View>
+
+        {/* Badges Footer */}
         <View style={styles.badgesRow}>
           <View style={styles.typeBadge}>
             <Text style={styles.typeBadgeText}>{typeName}</Text>
@@ -148,54 +111,51 @@ export default function CardService({ service, onPress }: CardServiceProps) {
 
           {service.isPaid ? (
             <View style={[styles.paidBadge, { backgroundColor: "#D1FAE5" }]}>
-              <Text style={[styles.paidBadgeText, { color: "#065F46" }]}>✓ Pagado</Text>
+              <Text style={[styles.paidBadgeText, { color: "#065F46" }]}>Pagada</Text>
             </View>
           ) : (
             <View style={[styles.paidBadge, { backgroundColor: "#FEE2E2" }]}>
-              <Text style={[styles.paidBadgeText, { color: "#991B1B" }]}>⏳ Pendiente</Text>
-            </View>
-          )}
-
-          {service.delivery && (
-            <View style={styles.deliveryBadge}>
-              <Text style={styles.deliveryBadgeText}>{deliveryName}</Text>
+              <Text style={[styles.paidBadgeText, { color: "#991B1B" }]}>Pendiente</Text>
             </View>
           )}
         </View>
-
-        <Text style={styles.tapHint}>Toca para ver detalles</Text>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.activeMenuBackground,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.activeMenuText,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+  cardWrapper: {
+    alignItems: "center",
+    width: "100%",
+    paddingHorizontal: isLargeScreen ? 12 : 0,
   },
 
-  // Header
-  header: {
+  card: {
+    backgroundColor: Colors.activeMenuBackground,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.activeMenuText,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
+    width: isLargeScreen ? Math.min(screenWidth - 24, 550) : "100%",
+    maxWidth: isLargeScreen ? 550 : "100%",
+  },
+
+  // Top Row - Nombre + ID | Estado
+  topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 12,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.Border,
+    marginBottom: 10,
   },
 
-  headerLeft: {
+  titleSection: {
     flex: 1,
   },
 
@@ -209,13 +169,7 @@ const styles = StyleSheet.create({
   serviceId: {
     fontSize: 11,
     color: Colors.menuText,
-    marginBottom: 2,
-  },
-
-  date: {
-    fontSize: 10,
-    color: Colors.menuText,
-    fontStyle: "italic",
+    fontWeight: "500",
   },
 
   statusBadge: {
@@ -229,87 +183,41 @@ const styles = StyleSheet.create({
   },
 
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     marginRight: 4,
   },
 
   statusLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
     color: Colors.normalText,
   },
 
-  // Cliente info
-  clientInfo: {
-    marginBottom: 12,
+  // Essential Info - Fecha y Domiciliario
+  essentialInfo: {
+    marginBottom: 10,
+    paddingVertical: 8,
     paddingHorizontal: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.Border,
   },
 
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-
-  label: {
+  dateText: {
     fontSize: 11,
-    fontWeight: "600",
     color: Colors.menuText,
-    width: 90,
+    marginBottom: 4,
+    fontStyle: "italic",
   },
 
-  value: {
-    fontSize: 12,
+  deliveryText: {
+    fontSize: 11,
+    fontWeight: "500",
     color: Colors.normalText,
-    fontWeight: "500",
-    flex: 1,
   },
 
-  address: {
-    flex: 1,
-  },
-
-  // Precios
-  priceSection: {
-    marginBottom: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    backgroundColor: Colors.Background,
-    borderRadius: 8,
-  },
-
-  priceRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-
-  priceRow_last: {
-    marginBottom: 0,
-  },
-
-  priceLabel: {
-    fontSize: 11,
-    color: Colors.menuText,
-    fontWeight: "500",
-  },
-
-  priceValue: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: Colors.activeMenuText,
-  },
-
-  // Footer
-  footer: {
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: 8,
-  },
-
+  // Badges Footer
   badgesRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -321,11 +229,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.activeMenuText,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 5,
   },
 
   typeBadgeText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "600",
     color: Colors.Background,
   },
@@ -333,11 +241,11 @@ const styles = StyleSheet.create({
   paidBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 5,
   },
 
   paidBadgeText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "600",
   },
 
@@ -345,20 +253,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#E0E7FF",
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 5,
   },
 
   deliveryBadgeText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "600",
     color: "#3730A3",
-  },
-
-  tapHint: {
-    fontSize: 9,
-    color: Colors.menuText,
-    fontStyle: "italic",
-    alignSelf: "center",
-    marginTop: 2,
   },
 });

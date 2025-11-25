@@ -1,5 +1,6 @@
 /**
  * Hook para obtener y gestionar historial de servicios del coordinador
+ * Los tipos se importan del service (sincronizados con backend)
  */
 
 import { useCallback, useState, useRef } from "react";
@@ -7,124 +8,41 @@ import {
   fetchServiceHistory,
   fetchServiceDetail,
   fetchHistoryStatistics,
+  ServiceHistorySummary,
+  ServiceHistoryDetail,
+  ServiceHistoryFilters,
+  ServiceHistoryResponse,
+  HistoryStatistics,
+  ServiceStatus,
+  ServiceType,
+  PaymentMethod,
+  StoreInfo,
+  ProfileStoreInfo,
+  DeliveryInfo,
+  ZoneInfo,
+  ServiceTypeInfo,
+  DeliveryTimeAnalysis,
+  ServiceEvent,
 } from "../services/serviceHistory";
 
-export interface StoreInfo {
-  id: string;
-  name: string;
-  type: "credito" | "efectivo";
-}
-
-export interface DeliveryInfo {
-  id: string;
-  name: string;
-  phone?: string;
-}
-
-export interface ZoneInfo {
-  id: string;
-  name: string;
-}
-
-export interface ServiceTypeInfo {
-  id: string;
-  name: string;
-}
-
-export interface DeliveryTimeAnalysis {
-  timeToRoute: number | null;
-  timeToDelivery: number | null;
-  totalTime: number | null;
-  averageTimeToRouteInZone: number;
-  averageTimeToDeliveryInZone: number;
-  comparisonToZoneAverage: {
-    timeToRoutePercent: number;
-    timeToDeliveryPercent: number;
-  };
-  deliveryAverageTimeToRoute: number;
-  deliveryAverageTimeToDelivery: number;
-  comparisonToDeliveryAverage: {
-    timeToRoutePercent: number;
-    timeToDeliveryPercent: number;
-  };
-  performanceScore: number;
-}
-
-export interface ServiceEvent {
-  timestamp: string;
-  status: string;
-  actor?: string;
-  actorRole: "store" | "delivery" | "coordinator";
-  notes?: string;
-}
-
-export interface ServiceHistorySummary {
-  id: string;
-  clientName: string;
-  clientPhone: string;
-  deliveryAddress: string;
-  store: StoreInfo;
-  delivery?: DeliveryInfo;
-  zone: ZoneInfo;
-  type: ServiceTypeInfo;
-  status: string;
-  paymentMethod: string;
-  isPaid: boolean;
-  price: number;
-  priceDelivery: number;
-  storeCharge: number;
-  totalToCollect: number;
-  createdAt: string;
-  completedAt?: string;
-  assignedAt?: string;
-  truyectoAt?: string;
-  finalizedAt?: string;
-  notes?: string;
-  expectedAt?: string;
-}
-
-export interface ServiceHistoryDetail extends ServiceHistorySummary {
-  pickupAddress?: string;
-  prepTime?: number;
-  timeline: ServiceEvent[];
-  timeAnalysis: DeliveryTimeAnalysis;
-}
-
-export interface ServiceHistoryFilters {
-  limit?: number;
-  offset?: number;
-  search?: string;
-  startDate?: string;
-  endDate?: string;
-  storeId?: string;
-  deliveryId?: string;
-  zoneId?: string;
-  type?: string;
-  status?: string;
-  isPaid?: boolean;
-  sortBy?: "created_at" | "completed_at" | "price";
-  sortOrder?: "asc" | "desc";
-}
-
-export interface ServiceHistoryResponse {
-  items: ServiceHistorySummary[];
-  total: number;
-  limit: number;
-  offset: number;
-  hasMore: boolean;
-}
-
-export interface HistoryStatistics {
-  totalServices: number;
-  totalEarnings: number;
-  totalCollected: number;
-  averageDeliveryTime: number;
-  completionRate: number;
-  paymentRate: number;
-  byType: Record<string, { count: number; earnings: number }>;
-  byZone: Record<string, { count: number; averageDeliveryTime: number; earnings: number }>;
-  byDelivery: Record<string, { count: number; averageDeliveryTime: number; earnings: number; paymentRate: number }>;
-}
+// Exportar tipos para que otros componentes los usen
+export type {
+  ServiceHistorySummary,
+  ServiceHistoryDetail,
+  ServiceHistoryFilters,
+  ServiceHistoryResponse,
+  HistoryStatistics,
+  ServiceStatus,
+  ServiceType,
+  PaymentMethod,
+  StoreInfo,
+  ProfileStoreInfo,
+  DeliveryInfo,
+  ZoneInfo,
+  ServiceTypeInfo,
+  DeliveryTimeAnalysis,
+  ServiceEvent,
+};
 
 export function useServiceHistory(token: string | null) {
   const [services, setServices] = useState<ServiceHistorySummary[]>([]);
@@ -145,6 +63,7 @@ export function useServiceHistory(token: string | null) {
 
   /**
    * 📊 Obtener historial de servicios
+   * El backend obtiene datos de Supabase con joins optimizados
    */
   const getServiceHistory = useCallback(
     async (filters: ServiceHistoryFilters, append: boolean = false) => {
@@ -179,7 +98,8 @@ export function useServiceHistory(token: string | null) {
   );
 
   /**
-   * 📋 Obtener detalle de un servicio
+   * 📋 Obtener detalle de un servicio con timeline y análisis
+   * El backend calcula tiempos y crea timeline en Supabase
    */
   const getServiceDetail = useCallback(
     async (serviceId: string) => {
@@ -206,7 +126,8 @@ export function useServiceHistory(token: string | null) {
   );
 
   /**
-   * 📈 Obtener estadísticas
+   * 📈 Obtener estadísticas agrupadas por tipo, zona y domiciliario
+   * El backend agrupa y calcula porcentajes en Supabase
    */
   const getStatistics = useCallback(
     async (filters?: Partial<ServiceHistoryFilters>) => {
@@ -262,7 +183,7 @@ export function useServiceHistory(token: string | null) {
   );
 
   /**
-   * 🔄 Refrescar
+   * 🔄 Refrescar listado
    */
   const refresh = useCallback(() => {
     getServiceHistory({

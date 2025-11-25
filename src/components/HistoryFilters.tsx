@@ -21,6 +21,7 @@ import { ServiceHistoryFilters } from "../hooks/useServiceHistory";
 interface HistoryFiltersProps {
   onFiltersChange: (filters: Partial<ServiceHistoryFilters>) => void;
   onSearch: (searchTerm: string) => void;
+  onClear?: () => void;
   loading?: boolean;
 }
 
@@ -42,13 +43,14 @@ const SERVICE_STATUS = [
 
 const PAYMENT_STATUS = [
   { label: "Todos", value: undefined },
-  { label: "Pagado", value: true },
+  { label: "Pagada", value: true },
   { label: "Pendiente", value: false },
 ];
 
 export default function HistoryFilters({
   onFiltersChange,
   onSearch,
+  onClear,
   loading = false,
 }: HistoryFiltersProps) {
   const [searchText, setSearchText] = useState("");
@@ -76,9 +78,12 @@ export default function HistoryFilters({
       }
 
       // Debounce: esperar 300ms antes de hacer la búsqueda
-      searchTimeoutRef.current = setTimeout(() => {
-        onSearch(text);
-      }, 300);
+      // Solo busca si el texto tiene al menos 2 caracteres o está vacío
+      if (text.length >= 2 || text === "") {
+        searchTimeoutRef.current = setTimeout(() => {
+          onSearch(text.trim());
+        }, 300);
+      }
     },
     [onSearch]
   );
@@ -150,7 +155,10 @@ export default function HistoryFilters({
       clearTimeout(searchTimeoutRef.current);
     }
     onSearch("");
-  }, [onFiltersChange, onSearch]);
+
+    // Llamar callback opcional
+    onClear?.();
+  }, [onFiltersChange, onSearch, onClear]);
 
   const hasActiveFilters =
     searchText ||
@@ -167,15 +175,16 @@ export default function HistoryFilters({
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar tienda, cliente..."
+          placeholder="Buscar tienda, cliente, teléfono..."
           placeholderTextColor={Colors.menuText}
           value={searchText}
           onChangeText={handleSearchChange}
-          editable={!loading}
+          editable={true}
           autoCorrect={false}
+          autoCapitalize="none"
         />
         {searchText ? (
-          <TouchableOpacity onPress={() => handleSearchChange("")}>
+          <TouchableOpacity onPress={() => handleSearchChange("")} disabled={loading}>
             <Text style={styles.clearIcon}>×</Text>
           </TouchableOpacity>
         ) : null}
@@ -275,7 +284,7 @@ export default function HistoryFilters({
             <Text style={styles.filterBtnText}>
               {selectedPayment !== undefined
                 ? PAYMENT_STATUS.find((p) => p.value === selectedPayment)?.label
-                : "Pago"}
+                : "Pago Admin"}
             </Text>
             {showPaymentMenu && <Text style={styles.dropIcon}>▲</Text>}
             {!showPaymentMenu && <Text style={styles.dropIcon}>▼</Text>}

@@ -1,8 +1,13 @@
 /**
- * HistoryScreen - Pantalla de historial de servicios para Coordinador
+ * HistorialScreen v3 - Con Real-time Subscriptions
+ * ✅ Filtrado local (sin nuevas peticiones)
+ * ✅ Carga más si no está todo
+ * ✅ Suscripción en tiempo real (Supabase)
+ * ✅ Nuevo servicio aparece instantáneamente
+ * ✅ Cambios se reflejan sin refrescar
  */
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -11,14 +16,21 @@ import {
   RefreshControl,
   StyleSheet,
   Alert,
-  TouchableOpacity,
+  Dimensions,
+  ListRenderItemInfo,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../../../../providers/AuthProvider";
-import { useServiceHistory, ServiceHistoryFilters } from "../../../../hooks/useServiceHistory";
+import { useServiceHistoryRealtime } from "../../../../hooks/useServiceHistoryRealtime";
 import { Colors } from "../../../../constans/colors";
 import CardService from "../../../../components/CardService";
 import HistoryFilters from "../../../../components/HistoryFilters";
 import ServiceDetailModal from "../../../../components/ServiceDetailModal";
+import { ServiceHistorySummary } from "../../../../services/serviceHistory";
+
+const { width: screenWidth } = Dimensions.get("window");
+const isLargeScreen = screenWidth > 600;
+const contentMaxWidth = isLargeScreen ? 600 : "100%";
 
 export default function CoordinatorHistoryScreen() {
   const { session } = useAuth();
@@ -26,35 +38,49 @@ export default function CoordinatorHistoryScreen() {
     services,
     total,
     loading,
+    isLoadingMore,
     error,
     selectedService,
     serviceLoading,
     getServiceHistory,
     getServiceDetail,
-    loadMore,
     search,
+    applyFilters,
+    clearFilters,
     refresh,
+    loadMore,
+    saveScrollPosition,
     setSelectedService,
     setError,
-  } = useServiceHistory(session?.access_token || null);
+  } = useServiceHistoryRealtime(session?.access_token || null);
 
   const [refreshing, setRefreshing] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [currentFilters, setCurrentFilters] = useState<ServiceHistoryFilters>({
-    limit: 20,
-    offset: 0,
-    sortBy: "created_at",
-    sortOrder: "desc",
-  });
 
-  // Cargar historial inicial
+  const flatListRef = useRef<FlatList>(null);
+  const scrollPositionRef = useRef({ offset: 0, index: 0 });
+
   useEffect(() => {
     if (session?.access_token) {
       loadInitialHistory();
     }
   }, [session?.access_token]);
 
-  // Mostrar errores
+  useFocusEffect(
+    useCallback(() => {
+      const { index } = scrollPositionRef.current;
+      if (flatListRef.current && index > 0) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({
+            index,
+            animated: false,
+          });
+        }, 100);
+      }
+      return () => {};
+    }, [])
+  );
+
   useEffect(() => {
     if (error) {
       Alert.alert("Error", error);
@@ -64,7 +90,7 @@ export default function CoordinatorHistoryScreen() {
 
   const loadInitialHistory = async () => {
     await getServiceHistory({
-      limit: 20,
+      limit: 50,
       offset: 0,
       sortBy: "created_at",
       sortOrder: "desc",
@@ -80,31 +106,16 @@ export default function CoordinatorHistoryScreen() {
     }
   };
 
-  const handleLoadMore = () => {
-    if (!loading && services.length < total) {
-      loadMore();
-    }
-  };
-
   const handleSearch = (searchTerm: string) => {
-    setCurrentFilters((prev) => ({
-      ...prev,
-      search: searchTerm,
-      offset: 0,
-    }));
-
-    search(searchTerm, { offset: 0 });
+    search(searchTerm);
   };
 
-  const handleFiltersChange = (newFilters: Partial<ServiceHistoryFilters>) => {
-    const updatedFilters = {
-      ...currentFilters,
-      ...newFilters,
-      offset: 0, // Reset pagination
-    };
+  const handleFiltersChange = (newFilters: any) => {
+    applyFilters(newFilters);
+  };
 
-    setCurrentFilters(updatedFilters);
-    getServiceHistory(updatedFilters);
+  const handleClearFilters = () => {
+    clearFilters();
   };
 
   const handleServicePress = async (serviceId: string) => {
@@ -112,9 +123,69 @@ export default function CoordinatorHistoryScreen() {
     await getServiceDetail(serviceId);
   };
 
-  const renderServiceItem = ({ item }: { item: any }) => (
+  const handleScroll = (event: any) => {
+    const offset = event.nativeEvent.contentOffset.y;
+    const index = Math.floor(
+      offset / (event.nativeEvent.layoutMeasurement.height / 3)
+    );
+    scrollPositionRef.current = { offset, index };
+    saveScrollPosition(offset, index);
+  };
+
+  const handleEndReached = () => {
+    if (!loading && !isLoadingMore && services.length < total) {
+      console.log("[INFINITE] Cargando más servicios...");
+      loadMore();
+    }
+  };
+
+  const renderServiceItem = ({ item }: ListRenderItemInfo<ServiceHistorySummary>) => (
     <CardService service={item} onPress={() => handleServicePress(item.id)} />
   );
+
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyIcon}>📭</Text>
+      <Text style={styles.emptyTitle}>Sin servicios</Text>
+      <Text style={styles.emptyText}>
+        No hay servicios que coincidan con los filtros aplicados
+      </Text>
+    </View>
+  );
+
+  const renderFooter = () => {
+    if (services.length === 0) return null;
+
+    if (isLoadingMore) {
+      return (
+        <View style={styles.footerContainer}>
+          <ActivityIndicator color={Colors.activeMenuText} size="small" />
+          <Text style={styles.footerText}>Cargando más servicios...</Text>
+        </View>
+      );
+    }
+
+    if (services.length < total) {
+      return (
+        <View style={styles.footerContainer}>
+          <Text style={styles.footerText}>
+            Mostrando {services.length} de {total} servicios
+          </Text>
+          <Text style={styles.footerSubtext}>
+            Scroll hacia abajo para cargar más
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.footerComplete}>
+        <Text style={styles.footerCompleteText}>
+          Todos los {total} servicios cargados
+        </Text>
+      </View>
+    );
+  };
 
   if (loading && services.length === 0) {
     return (
@@ -126,39 +197,37 @@ export default function CoordinatorHistoryScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Historial de Servicios</Text>
-        <Text style={styles.headerSubtitle}>
-          {total} servicio{total !== 1 ? "s" : ""} en total
-        </Text>
-      </View>
-
-      {/* Filtros FUERA del FlatList (no se cubren) */}
-      <View style={styles.filtersContainer}>
-        <HistoryFilters
-          onFiltersChange={handleFiltersChange}
-          onSearch={handleSearch}
-          loading={loading}
-        />
-      </View>
-
-      {/* Lista de servicios */}
-      {services.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>📭</Text>
-          <Text style={styles.emptyTitle}>Sin servicios</Text>
-          <Text style={styles.emptyText}>
-            No hay servicios que coincidan con los filtros aplicados
+    <View style={styles.screenWrapper}>
+      <View style={styles.contentContainer}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Historial de Servicios</Text>
+          <Text style={styles.headerSubtitle}>
+            {services.length} de {total} servicio{total !== 1 ? "s" : ""}{" "}
+            {total > services.length && "(cargando más...)"}
           </Text>
         </View>
-      ) : (
+
+        <View style={styles.filtersContainer}>
+          <HistoryFilters
+            onFiltersChange={handleFiltersChange}
+            onSearch={handleSearch}
+            onClear={handleClearFilters}
+            loading={loading}
+          />
+        </View>
+
         <FlatList
+          ref={flatListRef}
           data={services}
           keyExtractor={(item) => item.id}
           renderItem={renderServiceItem}
           contentContainerStyle={styles.listContent}
+          ListEmptyComponent={renderEmpty}
+          ListFooterComponent={renderFooter}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.3}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -166,49 +235,13 @@ export default function CoordinatorHistoryScreen() {
               tintColor={Colors.activeMenuText}
             />
           }
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            services.length > 0 ? (
-              <View style={styles.footerContainer}>
-                {loading && services.length > 0 ? (
-                  <View style={styles.footerLoader}>
-                    <ActivityIndicator color={Colors.activeMenuText} />
-                    <Text style={styles.footerText}>Cargando más...</Text>
-                  </View>
-                ) : services.length < total ? (
-                  <>
-                    <View style={styles.footerInfo}>
-                      <Text style={styles.footerCount}>
-                        Mostrando {services.length} de {total} servicios
-                      </Text>
-                      <Text style={styles.footerSubtext}>
-                        Scroll hacia abajo para cargar más
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.loadMoreBtn}
-                      onPress={handleLoadMore}
-                      disabled={loading}
-                    >
-                      <Text style={styles.loadMoreBtnText}>Cargar más</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <View style={styles.footerComplete}>
-                    <Text style={styles.footerCompleteText}>
-                      Todos los {total} servicios han sido cargados
-                    </Text>
-                  </View>
-                )}
-              </View>
-            ) : null
-          }
-          scrollEnabled={true}
+          initialNumToRender={10}
+          maxToRenderPerBatch={20}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={true}
         />
-      )}
+      </View>
 
-      {/* Modal de detalle */}
       <ServiceDetailModal
         visible={showDetailModal}
         service={selectedService}
@@ -223,15 +256,23 @@ export default function CoordinatorHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screenWrapper: {
     flex: 1,
+    alignItems: "center",
+    width: "100%",
     backgroundColor: Colors.Background,
   },
 
+  contentContainer: {
+    width: isLargeScreen ? contentMaxWidth : "100%",
+    paddingHorizontal: isLargeScreen ? 12 : 0,
+    flex: 1,
+  },
+
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    backgroundColor: Colors.Background,
     borderBottomWidth: 1,
     borderBottomColor: Colors.Border,
   },
@@ -244,13 +285,16 @@ const styles = StyleSheet.create({
   },
 
   headerSubtitle: {
-    fontSize: 13,
+    fontSize: 14,
     color: Colors.menuText,
+    textAlign: "left",
   },
 
   filtersContainer: {
     backgroundColor: Colors.Background,
     zIndex: 100,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
 
   loadingContainer: {
@@ -291,68 +335,39 @@ const styles = StyleSheet.create({
   },
 
   listContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 0,
+    paddingVertical: 10,
   },
 
   footerContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-  },
-
-  footerLoader: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 16,
-    gap: 8,
-  },
-
-  footerText: {
-    fontSize: 12,
-    color: Colors.menuText,
-  },
-
-  footerInfo: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     alignItems: "center",
     backgroundColor: Colors.activeMenuBackground,
+    marginHorizontal: 12,
+    marginVertical: 8,
     borderRadius: 8,
-    marginBottom: 12,
     borderLeftWidth: 4,
     borderLeftColor: Colors.activeMenuText,
   },
 
-  footerCount: {
-    fontSize: 14,
-    fontWeight: "600",
+  footerText: {
+    fontSize: 13,
+    fontWeight: "500",
     color: Colors.normalText,
-    marginBottom: 4,
   },
 
   footerSubtext: {
     fontSize: 12,
     color: Colors.menuText,
-  },
-
-  loadMoreBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: Colors.activeMenuText,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-
-  loadMoreBtnText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.Background,
+    marginTop: 4,
   },
 
   footerComplete: {
     paddingVertical: 16,
     paddingHorizontal: 16,
+    marginHorizontal: 12,
+    marginVertical: 8,
     alignItems: "center",
     backgroundColor: "#E8F5E9",
     borderRadius: 8,
