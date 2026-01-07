@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "67132130281",
+    "project_id": "aliados-sistem-app",
+    "storage_bucket": "aliados-sistem-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:67132130281:android:dfba24c6d03d42345dc178",
+        "android_client_info": {
+          "package_name": "com.wolfagua.aliados_sistem_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSD0GqQvl2tAlISd91lMLzmSZdlj3A8KA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

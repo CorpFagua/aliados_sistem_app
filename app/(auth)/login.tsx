@@ -1,56 +1,77 @@
-import { View, StyleSheet, ImageBackground, useWindowDimensions } from "react-native";
+import { View, StyleSheet, useWindowDimensions, KeyboardAvoidingView, Platform, SafeAreaView } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import LoginForm from "../../src/modules/auth/components/LoginForm";
 
 export default function LoginScreen() {
   const { width } = useWindowDimensions();
-  const isLargeScreen = width > 768; // tablets/desktop
+  const isLargeScreen = width > 768;
+  const cardWidth = isLargeScreen ? 400 : width;
 
   return (
-    <ImageBackground
-      source={require("../../assets/images/Background.png")}
-      style={styles.background}
-      resizeMode="cover"
-    >
-      <View style={styles.container}>
-        <BlurView
-          intensity={90}
-          tint="light"
-          style={[
-            styles.glassContainer,
-            { width: isLargeScreen ? 400 : width * 0.9 }, // 400px en grande, 90% en móviles
-          ]}
-        >
-          <LoginForm />
-        </BlurView>
-      </View>
-      <StatusBar style="light" />
-    </ImageBackground>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.container}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
+        {isLargeScreen ? (
+          <LinearGradient
+            colors={["#00FF75", "#2563EB"]}
+            start={[0, 0]}
+            end={[1, 1]}
+            style={[styles.card, { width: cardWidth }]}
+          >
+            <View style={styles.innerCard}>
+              <LoginForm />
+            </View>
+          </LinearGradient>
+        ) : (
+          <View style={styles.mobileContainer}>
+            <LoginForm />
+          </View>
+        )}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
+  safeArea: {
     flex: 1,
-    width: "100%",
-    height: "100%",
+    backgroundColor: "#111",
   },
   container: {
     flex: 1,
+    backgroundColor: "#111",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 10,
   },
-  glassContainer: {
-    padding: 20,
-    borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 8,
+  card: {
+    borderRadius: 22,
+    shadowColor: "#00FF75",
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 16,
+    padding: 3,
+  },
+  innerCard: {
+    backgroundColor: "#171717",
+    borderRadius: 19,
+    paddingVertical: 36,
+    paddingHorizontal: 28,
+    minWidth: 280,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mobileContainer: {
+    width: "100%",
+    height: "100%",
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === "android" ? 40 : 0,
+    backgroundColor: "#171717",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

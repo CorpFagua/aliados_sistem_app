@@ -1,99 +1,99 @@
 import { useState } from "react"
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, Platform, useWindowDimensions } from "react-native"
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from "react-native"
 import { useAuth } from "@/providers/AuthProvider"
+import Toast from 'react-native-toast-message'; // 👈 Importar Toast
 
 export default function LoginForm() {
-  const { width } = useWindowDimensions();
-  const isLargeScreen = width > 768;
   const { login } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
-  const showAlert = (title: string, message: string) => {
-    if (Platform.OS === 'web') {
-        window.alert(`${title}\n${message}`);
-    } else {
-        Alert.alert(title, message, [{ text: 'OK' }]);
-    }
-  };
-
   const handleLogin = async () => {
+    // 1. Manejo de campos vacíos
     if (!email || !password) {
-      showAlert("Campos requeridos", "Por favor ingresa tu correo y contraseña");
-      return;
+        Toast.show({
+            type: 'error',
+            text1: 'Campos requeridos',
+            text2: 'Por favor, introduce tu correo y contraseña.',
+            position: 'top',
+        });
+        return;
     }
 
+    setIsLoading(true);
     try {
-      setIsLoading(true);
       await login(email, password);
+      // Opcional: Mostrar un Toast de éxito (aunque la redirección es suficiente)
+      // Toast.show({
+      //    type: 'success',
+      //    text1: '¡Bienvenido!',
+      //    text2: 'Has iniciado sesión correctamente.',
+      // });
     } catch (error: any) {
+      // 2. Mostrar Toast en caso de error
+      let errorMessage = 'Error de inicio de sesión. Inténtalo de nuevo.';
       
-      if (error.message === "Usuario inactivo") {
-        showAlert(
-          "Cuenta Desactivada",
-          "Tu cuenta ha sido desactivada. Por favor contacta al administrador del sistema."
-        );
-      } else {
-        showAlert(
-          "Error",
-          "Credenciales inválidas. Por favor verifica tus datos."
-        );
+      // Intentar obtener un mensaje de error más específico
+      if (error.message) {
+        // En tu AuthProvider estás propagando el error con .message
+        // por ejemplo: "Invalid login credentials", "Usuario inactivo"
+        errorMessage = error.message; 
       }
+      
+      Toast.show({
+        type: 'error',
+        text1: 'Error al Ingresar',
+        text2: errorMessage,
+        position: 'top',
+      });
+
     } finally {
       setIsLoading(false);
-      setPassword(""); // Limpiar la contraseña después de un intento fallido
+      setPassword(""); // Limpiar la contraseña en ambos casos (éxito o error)
     }
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.content}>
       <Image
-        source={require("../../../../assets/images/logo.png")}
-        style={[
-          styles.logo,
-          isLargeScreen && styles.logoLarge
-        ]}
+        source={require("../../../../assets/images/LOGO.png")}
+        style={styles.logo}
         resizeMode="contain"
       />
-      
-      <Text style={styles.title}>¡Bienvenido a Aliados Express!</Text>
-      <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
-      
+      <Text style={styles.title}>Inicia sesión</Text>
+      <Text style={styles.phrase}>
+        Corriendo por tu tranquilidad.
+      </Text>
       <View style={styles.inputContainer}>
         <TextInput
-          style={[styles.input, isLargeScreen && styles.inputLarge]}
+          style={styles.input}
           placeholder="Correo electrónico"
+          placeholderTextColor="#888"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
           editable={!isLoading}
-          placeholderTextColor="#666"
         />
-
         <TextInput
-          style={[styles.input, isLargeScreen && styles.inputLarge]}
+          style={styles.input}
           placeholder="Contraseña"
+          placeholderTextColor="#888"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           autoComplete="password"
           editable={!isLoading}
-          placeholderTextColor="#666"
         />
-
         <TouchableOpacity
-          style={[
-            styles.button,
-            isLargeScreen && styles.buttonLarge
-          ]}
+          style={styles.button}
           onPress={handleLogin}
           disabled={isLoading}
         >
           <Text style={styles.buttonText}>
-            {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+            {isLoading ? "Ingresando..." : "Ingresar"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -101,79 +101,67 @@ export default function LoginForm() {
   )
 }
 
+// ... (El resto de tus estilos StyleSheet.create se mantiene igual)
 const styles = StyleSheet.create({
-  container: {
-    width: "100%",
+  // ... (tus estilos existentes)
+  content: {
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    width: "100%",
   },
   logo: {
-    width: 200,
-    height: 80,
-    marginBottom: 30,
-  },
-  logoLarge: {
-    width: 300,
-    height: 120,
-    marginBottom: 40,
+    width: 250,
+    height: 180,
+    marginBottom: 5,
+    alignSelf: "center",
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "bold",
-    color: "#000",
-    marginBottom: 10,
+    color: "#fff",
+    marginBottom: 8,
     textAlign: "center",
+    letterSpacing: 1,
   },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 30,
+  phrase: {
     textAlign: "center",
+    color: "#fff",
+    fontSize: 13,
+    marginBottom: 28,
+    opacity: 0.5,
+    fontStyle: "italic",
+    fontWeight: "400",
+    letterSpacing: 0.5,
   },
   inputContainer: {
     width: "100%",
-    maxWidth: 400,
+    maxWidth: 350,
   },
   input: {
     width: "100%",
-    height: 55,
-    borderWidth: 2,
-    borderColor: "#FFD700", // Color amarillo
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    marginBottom: 15,
-    backgroundColor: "rgba(255,255,255,0.95)",
+    height: 48,
+    borderWidth: 0,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: "#222",
     fontSize: 16,
-    color: "#000",
-  },
-  inputLarge: {
-    fontSize: 18,
-    height: 60,
+    color: "#fff",
   },
   button: {
     width: "100%",
-    height: 55,
-    backgroundColor: "#2563EB", // Azul más llamativo
-    borderRadius: 12,
+    height: 48,
+    backgroundColor: "#fff",
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 5,
-  },
-  buttonLarge: {
-    height: 60,
+    marginTop: 12,
+    marginBottom: 4,
   },
   buttonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
+    color: "#111",
+    fontSize: 16,
+    fontWeight: "bold",
+    letterSpacing: 1,
   },
-})
+});
