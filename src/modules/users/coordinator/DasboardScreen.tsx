@@ -64,7 +64,7 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
-      {isLargeScreen && <Header />}
+      {isLargeScreen && <Header profileRoute="/(coordinator)/profile" />}
 
       <View style={styles.container}>
         {isLargeScreen && (

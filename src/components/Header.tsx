@@ -127,7 +127,7 @@ const handleProfilePress = () => {
                 { top: cardPosition.top, left: cardPosition.left, position: "absolute" },
               ]}
             >
-              <CardProfile onClose={() => setCardVisible(false)} />
+              <CardProfile profileRoute={profileRoute} onClose={() => setCardVisible(false)} />
             </View>
           </TouchableOpacity>
         </Modal>

@@ -171,24 +171,12 @@ export default function DeliveryProfileScreen() {
             </View>
             <Text style={styles.menuItemArrow}>›</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push("/delivery/requests")}>
-            <View style={styles.menuItemLeft}>
-              <Text style={styles.menuItemIcon}>📄</Text>
-              <View>
-                <Text style={styles.menuItemTitle}>Solicitudes</Text>
-                <Text style={styles.menuItemSubtitle}>Tus cortes solicitados</Text>
-              </View>
-            </View>
-            <Text style={styles.menuItemArrow}>›</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push("/delivery/history")}>
             <View style={styles.menuItemLeft}>
               <Text style={styles.menuItemIcon}>📊</Text>
               <View>
                 <Text style={styles.menuItemTitle}>Historial</Text>
-                <Text style={styles.menuItemSubtitle}>Pedidos sin pagar</Text>
+                <Text style={styles.menuItemSubtitle}>Pedidos entregados / Prefacturas</Text>
               </View>
             </View>
             <Text style={styles.menuItemArrow}>›</Text>

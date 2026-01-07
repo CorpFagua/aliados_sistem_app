@@ -11,6 +11,7 @@ import {
   RefreshControl,
   Modal,
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from "../../../../providers/AuthProvider";
 import { usePayments } from "../../../../hooks/usePayments";
 import { Colors } from "../../../../constans/colors";
@@ -28,7 +29,7 @@ const formatCurrency = (amount: number): string => {
  */
 export default function DeliveryHistoryScreen() {
   const { session } = useAuth();
-  const { getPaymentHistory, createPaymentRequest, loading } = usePayments(
+  const { getPaymentHistory, createPaymentRequest, createSnapshotFromServices, loading, error } = usePayments(
     session?.access_token || null
   );
 
@@ -47,14 +48,15 @@ export default function DeliveryHistoryScreen() {
 
     setRefreshing(true);
     try {
-      const data = await getPaymentHistory({
-        type: "earnings",
-        limit: 200,
+      // Obtener historial de pagos (el backend determina si es delivery o store según el usuario)
+      const data = await getPaymentHistory({ limit: 200 });
+      // Filtrar solo servicios/pedidos entregados y no pagados
+      const arr = Array.isArray(data) ? data : [];
+      const unpaid = arr.filter((order) => {
+        const delivered = order.status === "Entregado" || order.status === "entregado" || order.status === "delivered" || order.status === "completed";
+        const paid = order.is_paid === true || order.is_paid === 'true' || order.paid === true || order.paid === 'true';
+        return delivered && !paid;
       });
-      // Filtrar solo pedidos sin pagar (pending)
-      const unpaid = (Array.isArray(data) ? data : []).filter(
-        (order) => order.status === "pending"
-      );
       setUnpaidOrders(unpaid);
     } catch (err) {
       Alert.alert("Error", "No se pudieron cargar los pedidos");
@@ -69,9 +71,11 @@ export default function DeliveryHistoryScreen() {
 
     setRequesting(true);
     try {
-      await createPaymentRequest({
-        snapshot_id: selectedOrder.id,
-      });
+      // Crear snapshot en backend a partir del servicio seleccionado
+      const snapshot = await createSnapshotFromServices([selectedOrder.serviceId || selectedOrder.id]);
+      if (!snapshot || !snapshot.id) throw new Error('No se pudo crear snapshot');
+
+      await createPaymentRequest({ snapshot_id: snapshot.id });
       Alert.alert("Éxito", "Prefactura solicitada. Espera la aprobación del coordinador.");
       setShowConfirmModal(false);
       setSelectedOrder(null);
@@ -81,6 +85,15 @@ export default function DeliveryHistoryScreen() {
     } finally {
       setRequesting(false);
     }
+  };
+
+  const isCutoffOpen = () => {
+    const now = new Date();
+    const day = now.getDate();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const hour = now.getHours();
+    // Habilitar solo si es 15 o último día del mes y son las 22:00 o más
+    return ( (day === 15 || day === lastDay) && hour >= 22 );
   };
 
   const renderOrderItem = ({ item }: { item: any }) => (
@@ -93,9 +106,9 @@ export default function DeliveryHistoryScreen() {
     >
       <View style={styles.orderHeader}>
         <View>
-          <Text style={styles.orderNumber}>Pedido #{item.id?.slice(-6)}</Text>
+          <Text style={styles.orderNumber}>Servicio #{(item.serviceId || item.id)?.toString().slice(-6)}</Text>
           <Text style={styles.orderDate}>
-            {new Date(item.date).toLocaleDateString("es-CO")}
+            {item.completedAt ? new Date(item.completedAt).toLocaleDateString("es-CO") : ""}
           </Text>
         </View>
         <View style={styles.statusContainer}>
@@ -107,14 +120,14 @@ export default function DeliveryHistoryScreen() {
 
       <View style={styles.orderBody}>
         <View style={styles.amountRow}>
-          <Text style={styles.label}>Valor del Pedido:</Text>
-          <Text style={styles.amount}>{formatCurrency(item.amount || 0)}</Text>
+          <Text style={styles.label}>Tu Ganancia:</Text>
+          <Text style={styles.amount}>{formatCurrency(item.earnedByDelivery ?? item.price_delivery_srv ?? item.amount ?? 0)}</Text>
         </View>
 
-        {item.description && (
+        {item.notes && (
           <View style={styles.descriptionRow}>
-            <Text style={styles.label}>Descripción:</Text>
-            <Text style={styles.description}>{item.description}</Text>
+            <Text style={styles.label}>Notas:</Text>
+            <Text style={styles.description}>{item.notes}</Text>
           </View>
         )}
       </View>
@@ -133,15 +146,20 @@ export default function DeliveryHistoryScreen() {
 
   if (loading && unpaidOrders.length === 0) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.activeMenuText} />
         <Text style={styles.loadingText}>Cargando pedidos...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      {error ? (
+        <View style={{ backgroundColor: '#ffe6e6', padding: 10 }}>
+          <Text style={{ color: '#b30000' }}>Error: {String(error)}</Text>
+        </View>
+      ) : null}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Historial de Cobro</Text>
         <Text style={styles.headerSubtitle}>
@@ -165,7 +183,7 @@ export default function DeliveryHistoryScreen() {
       ) : (
         <FlatList
           data={unpaidOrders}
-          keyExtractor={(item) => item.id || Math.random().toString()}
+          keyExtractor={(item) => (item.id ? String(item.id) : Math.random().toString())}
           renderItem={renderOrderItem}
           contentContainerStyle={styles.listContainer}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadUnpaidOrders} />}
@@ -190,27 +208,45 @@ export default function DeliveryHistoryScreen() {
 
             {selectedOrder && (
               <>
-                <View style={styles.modalBody}>
+                <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 24 }}>
                   <View style={styles.orderInfo}>
                     <Text style={styles.orderInfoLabel}>Pedido #</Text>
-                    <Text style={styles.orderInfoValue}>
-                      {selectedOrder.id?.slice(-6)}
-                    </Text>
+                    <Text style={styles.orderInfoValue}>{selectedOrder.id ? String(selectedOrder.id).slice(-6) : 'N/D'}</Text>
                   </View>
 
                   <View style={styles.orderInfo}>
-                    <Text style={styles.orderInfoLabel}>Valor:</Text>
-                    <Text style={styles.orderInfoValue}>
-                      {formatCurrency(selectedOrder.amount || 0)}
-                    </Text>
+                    <Text style={styles.orderInfoLabel}>Tienda:</Text>
+                    <Text style={styles.orderInfoValue}>{selectedOrder.store_id || selectedOrder.storeId || selectedOrder.store || selectedOrder.store_name || 'N/A'}</Text>
                   </View>
 
                   <View style={styles.orderInfo}>
-                    <Text style={styles.orderInfoLabel}>Fecha:</Text>
+                    <Text style={styles.orderInfoLabel}>Cliente:</Text>
+                    <Text style={styles.orderInfoValue}>{selectedOrder.clientName || selectedOrder.client_name || selectedOrder.client || 'N/D'}</Text>
+                  </View>
+
+                  <View style={styles.orderInfo}>
+                    <Text style={styles.orderInfoLabel}>Dirección:</Text>
+                    <Text style={styles.orderInfoValue}>{selectedOrder.deliveryAddress || selectedOrder.delivery_address || selectedOrder.delivery_address_text || 'N/D'}</Text>
+                  </View>
+
+                  <View style={styles.orderInfo}>
+                    <Text style={styles.orderInfoLabel}>Fecha entrega:</Text>
+                    <Text style={styles.orderInfoValue}>{selectedOrder.completedAt ? new Date(selectedOrder.completedAt).toLocaleString('es-CO') : ''}</Text>
+                  </View>
+
+                  <View style={styles.orderInfo}>
+                    <Text style={styles.orderInfoLabel}>Tiempos (asignado / trayecto / finalizado):</Text>
                     <Text style={styles.orderInfoValue}>
-                      {new Date(selectedOrder.date).toLocaleDateString("es-CO")}
+                      {selectedOrder.assignedAt ? new Date(selectedOrder.assignedAt).toLocaleTimeString('es-CO') : '-'} / {selectedOrder.trayectoAt ? new Date(selectedOrder.trayectoAt).toLocaleTimeString('es-CO') : '-'} / {selectedOrder.finalizedAt ? new Date(selectedOrder.finalizedAt).toLocaleTimeString('es-CO') : '-'}
                     </Text>
                   </View>
+
+                  {selectedOrder.notes && (
+                    <View style={{ marginTop: 12 }}>
+                      <Text style={styles.infoTitle}>Notas</Text>
+                      <Text style={styles.infoText}>{selectedOrder.notes}</Text>
+                    </View>
+                  )}
 
                   <View style={styles.infoBox}>
                     <Text style={styles.infoTitle}>ℹ️ Información</Text>
@@ -218,8 +254,11 @@ export default function DeliveryHistoryScreen() {
                       Al solicitar esta prefactura, se enviará una notificación al coordinador
                       para que la revise y apruebe. Una vez aprobada, podrás recibir el pago.
                     </Text>
+                    <Text style={{ marginTop: 8, color: Colors.menuText }}>
+                      Botón activo solo el día 15 o el último día del mes después de las 22:00.
+                    </Text>
                   </View>
-                </View>
+                </ScrollView>
 
                 <View style={styles.modalFooter}>
                   <TouchableOpacity
@@ -231,9 +270,9 @@ export default function DeliveryHistoryScreen() {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.confirmButton, requesting && styles.disabledButton]}
+                    style={[styles.confirmButton, (!isCutoffOpen() || requesting) && styles.disabledButton]}
                     onPress={handleRequestPayment}
-                    disabled={requesting}
+                    disabled={!isCutoffOpen() || requesting}
                   >
                     {requesting ? (
                       <ActivityIndicator color="#fff" size="small" />
@@ -247,7 +286,7 @@ export default function DeliveryHistoryScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -435,11 +474,18 @@ const styles = StyleSheet.create({
   orderInfoLabel: {
     fontSize: 14,
     color: Colors.menuText,
+    flex: 1,
+    flexBasis: '45%'
   },
   orderInfoValue: {
     fontSize: 14,
     fontWeight: "600",
     color: Colors.normalText,
+    flex: 1,
+    flexBasis: '55%',
+    textAlign: 'right',
+    flexShrink: 1,
+    maxWidth: '70%'
   },
   infoBox: {
     backgroundColor: Colors.activeMenuBackground,

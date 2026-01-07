@@ -32,6 +32,8 @@ export default function StoreHome() {
     switch (activeSection) {
       case "home":
         return <HomeScreen />;
+      case "profile":
+        return <ProfileScreen />;
       default:
         return <HomeScreen />;
     }
@@ -39,7 +41,7 @@ export default function StoreHome() {
 
   return (
     <SafeAreaView  style={styles.safeArea} edges={["top", "bottom"]}>
-      {isLargeScreen && <Header />}
+      {isLargeScreen && <Header profileRoute="/store/profile" />} 
 
       <View style={styles.container}>
         {isLargeScreen && (

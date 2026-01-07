@@ -5,10 +5,11 @@ import { useAuth } from "@/providers/AuthProvider";
 import { Ionicons } from "@expo/vector-icons";
 
 type CardProfileProps = {
+  profileRoute?: string;
   onClose: () => void;
 };
 
-export default function CardProfile({ onClose }: CardProfileProps) {
+export default function CardProfile({ profileRoute, onClose }: CardProfileProps) {
   const { session, logout } = useAuth();
   const router = useRouter();
 
@@ -30,7 +31,7 @@ export default function CardProfile({ onClose }: CardProfileProps) {
       <TouchableOpacity
         style={[styles.button, styles.profileButton]}
         onPress={() => {
-          router.push("/shared/profile");
+          router.push(profileRoute || "/shared/profile");
           onClose();
         }}
       >

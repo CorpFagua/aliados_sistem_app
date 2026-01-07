@@ -306,6 +306,38 @@ export function usePayments(token: string | null) {
   }, [token, headers]);
 
   /**
+   * Crear snapshot a partir de servicios (utilizado por domiciliarios)
+   */
+  const createSnapshotFromServices = useCallback(
+    async (services_ids: string[]): Promise<PaymentSnapshot | null> => {
+      if (!token) {
+        setError("No hay sesión activa");
+        return null;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await api.post<PaymentSnapshot>(
+          "/payments/snapshots/from-services",
+          { services_ids },
+          { headers }
+        );
+        return response.data;
+      } catch (err: any) {
+        const message = err.response?.data || "Error creando snapshot";
+        setError(message);
+        console.error("❌ Error en createSnapshotFromServices:", message);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, headers]
+  );
+
+  /**
    * Obtener detalles de un snapshot específico
    */
   const getPaymentSnapshot = useCallback(
@@ -525,6 +557,7 @@ export function usePayments(token: string | null) {
     // Snapshots
     getPaymentSnapshots,
     getPaymentSnapshot,
+    createSnapshotFromServices,
 
     // Tiendas
     getStorePaymentRecords,

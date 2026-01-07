@@ -45,8 +45,20 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     setLoading(true);
     try{
       const all = await fetchServices(session.access_token);
-      const sUnpaid = all.filter((s)=> (s.storeId === storeId || s.profileStoreId === storeId) && !s.isPaid);
+      console.log('[StorePaymentSummary] fetched services count:', Array.isArray(all) ? all.length : 0);
+      const sUnpaid = all.filter((s)=> {
+        const belongs = (s.storeId === storeId || s.profileStoreId === storeId);
+        const notPaid = !s.isPaid;
+        const status = (s.status || '').toString().toLowerCase();
+        const allowed = status === 'entregado' || status === 'pago' || status === 'pagado' || status === 'paid';
+        return belongs && notPaid && allowed;
+      });
+      console.log('[StorePaymentSummary] unpaid count:', sUnpaid.length);
       const sAll = all.filter((s)=> (s.storeId === storeId || s.profileStoreId === storeId));
+      console.log('[StorePaymentSummary] history count:', sAll.length);
+      if (Array.isArray(all) && all.length > 0) {
+        console.log('[StorePaymentSummary] sample services:', all.slice(0,3).map(s=>({ id: s.id, storeId: s.storeId, profileStoreId: s.profileStoreId, isPaid: s.isPaid, status: s.status })));
+      }
       setUnpaid(sUnpaid);
       setHistory(sAll);
     }catch(e){
@@ -146,7 +158,7 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       {/* Tabs */}
       <View style={styles.tabRow}>
         <TouchableOpacity onPress={()=>setActiveTab('due')} style={[styles.tabButton, activeTab==='due' && styles.tabActive]}>
-          <Text style={[styles.tabText, activeTab==='due' && styles.tabTextActive]}>Por pagar</Text>
+          <Text style={[styles.tabText, activeTab==='due' && styles.tabTextActive]}>Por Cobrar</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={()=>setActiveTab('history')} style={[styles.tabButton, activeTab==='history' && styles.tabActive]}>
           <Text style={[styles.tabText, activeTab==='history' && styles.tabTextActive]}>Historial</Text>
@@ -172,7 +184,7 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
               <Text style={{color:Colors.menuText}}>{selectAll ? 'Deseleccionar todo' : 'Seleccionar todo'}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={()=>setShowPayModal(true)} style={styles.payButtonSmall}>
-              <Text style={{color:Colors.activeMenuText, fontWeight:'bold'}}>Pagar seleccionado</Text>
+              <Text style={{color:Colors.activeMenuText, fontWeight:'bold'}}>Cobrar seleccionado</Text>
             </TouchableOpacity>
           </View>
 

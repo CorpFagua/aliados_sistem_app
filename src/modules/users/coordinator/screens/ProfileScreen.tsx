@@ -12,7 +12,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { Colors } from "@/constans/colors";
 import { LinearGradient } from "expo-linear-gradient";
 
-export default function ProfileScreen() {
+export default function CoordinatorProfileScreen() {
   const { session, logout } = useAuth();
   const user = session?.user;
 
