@@ -21,7 +21,15 @@ import {
 import { Colors } from "../../../../constans/colors";
 
 // Funciones auxiliares
-const formatCurrency = (amount: number): string => {
+const formatCurrency = (amount: number | undefined | null): string => {
+  // Fallback para valores inválidos
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
+      minimumFractionDigits: 0,
+    }).format(0);
+  }
   return new Intl.NumberFormat("es-CO", {
     style: "currency",
     currency: "COP",
@@ -36,7 +44,14 @@ export default function DeliveryEarningsScreen() {
   const { session } = useAuth();
   const { getDeliveryEarnings, getPaymentHistory, createSnapshotFromServices, createPaymentRequest, loading, error } = usePayments(session?.access_token || null);
 
-  const [earnings, setEarnings] = useState<any>(null);
+  const [earnings, setEarnings] = useState<any>({
+    delivery_id: "",
+    current_period_earnings: 0,
+    total_earnings: 0,
+    total_paid: 0,
+    total_pending: 0,
+    last_updated: new Date().toISOString(),
+  });
   const [refreshing, setRefreshing] = useState(false);
   const [pendingServices, setPendingServices] = useState<any[]>([]);
   const [selectedService, setSelectedService] = useState<any | null>(null);
@@ -44,21 +59,49 @@ export default function DeliveryEarningsScreen() {
   const [requesting, setRequesting] = useState(false);
 
   useEffect(() => {
-    loadEarnings();
-    loadPendingServices();
-  }, [session]);
+    if (session?.access_token) {
+      loadEarnings();
+      loadPendingServices();
+    }
+  }, [session?.access_token]);
 
   const loadEarnings = async () => {
     if (!session?.access_token) return;
 
     setRefreshing(true);
     try {
+      console.log("🔄 Cargando ganancias...");
       const data = await getDeliveryEarnings();
       if (data) {
+        console.log("✅ Datos de ganancias recibidos:", {
+          current_period_earnings: data.current_period_earnings,
+          total_earnings: data.total_earnings,
+          total_paid: data.total_paid,
+          total_pending: data.total_pending,
+        });
         setEarnings(data);
+      } else {
+        console.warn("⚠️ No se recibieron datos de ganancias");
+        setEarnings({
+          delivery_id: session?.user?.id || "",
+          current_period_earnings: 0,
+          total_earnings: 0,
+          total_paid: 0,
+          total_pending: 0,
+          last_updated: new Date().toISOString(),
+        });
       }
     } catch (err) {
+      console.error("❌ Error al cargar ganancias:", err);
       Alert.alert("Error", "No se pudieron cargar las ganancias");
+      setEarnings({
+        delivery_id: session?.user?.id || "",
+        current_period_earnings: 0,
+        total_earnings: 0,
+        total_paid: 0,
+        total_pending: 0,
+        last_updated: new Date().toISOString(),
+      });
     } finally {
       setRefreshing(false);
     }
@@ -67,16 +110,38 @@ export default function DeliveryEarningsScreen() {
   const loadPendingServices = async () => {
     if (!session?.access_token) return;
     try {
+      console.log("🔄 Cargando servicios pendientes...");
       const data = await getPaymentHistory({ type: "earnings", limit: 200 });
       const arr = Array.isArray(data) ? data : [];
+      console.log("📋 Servicios obtenidos:", arr.length);
+      
       const unpaid = arr.filter((s) => {
-        const delivered = s.status === "entregado" || s.status === "delivered" || s.status === "completed";
-        const paid = s.is_paid === true || s.is_paid === 'true' || s.paid === true || s.paid === 'true';
-        return delivered && !paid;
+        // Verificar si el servicio está entregado pero no pagado
+        const delivered = 
+          s.status === "entregado" || 
+          s.status === "delivered" || 
+          s.status === "completed" ||
+          s.completedAt !== undefined && s.completedAt !== null;
+        
+        const paid = 
+          s.is_paid === true || 
+          s.is_paid === 'true' || 
+          s.paid === true || 
+          s.paid === 'true';
+        
+        const hasEarnings = (s.earnedByDelivery || s.price_delivery_srv || s.amount || 0) > 0;
+        
+        return delivered && !paid && hasEarnings;
       });
+      
+      console.log(`✅ Servicios sin pagar encontrados: ${unpaid.length}`);
+      unpaid.forEach((s) => {
+        console.log(`  - ${s.id}: $${s.earnedByDelivery || s.price_delivery_srv || s.amount || 0}`);
+      });
+      
       setPendingServices(unpaid);
     } catch (err) {
-      console.warn("No se pudieron cargar servicios pendientes", err);
+      console.warn("⚠️ No se pudieron cargar servicios pendientes", err);
       setPendingServices([]);
     }
   };
@@ -107,7 +172,7 @@ export default function DeliveryEarningsScreen() {
     return ( (day === 15 || day === lastDay) && hour >= 22 );
   };
 
-  if (loading || !earnings) {
+  if (loading && earnings.current_period_earnings === 0 && earnings.total_earnings === 0) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.activeMenuText} />
