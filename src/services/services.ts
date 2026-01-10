@@ -37,6 +37,38 @@ export async function fetchServices(token: string): Promise<Service[]> {
   }
 }
 
+/**
+ * 📦 Obtener servicios optimizados para DELIVERY
+ * Solo trae: servicios disponibles + servicios asignados al delivery
+ * Incluye: price_delivery_srv (ganancia del delivery)
+ * 
+ * @param token - Token de autenticación
+ * @param deliveryId - ID del delivery. Si no se proporciona, usa el del usuario actual
+ */
+export async function fetchDeliveryServices(token: string, deliveryId?: string): Promise<Service[]> {
+  try {
+    const endpoint = deliveryId 
+      ? `/services/delivery/${deliveryId}` 
+      : `/services/delivery/current`;
+    
+    console.log("📦 [DELIVERY] Obteniendo servicios optimizados...");
+    const res = await api.get<ServiceResponse[]>(endpoint, {
+      headers: authHeaders(token),
+    });
+
+    // ⚡ Aseguramos que siempre sea un array
+    const raw = Array.isArray(res.data) ? res.data : (res.data as any).data;
+
+    console.log(`✅ [DELIVERY] Servicios obtenidos: ${raw.length}`);
+
+    // ⚡ Transformamos DTO -> Modelo interno
+    return raw.map(toService);
+  } catch (err: any) {
+    console.error("❌ Error fetching delivery services:", err.response?.data || err.message);
+    throw err;
+  }
+}
+
 // Actualizar estado de un servicio
 export async function updateServiceStatus(
   serviceId: string,

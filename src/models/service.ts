@@ -210,6 +210,7 @@ export function toService(dto: ServiceResponse): Service {
     status: dto.status as Service["status"],
 
     pickup: dto.pickup_address ?? null,
+    priceDeliverySrv: dto.price_delivery_srv ?? undefined,
 
     typeId: (dto.type_id as ServiceTypeId) ?? null,
 

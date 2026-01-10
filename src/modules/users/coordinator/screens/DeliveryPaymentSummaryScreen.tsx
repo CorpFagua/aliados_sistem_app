@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, FlatList, RefreshControl } from "react-native";
 import { Colors } from "../../../../constans/colors";
 import { useAuth } from "../../../../providers/AuthProvider";
-import { fetchServices, updateServiceData } from "../../../../services/services";
+import { fetchDeliveryServices, updateServiceData } from "../../../../services/services";
 import { formatCurrency } from "../../../../services/payments";
 import { TextInput, TouchableOpacity, Modal, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -34,7 +34,9 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
     if (!session?.access_token || !delivery?.id) return;
     setLoading(true);
     try {
-      const allServices = await fetchServices(session.access_token);
+      console.log(`🔍 [COORDINATOR] Cargando servicios del delivery: ${delivery.id}`);
+      const allServices = await fetchDeliveryServices(session.access_token, delivery.id);
+      console.log(`📦 [SERVICES] Servicios obtenidos para delivery ${delivery.id}:`, allServices);
       const unpaidData = allServices.filter(
         s => s.assignedDelivery === delivery.id && s.status === "entregado" && !s.isPaid
       );
@@ -44,6 +46,7 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
       setUnpaid(unpaidData);
       setHistory(historyData);
     } catch (err) {
+      console.error("❌ Error cargando datos:", err);
       setUnpaid([]);
       setHistory([]);
     } finally {
@@ -73,7 +76,7 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
       <View style={{ flex: 1 }}>
         <Text style={styles.serviceTitle}>Viaje #{item.id.slice(-4)}</Text>
         <Text style={styles.serviceDetail}>Estado: {item.status}</Text>
-        <Text style={styles.serviceDetail}>Valor: {formatCurrency(item.priceDeliverySrv || item.price || item.amount || 0)}</Text>
+        <Text style={styles.serviceDetail}>Valor: {formatCurrency(item.priceDeliverySrv || 0)}</Text>
       </View>
     </View>
   );
@@ -115,7 +118,7 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
 
   const totalSelectedAmount = () => {
     const list = unpaid.filter((s) => selectedIds.includes(s.id));
-    return list.reduce((sum, s) => sum + (s.priceDeliverySrv || s.price || s.amount || 0), 0);
+    return list.reduce((sum, s) => sum + (s.priceDeliverySrv || 0), 0);
   };
 
   const handleSelectAll = () => {
