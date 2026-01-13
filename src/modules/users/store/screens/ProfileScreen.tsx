@@ -6,18 +6,37 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/providers/AuthProvider";
 import { Colors } from "@/constans/colors";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import AntDesign from "@expo/vector-icons/AntDesign";
 
 export default function StoreProfileScreen() {
   const { session, logout } = useAuth();
+  const { push, back } = useRouter();
   const user = session?.user;
+
+  const handleLogout = () => {
+    Alert.alert("Cerrar Sesión", "¿Estás seguro que deseas cerrar sesión?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Cerrar Sesión",
+        style: "destructive",
+        onPress: logout,
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      {/* Back Button */}
+      <TouchableOpacity style={styles.backButton} onPress={() => back()}>
+        <AntDesign name="arrow-left" size={24} color={Colors.normalText} />
+      </TouchableOpacity>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
@@ -62,8 +81,24 @@ export default function StoreProfileScreen() {
           </View>
         </View>
 
+        {/* Opciones de Menú */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Mis Opciones</Text>
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => push("/store/history")}>
+            <View style={styles.menuItemLeft}>
+              <Text style={styles.menuItemIcon}>📊</Text>
+              <View>
+                <Text style={styles.menuItemTitle}>Historial</Text>
+                <Text style={styles.menuItemSubtitle}>Pedidos y facturas</Text>
+              </View>
+            </View>
+            <Text style={styles.menuItemArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Botón cerrar sesión */}
-        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Cerrar Sesión</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -75,6 +110,11 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: Colors.Background, // ✅ Fondo más oscuro
+  },
+  backButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    justifyContent: "center",
   },
   scrollContent: {
     flexGrow: 1,
@@ -152,6 +192,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.normalText, // ✅ blanco
     fontWeight: "600",
+  },
+
+  // Menu Items
+  menuItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.Border,
+  },
+  menuItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  menuItemIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  menuItemTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.normalText,
+  },
+  menuItemSubtitle: {
+    fontSize: 12,
+    color: Colors.menuText,
+    marginTop: 2,
+  },
+  menuItemArrow: {
+    fontSize: 20,
+    color: Colors.activeMenuText,
+    marginLeft: 8,
   },
 
   // Logout

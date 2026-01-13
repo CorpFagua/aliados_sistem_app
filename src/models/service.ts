@@ -18,6 +18,7 @@ export interface Service {
   // Tiempos
   prepTime?: number | null;
   completedAt?: Date | null;
+  assignedAt?: Date | null;
   expectedAt?: Date | null;
   createdAt: Date;
 
@@ -193,6 +194,7 @@ export function toService(dto: ServiceResponse): Service {
 
     destination: dto.delivery_address,
     phone: dto.client_phone,
+    clientName: dto.client_name ?? undefined,
     notes: dto.notes,
 
     payment: dto.payment_method as Service["payment"],
@@ -207,6 +209,7 @@ export function toService(dto: ServiceResponse): Service {
 
     createdAt: createdDate,
     completedAt: dto.completed_at ? new Date(dto.completed_at) : null,
+    assignedAt: dto.assigned_at ? new Date(dto.assigned_at) : null,
     status: dto.status as Service["status"],
 
     pickup: dto.pickup_address ?? null,
