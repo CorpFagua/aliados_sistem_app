@@ -157,7 +157,33 @@ export async function getPendingTransfers(token: string): Promise<any[]> {
 }
 
 /**
- * 📜 HISTORIAL DE TRANSFERENCIAS
+ * � OBTENER TODAS LAS TRANSFERENCIAS
+ * El delivery ve todas las transferencias (pendientes + historial)
+ * Incluye las que envió y las que recibió
+ * 
+ * @param token - Token de autenticación
+ * @returns Array de todas las transferencias
+ */
+export async function getAllTransfers(token: string): Promise<any[]> {
+  try {
+    const res = await api.get(
+      "/transfers/all",
+      {
+        headers: authHeaders(token),
+      }
+    );
+
+    const data = Array.isArray(res.data) ? res.data : res.data.data || [];
+    console.log("📊 Todas las transferencias:", data);
+    return data;
+  } catch (err: any) {
+    console.error("❌ Error obteniendo transferencias:", err.response?.data || err.message);
+    throw err;
+  }
+}
+
+/**
+ * �📜 HISTORIAL DE TRANSFERENCIAS
  * Obtiene el historial de transferencias completadas
  * 
  * @param token - Token de autenticación

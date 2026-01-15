@@ -13,6 +13,7 @@ import { Colors } from "@/constans/colors";
 import { Service } from "@/models/service";
 import { useAuth } from "@/providers/AuthProvider";
 import ChatModal from "@/components/ChatModal";
+import RequestTransferModal from "./RequestTransferModal";
 
 // ⏱ función para calcular tiempos
 function calcularEstadoTiempo(createdAt: Date, prepTime: number) {
@@ -59,6 +60,7 @@ export default function OrderDetailModal({
 
   const { session, profile } = useAuth();
   const [chatVisible, setChatVisible] = useState(false);
+  const [transferVisible, setTransferVisible] = useState(false);
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -191,14 +193,42 @@ export default function OrderDetailModal({
                 userId={profile.id}
               />
 
-              <TouchableOpacity style={styles.transferBtn} onPress={onTransfer}>
-                <Ionicons
-                  name="swap-horizontal-outline"
-                  size={18}
-                  color="#fff"
-                />
-                <Text style={styles.transferText}>Transferir a</Text>
-              </TouchableOpacity>
+              {/* Mostrar botón de transferencia solo para delivery */}
+              {profile.role === "delivery" && (
+                <>
+                  <TouchableOpacity
+                    style={styles.transferBtn}
+                    onPress={() => setTransferVisible(true)}
+                  >
+                    <Ionicons
+                      name="swap-horizontal-outline"
+                      size={18}
+                      color="#fff"
+                    />
+                    <Text style={styles.transferText}>Solicitar</Text>
+                  </TouchableOpacity>
+
+                  <RequestTransferModal
+                    visible={transferVisible}
+                    onClose={() => setTransferVisible(false)}
+                    serviceId={pedido.id}
+                    currentDeliveryId={profile.id}
+                    onSuccess={() => onTransfer?.()}
+                  />
+                </>
+              )}
+
+              {/* Mostrar botón de transferencia para coordinador */}
+              {profile.role !== "delivery" && onTransfer && (
+                <TouchableOpacity style={styles.transferBtn} onPress={onTransfer}>
+                  <Ionicons
+                    name="swap-horizontal-outline"
+                    size={18}
+                    color="#fff"
+                  />
+                  <Text style={styles.transferText}>Transferir a</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>

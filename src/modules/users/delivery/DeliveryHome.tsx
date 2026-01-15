@@ -2,9 +2,11 @@
 import { useState } from "react";
 import { View, StyleSheet, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import Header from "@/components/Header";
 import NavigationMenu from "@/modules/dashboard/components/NavigationMenu";
 import { Colors } from "@/constans/colors";
+import { useNotificationCount } from "@/hooks/useNotificationCount";
 
 // Pantallas
 import DisponiblesScreen from "./screens/DisponiblesScreen";
@@ -27,8 +29,10 @@ const mobileMenuItems = [
 export default function DeliveryHome() {
   const { width } = useWindowDimensions();
   const isLargeScreen = width > 768;
+  const router = useRouter();
 
   const [activeSection, setActiveSection] = useState("disponibles");
+  const { unviewedCount, refetch } = useNotificationCount();
 
   const renderContent = () => {
     switch (activeSection) {
@@ -43,9 +47,17 @@ export default function DeliveryHome() {
     }
   };
 
+  const handleNotificationsPress = () => {
+    router.push("/delivery/notifications");
+  };
+
   return (
     <SafeAreaView  style={styles.safeArea} edges={["bottom"]}>
-      <Header  profileRoute="/delivery/profile" />
+      <Header
+        profileRoute="/delivery/profile"
+        onNotificationsPress={handleNotificationsPress}
+        notificationsCount={unviewedCount}
+      />
 
       <View style={styles.container}>
         {isLargeScreen && (
