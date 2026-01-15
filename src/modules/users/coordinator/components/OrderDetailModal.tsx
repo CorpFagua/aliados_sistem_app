@@ -13,7 +13,8 @@ import { useAuth } from "@/providers/AuthProvider";
 import { updateServiceStatus } from "@/services/services";
 import AssignDeliveryModal from "./AssignDeliveryModal";
 import AssignZoneModal from "./AssignZoneModal";
-import ServiceFormModal from "./ServiceFormModalCoordinator"; // 🟢 Import agregado
+import ServiceFormModal from "./ServiceFormModalCoordinator";
+import TransferDeliveryModal from "./TransferDeliveryModal"; // 🟢 Importar modal de transferencia
 import { Service } from "@/models/service";
 import ChatModal from "@/components/ChatModal";
 import { getServiceType } from "@/utils/serviceTypeUtils";
@@ -34,8 +35,9 @@ export default function OrderDetailModal({
   const { session } = useAuth();
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showZoneModal, setShowZoneModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false); // 🟢 Modal de edición
-  const [showChatModal, setShowChatModal] = useState(false); // 🟢 Modal de chat
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false); // 🟢 Estado para modal de transferencia
 
   if (!pedido) return null;
 
@@ -153,6 +155,25 @@ export default function OrderDetailModal({
       );
     }
 
+    return null;
+  };
+
+  // 🟢 Mostrar botón de transferencia si está asignado o en ruta
+  const renderTransferButton = () => {
+    if (
+      serviceType !== "paqueteria" &&
+      (pedido.status === "asignado" || pedido.status === "en_ruta")
+    ) {
+      return (
+        <TouchableOpacity
+          style={[styles.actionBtn, { backgroundColor: "#FF9800" }]}
+          onPress={() => setShowTransferModal(true)}
+        >
+          <Ionicons name="swap-horizontal-outline" size={18} color="#000" />
+          <Text style={styles.actionText}>Transferir</Text>
+        </TouchableOpacity>
+      );
+    }
     return null;
   };
 
@@ -294,7 +315,7 @@ export default function OrderDetailModal({
             <Text style={styles.price}>${pedido.amount.toLocaleString()}</Text>
             <View style={styles.actionRow}>
               {renderActionButton()}
-
+              {renderTransferButton()} {/* 🟢 Mostrar botón de transferencia */}
 
               {/* 🟢 BOTÓN CHAT */}
               <TouchableOpacity
@@ -350,6 +371,18 @@ export default function OrderDetailModal({
             editing={pedido}
             onSuccess={() => {
               setShowEditModal(false);
+              onClose();
+              onRefresh?.();
+            }}
+          />
+
+          {/* 🟢 MODAL DE TRANSFERENCIA */}
+          <TransferDeliveryModal
+            visible={showTransferModal}
+            onClose={() => setShowTransferModal(false)}
+            service={pedido}
+            currentDeliveryId={pedido.assignedDelivery }
+            onSuccess={() => {
               onClose();
               onRefresh?.();
             }}
