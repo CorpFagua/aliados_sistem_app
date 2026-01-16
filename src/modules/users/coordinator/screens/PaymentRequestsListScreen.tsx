@@ -103,11 +103,11 @@ export default function PaymentRequestsListScreen() {
       <View style={styles.cardBody}>
         <View style={styles.infoRow}>
           <Text style={styles.label}>Servicios:</Text>
-          <Text style={styles.value}>{item.snapshot?.services_ids?.length || 0}</Text>
+          <Text style={styles.value}>{item.services_count || 0}</Text>
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.label}>Período:</Text>
-          <Text style={styles.value}>{item.snapshot?.period || "N/A"}</Text>
+          <Text style={styles.value}>{item.period_start && item.period_end ? `${item.period_start} a ${item.period_end}` : "N/A"}</Text>
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.label}>Solicitud:</Text>
@@ -173,12 +173,12 @@ export default function PaymentRequestsListScreen() {
 
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>Servicios incluidos</Text>
-                  <Text style={styles.detailValue}>{selectedRequest.snapshot?.services_ids?.length || 0}</Text>
+                  <Text style={styles.detailValue}>{selectedRequest.services_count || 0}</Text>
                 </View>
 
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>Período</Text>
-                  <Text style={styles.detailValue}>{selectedRequest.snapshot?.period || "N/A"}</Text>
+                  <Text style={styles.detailValue}>{selectedRequest.period_start && selectedRequest.period_end ? `${selectedRequest.period_start} a ${selectedRequest.period_end}` : "N/A"}</Text>
                 </View>
 
                 <View style={styles.detailSection}>

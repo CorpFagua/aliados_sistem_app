@@ -6,6 +6,7 @@ import { formatCurrency } from '../../../../services/payments';
 import { Colors } from '../../../../constans/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
+import { usePayments } from '../../../../hooks/usePayments';
 
 type Params = {
   StorePaymentSummary: {
@@ -33,6 +34,8 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   const route = useRoute<RouteProp<Params,'StorePaymentSummary'>>();
   const navigation = useNavigation();
   const { session } = useAuth();
+  const { getStorePaymentSnapshots, createStoreSnapshot, chargeStoreSnapshot } = usePayments(session?.access_token || null);
+  
   const routeParams = (route && (route.params as any)) || {};
   const storeId = store?.id ?? routeParams.storeId;
   const storeName = store?.name ?? routeParams.storeName;
@@ -60,7 +63,10 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     if (!session?.access_token || !storeId) return;
     setLoading(true);
     try{
+      console.log(`\n🛒 [STORE-PAYMENT] Cargando datos de tienda: ${storeId}`);
+      
       // Cargar servicios
+      console.log('📦 [STORE-PAYMENT] Cargando servicios sin pagar...');
       const all = await fetchServices(session.access_token);
       const sUnpaid = all.filter((s)=> {
         const belongs = (s.storeId === storeId || s.profileStoreId === storeId);
@@ -69,29 +75,41 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
         const allowed = status === 'entregado' || status === 'pago' || status === 'pagado' || status === 'paid';
         return belongs && notPaid && allowed;
       });
+      console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios sin pagar encontrados`);
       setUnpaid(sUnpaid);
 
-      // Cargar snapshots de tienda
+      // Cargar snapshots de tienda usando el hook
+      console.log('📋 [STORE-PAYMENT] Cargando snapshots del hook...');
       try {
-        const response = await fetch(
-          `http://localhost:3000/api/payments/snapshots/store/${storeId}/history?status=all`,
-          {
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-          }
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setSnapshots(data.data || []);
+        const snapshotsData = await getStorePaymentSnapshots(storeId);
+        console.log(`✅ [STORE-PAYMENT] ${snapshotsData?.length || 0} snapshots obtenidos`);
+        console.log('📊 [STORE-PAYMENT] Raw snapshots data:', JSON.stringify(snapshotsData, null, 2));
+        
+        if (snapshotsData && snapshotsData.length > 0) {
+          snapshotsData.forEach((snap: any, idx: number) => {
+            console.log(`\n  [Snapshot ${idx}]:`);
+            console.log(`    ID: ${snap.id}`);
+            console.log(`    Period: ${snap.period_start} a ${snap.period_end}`);
+            console.log(`    Total: ${snap.total_amount}`);
+            console.log(`    Services count: ${snap.services_count}`);
+            console.log(`    Status: ${snap.status}`);
+            console.log(`    Services array:`, snap.services);
+          });
         }
+        
+        setSnapshots(snapshotsData || []);
       } catch (snapErr) {
-        console.error('Error loading snapshots:', snapErr);
+        console.error('❌ [STORE-PAYMENT] Error loading snapshots:', snapErr);
         setSnapshots([]);
       }
     }catch(e){
-      setUnpaid([]); setSnapshots([]);
-    }finally{ setLoading(false); setRefreshing(false); }
+      console.error('❌ [STORE-PAYMENT] Error en load:', e);
+      setUnpaid([]); 
+      setSnapshots([]);
+    }finally{ 
+      setLoading(false); 
+      setRefreshing(false); 
+    }
   }
 
   function totalSelectedAmount(){
@@ -107,33 +125,28 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
 
     setProcessingPayment(true);
     try{
-      const response = await fetch('http://localhost:3000/api/payments/snapshots/store/create', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          store_id: storeId,
-          service_ids: selectedIds,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error creating snapshot');
+      const totalAmount = totalSelectedAmount();
+      
+      console.log(`\n📝 [SCREEN] Creando snapshot de tienda usando hook`);
+      
+      const newSnapshot = await createStoreSnapshot(storeId, selectedIds, totalAmount);
+      
+      if (!newSnapshot) {
+        throw new Error('No se pudo crear el snapshot');
       }
 
-      const data = await response.json();
-      Alert.alert('Éxito', `Prefactura #${data.data.id.slice(-8)} creada exitosamente`);
+      console.log(`✅ [SCREEN] Snapshot creado exitosamente`);
+      Alert.alert('Éxito', `Prefactura #${newSnapshot.id.slice(-8)} creada exitosamente`);
       setShowPayModal(false);
       setSelectedIds([]);
       setSelectAll(false);
       await load();
     }catch(e: any){
-      console.error('Error creating snapshot:', e);
+      console.error('❌ [SCREEN] Error:', e);
       Alert.alert('Error', e.message || 'No se pudo crear la prefactura');
-    }finally{ setProcessingPayment(false); }
+    }finally{ 
+      setProcessingPayment(false); 
+    }
   }
 
   async function handleChargeSnapshot(snapshot: Snapshot){
@@ -148,30 +161,22 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
           text: 'Cobrar',
           onPress: async () => {
             try {
+              console.log(`💳 [SCREEN] Cobrando snapshot usando hook: ${snapshot.id}`);
+              
               const serviceIds = snapshot.services.map((s: any) => s.service_id);
-              const response = await fetch(
-                `http://localhost:3000/api/payments/snapshots/store/${snapshot.id}/charge`,
-                {
-                  method: 'PATCH',
-                  headers: {
-                    'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    service_ids: serviceIds,
-                    notes: 'Cobrado',
-                  }),
-                }
-              );
-
-              if (!response.ok) {
-                throw new Error('Failed to charge snapshot');
+              console.log(`📤 [SCREEN] Service IDs a marcar como pagados:`, serviceIds);
+              
+              const result = await chargeStoreSnapshot(snapshot.id, serviceIds);
+              
+              if (!result) {
+                throw new Error('No se pudo cobrar el snapshot');
               }
 
+              console.log(`✅ [SCREEN] Prefactura cobrada exitosamente`);
               Alert.alert('Éxito', 'Prefactura cobrada exitosamente');
               await load();
             } catch (error: any) {
-              console.error('Error charging snapshot:', error);
+              console.error('❌ [SCREEN] Error charging snapshot:', error);
               Alert.alert('Error', 'No se pudo cobrar la prefactura');
             }
           },
@@ -235,6 +240,9 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
         styles.snapshotCard,
         item.status === 'paid' ? styles.snapshotCardPaid : styles.snapshotCardPending,
       ]}
+      onPress={() => {
+        console.log(`👁️ [RENDER] Snapshot presionado:`, item);
+      }}
     >
       <View style={styles.snapshotHeader}>
         <Text style={styles.snapshotId}>Factura #{item.id.slice(-8)}</Text>

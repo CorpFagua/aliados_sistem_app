@@ -45,26 +45,25 @@ export interface DeliveryPaymentRequest {
 
 export interface PendingPaymentRequest {
   id: string;
+  request_id: string;
+  type: string;
   delivery_id: string;
   snapshot_id: string;
   status: string;
   requested_at: string;
-  delivery: {
+  created_at: string;
+  period_start: string;
+  period_end: string;
+  total_amount: number;
+  total_to_pay: number;
+  services_count: number;
+  notes?: string;
+  delivery?: {
     id: string;
     name: string;
-    phone: string;
-    email: string;
+    phone?: string;
   };
-  snapshot: {
-    id: string;
-    user_id: string;
-    period: string;
-    services_ids: string[];
-    total_earned: number;
-    status: string;
-    created_at: string;
-  };
-  total_to_pay: number;
+  services?: any[];
 }
 
 export interface StorePaymentRecord {
@@ -693,6 +692,123 @@ export function usePayments(token: string | null) {
     [token, headers]
   );
 
+  /**
+   * Obtener snapshots de pago de una tienda
+   */
+  const getStorePaymentSnapshots = useCallback(
+    async (storeId: string): Promise<any[]> => {
+      if (!token) {
+        setError("No hay sesión activa");
+        return [];
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log(`🔄 [HOOK] Pidiendo snapshots de tienda: ${storeId}`);
+        const response = await api.get<{ ok: boolean; data: any[] }>(
+          `/payments/snapshots/store/${storeId}/history?status=all`,
+          { headers }
+        );
+        
+        console.log(`✅ [HOOK] Snapshots de tienda recibidos:`, response.data.data);
+        return response.data.data || [];
+      } catch (err: any) {
+        const message = err.response?.data?.message || "Error obteniendo snapshots de tienda";
+        setError(message);
+        console.error("❌ [HOOK] Error en getStorePaymentSnapshots:", message);
+        return [];
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, headers]
+  );
+
+  /**
+   * Crear snapshot de tienda a partir de servicios
+   */
+  const createStoreSnapshot = useCallback(
+    async (storeId: string, serviceIds: string[], totalAmount: number): Promise<any | null> => {
+      if (!token) {
+        setError("No hay sesión activa");
+        return null;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log(`📝 [HOOK] Creando snapshot de tienda`);
+        console.log(`   Store ID: ${storeId}`);
+        console.log(`   Service IDs: ${serviceIds}`);
+        console.log(`   Total Amount: ${totalAmount}`);
+
+        const response = await api.post<{ ok: boolean; data: any }>(
+          '/payments/snapshots/store/create',
+          {
+            store_id: storeId,
+            service_ids: serviceIds,
+            total_amount: totalAmount,
+          },
+          { headers }
+        );
+
+        console.log(`✅ [HOOK] Snapshot creado:`, response.data.data);
+        return response.data.data || null;
+      } catch (err: any) {
+        const message = err.response?.data?.message || "Error creando snapshot";
+        setError(message);
+        console.error("❌ [HOOK] Error en createStoreSnapshot:", message);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, headers]
+  );
+
+  /**
+   * Cobrar snapshot de tienda
+   */
+  const chargeStoreSnapshot = useCallback(
+    async (snapshotId: string, serviceIds: string[]): Promise<any | null> => {
+      if (!token) {
+        setError("No hay sesión activa");
+        return null;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log(`💳 [HOOK] Cobrando snapshot: ${snapshotId}`);
+        console.log(`📤 [HOOK] Service IDs: ${serviceIds}`);
+
+        const response = await api.patch<any>(
+          `/payments/snapshots/store/${snapshotId}/charge`,
+          {
+            service_ids: serviceIds,
+            notes: 'Cobrado',
+          },
+          { headers }
+        );
+
+        console.log(`✅ [HOOK] Snapshot cobrado exitosamente:`, response.data);
+        return response.data || null;
+      } catch (err: any) {
+        const message = err.response?.data?.message || "Error cobrando snapshot";
+        setError(message);
+        console.error("❌ [HOOK] Error en chargeStoreSnapshot:", message);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, headers]
+  );
+
   return {
     // Estado
     loading,
@@ -714,6 +830,9 @@ export function usePayments(token: string | null) {
     getPaymentSnapshots,
     getPaymentSnapshot,
     createSnapshotFromServices,
+    getStorePaymentSnapshots,
+    createStoreSnapshot,
+    chargeStoreSnapshot,
 
     // Tiendas
     getStorePaymentRecords,
