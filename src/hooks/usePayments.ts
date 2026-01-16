@@ -628,7 +628,7 @@ export function usePayments(token: string | null) {
    * Crea snapshot y marca servicios como pagados
    */
   const coordinatorPayServices = useCallback(
-    async (serviceIds: string[], deliveryId: string): Promise<any | null> => {
+    async (serviceIds: string[], deliveryId: string, paymentMethod?: string, reference?: string): Promise<any | null> => {
       if (!token) {
         setError("No hay sesión activa");
         return null;
@@ -643,48 +643,81 @@ export function usePayments(token: string | null) {
       setError(null);
 
       try {
-        console.log('\n🟦 [COORDINATOR] === coordinatorPayServices ===');
+        console.log('\n🟢 [COORDINATOR] === coordinatorPayServices (PAGO DIRECTO) ===');
         console.log(`📦 Service IDs: ${JSON.stringify(serviceIds)}`);
         console.log(`👤 Delivery ID: ${deliveryId}`);
+        console.log(`💳 Payment Method: ${paymentMethod || 'efectivo'}`);
+        console.log(`📌 Reference: ${reference || 'N/A'}`);
 
-        // 1. Crear snapshot de pago
-        console.log('\n📸 Creando snapshot...');
-        const snapshotResponse = await api.post(
-          '/payments/snapshots/from-services',
-          { services_ids: serviceIds },
-          { headers }
-        );
-
-        const snapshot = snapshotResponse.data;
-        if (!snapshot || !snapshot.id) {
-          throw new Error('No se pudo crear snapshot');
-        }
-
-        console.log(`✅ Snapshot creado: ${snapshot.id}`);
-
-        // 2. Marcar servicios como pagados
-        console.log('\n📝 Marcando servicios como pagados...');
-        const markPaymentResponse = await api.patch(
-          '/payments/snapshots/mark-paid',
+        // ✅ NUEVO: Usar el endpoint de pago directo que hace TODO en una sola llamada
+        console.log('\n🟢 Ejecutando PAGO DIRECTO (snapshot + pagados en una sola operación)...');
+        const paymentResponse = await api.post(
+          '/payments/snapshots/delivery/pay-direct',
           { 
-            snapshot_id: snapshot.id,
-            service_ids: serviceIds,
-            paid_by_role: 'coordinator'
+            services_ids: serviceIds, 
+            delivery_id: deliveryId,
+            payment_method: paymentMethod || 'efectivo',
+            reference: reference || '',
+            notes: `Pago directo por coordinador`
           },
           { headers }
         );
 
-        console.log(`✅ Servicios marcados como pagados`);
+        const { snapshot, payment } = paymentResponse.data?.data || {};
+        
+        if (!snapshot || !snapshot.id) {
+          throw new Error('No se pudo crear snapshot');
+        }
+
+        console.log(`\n✅ === PAGO DIRECTO COMPLETADO ===`);
+        console.log(`📌 Snapshot ID: ${snapshot.id}`);
+        console.log(`💰 Total: $${snapshot.total_amount}`);
+        console.log(`📦 Servicios pagados: ${serviceIds.length}`);
 
         return {
           snapshot,
-          marked: markPaymentResponse.data
+          payment,
+          success: true
         };
       } catch (err: any) {
-        const message = err.response?.data?.message || "Error procesando pago";
+        const message = err.response?.data?.error || "Error procesando pago directo";
         setError(message);
-        console.error("❌ Error en coordinatorPayServices:", message);
+        console.error("❌ Error en pago directo:", message);
         return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, headers]
+  );
+
+  /**
+   * Obtener snapshots de pago de un delivery
+   */
+  const getDeliveryPaymentSnapshots = useCallback(
+    async (deliveryId: string): Promise<any[]> => {
+      if (!token) {
+        setError("No hay sesión activa");
+        return [];
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log(`🔄 [HOOK] Pidiendo snapshots de delivery: ${deliveryId}`);
+        const response = await api.get<{ ok: boolean; data: any[] }>(
+          `/payments/snapshots/delivery/${deliveryId}/history?status=all`,
+          { headers }
+        );
+        
+        console.log(`✅ [HOOK] Snapshots de delivery recibidos:`, response.data.data);
+        return response.data.data || [];
+      } catch (err: any) {
+        const message = err.response?.data?.message || "Error obteniendo snapshots de delivery";
+        setError(message);
+        console.error("❌ [HOOK] Error en getDeliveryPaymentSnapshots:", message);
+        return [];
       } finally {
         setLoading(false);
       }
@@ -830,6 +863,7 @@ export function usePayments(token: string | null) {
     getPaymentSnapshots,
     getPaymentSnapshot,
     createSnapshotFromServices,
+    getDeliveryPaymentSnapshots,
     getStorePaymentSnapshots,
     createStoreSnapshot,
     chargeStoreSnapshot,

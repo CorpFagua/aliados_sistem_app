@@ -11,11 +11,11 @@ import { usePayments } from "../../../../hooks/usePayments";
 
 export default function DeliveryPaymentSummaryScreen({ delivery }) {
   const { session } = useAuth();
-  const { coordinatorPayServices } = usePayments(session?.access_token || null);
+  const { coordinatorPayServices, getDeliveryPaymentSnapshots } = usePayments(session?.access_token || null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unpaid, setUnpaid] = useState([]);
-  const [history, setHistory] = useState([]);
+  const [snapshots, setSnapshots] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<"due" | "history">("due");
   const [startDate, setStartDate] = useState(""); // YYYY-MM-DD
   const [endDate, setEndDate] = useState("");
@@ -43,15 +43,19 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
       const unpaidData = allServices.filter(
         s => s.assignedDelivery === delivery.id && s.status === "entregado" && !s.isPaid
       );
-      const historyData = allServices.filter(
-        s => s.assignedDelivery === delivery.id
-      );
       setUnpaid(unpaidData);
-      setHistory(historyData);
+
+      // Cargar snapshots pagados (historial de facturas)
+      console.log(`📋 [SNAPSHOTS] Cargando snapshots para delivery: ${delivery.id}`);
+      const snapshotsData = await getDeliveryPaymentSnapshots(delivery.id);
+      // Filtrar solo los snapshots pagados
+      const paidSnapshots = snapshotsData.filter((s: any) => s.status === 'paid');
+      setSnapshots(paidSnapshots);
+      console.log(`✅ ${paidSnapshots.length} snapshots pagados encontrados`);
     } catch (err) {
       console.error("❌ Error cargando datos:", err);
       setUnpaid([]);
-      setHistory([]);
+      setSnapshots([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -84,6 +88,25 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
     </View>
   );
 
+  const renderSnapshot = ({ item }) => (
+    <View style={styles.serviceCardRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.serviceTitle}>Factura #{item.id.slice(-8)}</Text>
+        <Text style={styles.serviceDetail}>Período: {item.period_start} a {item.period_end}</Text>
+        <Text style={styles.serviceDetail}>Total: {formatCurrency(item.total_amount || 0)}</Text>
+        <Text style={styles.serviceDetail}>Viajes: {item.services_count || 0}</Text>
+        {item.paid_at && <Text style={styles.serviceDetail}>Pagado: {new Date(item.paid_at).toLocaleDateString()}</Text>}
+      </View>
+      <View style={{ paddingLeft: 12, justifyContent: 'center' }}>
+        <Ionicons
+          name="checkmark-circle"
+          size={22}
+          color={Colors.activeMenuText}
+        />
+      </View>
+    </View>
+  );
+
   // Calendar helpers
   const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
   const daysInMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
@@ -107,8 +130,18 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
     const sd = parseDate(startDate);
     const ed = parseDate(endDate);
     if (!sd && !ed) return list;
-    return list.filter((s) => {
-      const dt = s.completedAt ? new Date(s.completedAt) : new Date(s.createdAt);
+    return list.filter((item) => {
+      // Para snapshots, usar period_start o period_end
+      // Para servicios, usar completedAt o createdAt
+      let dt: Date;
+      if (item.period_start) {
+        // Es un snapshot
+        dt = new Date(item.period_start);
+      } else {
+        // Es un servicio
+        dt = item.completedAt ? new Date(item.completedAt) : new Date(item.createdAt);
+      }
+      
       if (sd && dt < sd) return false;
       if (ed) {
         const edEnd = new Date(ed);
@@ -140,23 +173,23 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
     
     setProcessing(true);
     try {
-      console.log('\n🟦 [COORDINATOR] === handleConfirmPayment ===');
+      console.log('\n� [COORDINATOR] === handleConfirmPayment (PAGO DIRECTO) ===');
       console.log(`📦 Service IDs: ${JSON.stringify(selectedIds)}`);
       console.log(`💳 Método: ${paymentMethod}`);
       console.log(`📌 Referencia: ${reference}`);
 
-      // Usar la nueva función que crea snapshot + marca como pagado
-      const result = await coordinatorPayServices(selectedIds, delivery.id);
+      // Usar la nueva función de pago directo que hace TODO en una sola operación
+      const result = await coordinatorPayServices(selectedIds, delivery.id, paymentMethod, reference);
 
-      if (!result) {
+      if (!result || !result.snapshot) {
         throw new Error('No se pudo procesar el pago');
       }
 
-      console.log(`✅ Pago procesado exitosamente`);
+      console.log(`✅ Pago directo procesado exitosamente`);
       
       Alert.alert(
-        "Éxito", 
-        `Se generó la factura #${result.snapshot.id.slice(-8)} y se marcaron ${selectedIds.length} viaje${selectedIds.length !== 1 ? 's' : ''} como pagados`
+        "✅ Éxito", 
+        `Se generó la factura #${result.snapshot.id.slice(-8)} y se marcaron ${selectedIds.length} viaje${selectedIds.length !== 1 ? 's' : ''} como pagados.\n\nTotal: ${formatCurrency(result.snapshot.total_amount)}`
       );
       
       setShowPayModal(false);
@@ -166,7 +199,7 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
       loadData();
     } catch (err: any) {
       console.error('❌ Error:', err);
-      Alert.alert("Error", err.message || "No se pudo procesar el pago");
+      Alert.alert("Error", err.message || "No se pudo procesar el pago directo");
     } finally {
       setProcessing(false);
     }
@@ -228,10 +261,10 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
             </>
           ) : (
             <FlatList
-              data={applyDateFilter(history)}
-              renderItem={renderService}
+              data={applyDateFilter(snapshots)}
+              renderItem={renderSnapshot}
               keyExtractor={item => item.id}
-              ListEmptyComponent={<Text style={styles.emptyText}>No hay historial de viajes.</Text>}
+              ListEmptyComponent={<Text style={styles.emptyText}>No hay historial de pagos.</Text>}
             />
           )}
         </>
@@ -242,13 +275,14 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Generar pago</Text>
+            <Text style={styles.modalSubtitle}>Se creará una factura con {selectedIds.length} viaje{selectedIds.length !== 1 ? 's' : ''}</Text>
             <Text style={styles.modalSubtitle}>Total: {formatCurrency(totalSelectedAmount())}</Text>
 
-            <Text style={styles.label}>Método</Text>
+            <Text style={styles.label}>Método de pago (referencia)</Text>
             <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
               {(["efectivo", "transferencia", "cheque", "otro"] as any).map((m: any) => (
                 <TouchableOpacity key={m} onPress={() => setPaymentMethod(m)} style={[styles.methodBtn, paymentMethod === m && styles.methodBtnActive]}>
-                  <Text style={{ color: paymentMethod === m ? "white" : Colors.menuText }}>{m}</Text>
+                  <Text style={{ color: paymentMethod === m ? "white" : Colors.menuText, fontSize: 12 }}>{m}</Text>
                 </TouchableOpacity>
               ))}
             </View>
