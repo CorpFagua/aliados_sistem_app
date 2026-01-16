@@ -14,6 +14,21 @@ type Params = {
   };
 };
 
+interface Snapshot {
+  id: string;
+  type: 'store';
+  store_id: string;
+  period_start: string;
+  period_end: string;
+  total_amount: number;
+  status: 'pending' | 'paid';
+  notes?: string;
+  created_at: string;
+  paid_at?: string;
+  services_count: number;
+  services: any[];
+}
+
 export default function StorePaymentSummaryScreen({ store, onClose }: { store?: any; onClose?: ()=>void }){
   const route = useRoute<RouteProp<Params,'StorePaymentSummary'>>();
   const navigation = useNavigation();
@@ -24,7 +39,7 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
 
   const [loading, setLoading] = useState(false);
   const [unpaid, setUnpaid] = useState<any[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showPayModal, setShowPayModal] = useState(false);
@@ -37,6 +52,7 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   const [showCalendar, setShowCalendar] = useState<null | { field: 'start' | 'end' }>(null);
   const [calendarMonth, setCalendarMonth] = useState(()=> new Date());
   const [selectAll, setSelectAll] = useState(false);
+  const [selectedSnapshot, setSelectedSnapshot] = useState<Snapshot | null>(null);
 
   useEffect(()=>{ load(); },[session, storeId]);
 
@@ -44,8 +60,8 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     if (!session?.access_token || !storeId) return;
     setLoading(true);
     try{
+      // Cargar servicios
       const all = await fetchServices(session.access_token);
-      console.log('[StorePaymentSummary] fetched services count:', Array.isArray(all) ? all.length : 0);
       const sUnpaid = all.filter((s)=> {
         const belongs = (s.storeId === storeId || s.profileStoreId === storeId);
         const notPaid = !s.isPaid;
@@ -53,16 +69,28 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
         const allowed = status === 'entregado' || status === 'pago' || status === 'pagado' || status === 'paid';
         return belongs && notPaid && allowed;
       });
-      console.log('[StorePaymentSummary] unpaid count:', sUnpaid.length);
-      const sAll = all.filter((s)=> (s.storeId === storeId || s.profileStoreId === storeId));
-      console.log('[StorePaymentSummary] history count:', sAll.length);
-      if (Array.isArray(all) && all.length > 0) {
-        console.log('[StorePaymentSummary] sample services:', all.slice(0,3).map(s=>({ id: s.id, storeId: s.storeId, profileStoreId: s.profileStoreId, isPaid: s.isPaid, status: s.status })));
-      }
       setUnpaid(sUnpaid);
-      setHistory(sAll);
+
+      // Cargar snapshots de tienda
+      try {
+        const response = await fetch(
+          `http://localhost:3000/api/payments/snapshots/store/${storeId}/history?status=all`,
+          {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+          }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setSnapshots(data.data || []);
+        }
+      } catch (snapErr) {
+        console.error('Error loading snapshots:', snapErr);
+        setSnapshots([]);
+      }
     }catch(e){
-      setUnpaid([]); setHistory([]);
+      setUnpaid([]); setSnapshots([]);
     }finally{ setLoading(false); setRefreshing(false); }
   }
 
@@ -73,21 +101,83 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     },0);
   }
 
-  async function handleConfirmPayment(){
+  async function handleCreateSnapshot(){
     if (!session?.access_token) return Alert.alert('Error','No hay sesión');
-    if (selectedIds.length === 0) return Alert.alert('Selecciona viajes', 'Debes seleccionar al menos un servicio para generar el pago.');
+    if (selectedIds.length === 0) return Alert.alert('Selecciona viajes', 'Debes seleccionar al menos un servicio.');
+
     setProcessingPayment(true);
     try{
-      await Promise.all(selectedIds.map((id)=> updateServiceData(id, { isPaid: true }, session.access_token)));
-      Alert.alert('Éxito','Se marcaron los servicios como pagados');
+      const response = await fetch('http://localhost:3000/api/payments/snapshots/store/create', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          store_id: storeId,
+          service_ids: selectedIds,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error creating snapshot');
+      }
+
+      const data = await response.json();
+      Alert.alert('Éxito', `Prefactura #${data.data.id.slice(-8)} creada exitosamente`);
       setShowPayModal(false);
       setSelectedIds([]);
       setSelectAll(false);
       await load();
-    }catch(e){
-      console.error(e);
-      Alert.alert('Error','No se pudo procesar el pago');
+    }catch(e: any){
+      console.error('Error creating snapshot:', e);
+      Alert.alert('Error', e.message || 'No se pudo crear la prefactura');
     }finally{ setProcessingPayment(false); }
+  }
+
+  async function handleChargeSnapshot(snapshot: Snapshot){
+    if (!session?.access_token) return Alert.alert('Error','No hay sesión');
+
+    Alert.alert(
+      'Cobrar Prefactura',
+      `¿Cobrar $${snapshot.total_amount} a la tienda?`,
+      [
+        { text: 'Cancelar', onPress: () => {} },
+        {
+          text: 'Cobrar',
+          onPress: async () => {
+            try {
+              const serviceIds = snapshot.services.map((s: any) => s.service_id);
+              const response = await fetch(
+                `http://localhost:3000/api/payments/snapshots/store/${snapshot.id}/charge`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    service_ids: serviceIds,
+                    notes: 'Cobrado',
+                  }),
+                }
+              );
+
+              if (!response.ok) {
+                throw new Error('Failed to charge snapshot');
+              }
+
+              Alert.alert('Éxito', 'Prefactura cobrada exitosamente');
+              await load();
+            } catch (error: any) {
+              console.error('Error charging snapshot:', error);
+              Alert.alert('Error', 'No se pudo cobrar la prefactura');
+            }
+          },
+        },
+      ]
+    );
   }
 
   if (loading) return <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><ActivityIndicator color={Colors.activeMenuText} /></View>;
@@ -139,6 +229,48 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     </View>
   );
 
+  const renderSnapshot = ({ item }: { item: Snapshot }) => (
+    <TouchableOpacity 
+      style={[
+        styles.snapshotCard,
+        item.status === 'paid' ? styles.snapshotCardPaid : styles.snapshotCardPending,
+      ]}
+    >
+      <View style={styles.snapshotHeader}>
+        <Text style={styles.snapshotId}>Factura #{item.id.slice(-8)}</Text>
+        <Text
+          style={[
+            styles.statusBadge,
+            item.status === 'paid'
+              ? styles.statusBadgePaid
+              : styles.statusBadgePending,
+          ]}
+        >
+          {item.status === 'paid' ? '✓ Cobrado' : '⏳ Pendiente'}
+        </Text>
+      </View>
+
+      <View style={styles.snapshotDetails}>
+        <Text style={styles.snapshotAmount}>${item.total_amount.toFixed(2)}</Text>
+        <Text style={styles.snapshotPeriod}>
+          {item.period_start} a {item.period_end}
+        </Text>
+        <Text style={styles.snapshotServices}>
+          {item.services_count} servicio{item.services_count !== 1 ? 's' : ''}
+        </Text>
+      </View>
+
+      {item.status === 'pending' && (
+        <TouchableOpacity
+          style={styles.chargeButton}
+          onPress={() => handleChargeSnapshot(item)}
+        >
+          <Text style={styles.chargeButtonText}>Cobrar</Text>
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+
   const handleSelectAll = () => {
     if (selectAll){ setSelectedIds([]); setSelectAll(false); }
     else { setSelectedIds(unpaid.map(s=>s.id)); setSelectAll(true); }
@@ -184,7 +316,7 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
               <Text style={{color:Colors.menuText}}>{selectAll ? 'Deseleccionar todo' : 'Seleccionar todo'}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={()=>setShowPayModal(true)} style={styles.payButtonSmall}>
-              <Text style={{color:Colors.activeMenuText, fontWeight:'bold'}}>Cobrar seleccionado</Text>
+              <Text style={{color:Colors.activeMenuText, fontWeight:'bold'}}>Crear prefactura</Text>
             </TouchableOpacity>
           </View>
 
@@ -204,37 +336,28 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
         </>
       ) : (
         <FlatList
-          data={applyDateFilter(history)}
-          renderItem={renderService}
+          data={snapshots}
+          renderItem={renderSnapshot}
           keyExtractor={i=>i.id}
           contentContainerStyle={{ paddingTop: 8, paddingBottom: 20 }}
-          ListEmptyComponent={<Text style={styles.emptyStateText}>No hay historial de servicios.</Text>}
+          ListEmptyComponent={<Text style={styles.emptyStateText}>No hay historial de prefacturas.</Text>}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{ setRefreshing(true); load(); }} />}
         />
       )}
 
       <Modal visible={showPayModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Generar pago</Text>
+            <Text style={styles.modalTitle}>Crear prefactura</Text>
             <Text style={styles.modalSubtitle}>Total: {formatCurrency(totalSelectedAmount())}</Text>
-
-            <Text style={styles.label}>Método</Text>
-            <View style={{flexDirection:'row', gap:8, marginBottom:12}}>
-              {( ['efectivo','transferencia','cheque','otro'] as any).map((m:any)=>(
-                <TouchableOpacity key={m} onPress={()=>setPaymentMethod(m)} style={[styles.methodBtn, paymentMethod===m && styles.methodBtnActive]}>
-                  <Text style={{color: paymentMethod===m ? Colors.Background : Colors.menuText}}>{m}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TextInput placeholder="Referencia (opcional)" style={styles.input} value={reference} onChangeText={setReference} placeholderTextColor={Colors.menuText} />
+            <Text style={styles.modalText}>Se creará una prefactura con {selectedIds.length} servicio{selectedIds.length !== 1 ? 's' : ''}</Text>
 
             <View style={{flexDirection:'row', gap:12}}>
               <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={()=>setShowPayModal(false)}>
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={handleConfirmPayment}>
-                {processingPayment ? <ActivityIndicator color={Colors.Background} /> : <Text style={styles.confirmButtonText}>Confirmar pago</Text>}
+              <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={handleCreateSnapshot}>
+                {processingPayment ? <ActivityIndicator color={Colors.Background} /> : <Text style={styles.confirmButtonText}>Crear prefactura</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -518,5 +641,75 @@ const styles = StyleSheet.create({
     color: Colors.menuText,
     marginBottom: 6,
     fontSize: 13,
+  },
+  snapshotCard: {
+    backgroundColor: Colors.activeMenuBackground,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+    borderLeftWidth: 4,
+  },
+  snapshotCardPending: {
+    borderLeftColor: '#FFC107',
+  },
+  snapshotCardPaid: {
+    borderLeftColor: '#4CAF50',
+    opacity: 0.7,
+  },
+  snapshotHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  snapshotId: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.normalText,
+  },
+  statusBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  statusBadgePending: {
+    backgroundColor: '#FFF3CD',
+    color: '#856404',
+  },
+  statusBadgePaid: {
+    backgroundColor: '#D4EDDA',
+    color: '#155724',
+  },
+  snapshotDetails: {
+    marginBottom: 10,
+  },
+  snapshotAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.activeMenuText,
+    marginBottom: 4,
+  },
+  snapshotPeriod: {
+    fontSize: 12,
+    color: Colors.menuText,
+    marginBottom: 2,
+  },
+  snapshotServices: {
+    fontSize: 12,
+    color: Colors.menuText,
+  },
+  chargeButton: {
+    backgroundColor: Colors.activeMenuText,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  chargeButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

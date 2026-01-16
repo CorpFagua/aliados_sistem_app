@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from "../../../../providers/AuthProvider";
 import { usePayments } from "../../../../hooks/usePayments";
+import { fetchDeliveryServices } from "../../../../services/services";
 import {
   getNextCutDate,
   getCurrentCutType,
@@ -54,9 +55,8 @@ export default function DeliveryEarningsScreen() {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [pendingServices, setPendingServices] = useState<any[]>([]);
-  const [selectedService, setSelectedService] = useState<any | null>(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const [showCutModal, setShowCutModal] = useState(false);
 
   useEffect(() => {
     if (session?.access_token) {
@@ -110,55 +110,97 @@ export default function DeliveryEarningsScreen() {
   const loadPendingServices = async () => {
     if (!session?.access_token) return;
     try {
-      console.log("🔄 Cargando servicios pendientes...");
-      const data = await getPaymentHistory({ type: "earnings", limit: 200 });
-      const arr = Array.isArray(data) ? data : [];
-      console.log("📋 Servicios obtenidos:", arr.length);
+      console.log("\n🟦 [EARNINGS] === loadPendingServices ===");
+      console.log("🔄 Cargando servicios entregados sin pagar...");
       
-      const unpaid = arr.filter((s) => {
-        // Verificar si el servicio está entregado pero no pagado
+      // Usar fetchDeliveryServices en lugar de getPaymentHistory
+      const services = await fetchDeliveryServices(session.access_token);
+      console.log(`📦 Total servicios obtenidos: ${services.length}`);
+      
+      const unpaid = services.filter((s: any) => {
+        // Verificar si el servicio está entregado
         const delivered = 
           s.status === "entregado" || 
           s.status === "delivered" || 
           s.status === "completed" ||
           s.completedAt !== undefined && s.completedAt !== null;
         
-        const paid = 
-          s.is_paid === true || 
-          s.is_paid === 'true' || 
-          s.paid === true || 
-          s.paid === 'true';
+        // Verificar si NO está pagado
+        const notPaid = 
+          s.is_paid !== true && 
+          s.is_paid !== 'true' && 
+          s.paid !== true && 
+          s.paid !== 'true';
         
-        const hasEarnings = (s.earnedByDelivery || s.price_delivery_srv || s.amount || 0) > 0;
+        // Verificar que tenga monto a pagar
+        const hasEarnings = (s.earnedByDelivery || s.price_delivery_srv || s.priceDeliverySrv || s.amount || 0) > 0;
         
-        return delivered && !paid && hasEarnings;
+        if (delivered && notPaid && hasEarnings) {
+          console.log(`✅ Servicio válido: ${s.id} - $${s.earnedByDelivery || s.price_delivery_srv || s.priceDeliverySrv || s.amount}`);
+          return true;
+        }
+        
+        if (delivered) {
+          console.log(`⚠️ Servicio entregado pero: pagado=${!notPaid} | has_earnings=${hasEarnings}`);
+        }
+        
+        return false;
       });
       
-      console.log(`✅ Servicios sin pagar encontrados: ${unpaid.length}`);
-      unpaid.forEach((s) => {
-        console.log(`  - ${s.id}: $${s.earnedByDelivery || s.price_delivery_srv || s.amount || 0}`);
+      console.log(`\n📋 Servicios sin pagar encontrados: ${unpaid.length}`);
+      unpaid.forEach((s: any, idx: number) => {
+        console.log(`  ${idx + 1}. ID: ${s.id}`);
+        console.log(`     - Monto: $${s.earnedByDelivery || s.price_delivery_srv || s.priceDeliverySrv || s.amount || 0}`);
+        console.log(`     - Estado: ${s.status}`);
+        console.log(`     - Entregado: ${s.completedAt || 'N/A'}`);
       });
       
       setPendingServices(unpaid);
-    } catch (err) {
-      console.warn("⚠️ No se pudieron cargar servicios pendientes", err);
+    } catch (err: any) {
+      console.error("\n❌ [EARNINGS] Error cargando servicios:", err);
+      console.error("   Message:", err.message);
       setPendingServices([]);
     }
   };
 
   const handleRequestPayment = async () => {
-    if (!selectedService) return;
+    if (pendingServices.length === 0) {
+      Alert.alert('Sin servicios', 'No hay servicios pendientes para cobrar');
+      return;
+    }
+
     setRequesting(true);
     try {
-      const snapshot = await createSnapshotFromServices([selectedService.serviceId || selectedService.id]);
-      if (!snapshot || !snapshot.id) throw new Error('No se pudo crear snapshot');
+      console.log('\n🟦 [EARNINGS] === handleRequestCut ===');
+      console.log(`📦 Servicios a solicitar: ${pendingServices.length}`);
+      
+      const serviceIds = pendingServices.map(s => s.id);
+      console.log(`📌 IDs: ${JSON.stringify(serviceIds)}`);
+      
+      console.log('\n📸 [EARNINGS] Creando snapshot...');
+      const snapshot = await createSnapshotFromServices(serviceIds);
+      console.log(`📌 Snapshot retornado:`, snapshot);
+
+      if (!snapshot || !snapshot.id) {
+        console.error('❌ [EARNINGS] Snapshot sin ID válido');
+        throw new Error('No se pudo crear snapshot');
+      }
+
+      console.log(`\n📤 [EARNINGS] Creando payment request con snapshot ID: ${snapshot.id}`);
       await createPaymentRequest({ snapshot_id: snapshot.id });
-      Alert.alert('Éxito', 'Prefactura solicitada. Espera la aprobación del coordinador.');
-      setShowConfirmModal(false);
-      setSelectedService(null);
+      
+      console.log(`\n✅ [EARNINGS] Corte solicitado exitosamente`);
+      Alert.alert(
+        'Éxito',
+        `Solicitud de corte enviada con ${serviceIds.length} servicio${serviceIds.length !== 1 ? 's' : ''}. Espera la aprobación del coordinador.`
+      );
+      setShowCutModal(false);
       loadPendingServices();
-    } catch (err) {
-      Alert.alert('Error', 'No se pudo solicitar la prefactura');
+      loadEarnings();
+    } catch (err: any) {
+      console.error('\n❌ [EARNINGS] Error:', err);
+      console.error('   Message:', err.message);
+      Alert.alert('Error', err.message || 'No se pudo solicitar el corte');
     } finally {
       setRequesting(false);
     }
@@ -252,12 +294,12 @@ export default function DeliveryEarningsScreen() {
 
       {/* Botón solicitar corte */}
       <TouchableOpacity
-        style={[styles.button, !canRequestCut && styles.buttonDisabled]}
-        disabled={!canRequestCut}
-        onPress={() => Alert.alert("Solicitar Corte", "Serás dirigido a solicitudes")}
+        style={[styles.button, pendingServices.length === 0 && styles.buttonDisabled]}
+        disabled={pendingServices.length === 0}
+        onPress={() => setShowCutModal(true)}
       >
         <Text style={styles.buttonText}>
-          {canRequestCut ? "Solicitar Corte" : "No disponible aún"}
+          {pendingServices.length === 0 ? "No hay servicios" : `Solicitar Corte (${pendingServices.length})`}
         </Text>
       </TouchableOpacity>
 
@@ -274,113 +316,153 @@ export default function DeliveryEarningsScreen() {
 
       {/* Servicios entregados sin pagar */}
       <View style={[styles.header, { marginTop: 6 }] }>
-        <Text style={styles.headerTitle}>Servicios pendientes</Text>
-        <Text style={styles.headerSubtitle}>{pendingServices.length} servicio{pendingServices.length !== 1 ? 's' : ''} sin pagar</Text>
+        <Text style={styles.headerTitle}>Servicios del período</Text>
+        <Text style={styles.headerSubtitle}>{pendingServices.length} servicio{pendingServices.length !== 1 ? 's' : ''} entregado{pendingServices.length !== 1 ? 's' : ''}</Text>
       </View>
 
       {pendingServices.length === 0 ? (
         <View style={{ paddingHorizontal: 20, paddingVertical: 20 }}>
-          <Text style={{ color: Colors.menuText }}>No tienes servicios pendientes por cobrar.</Text>
+          <Text style={{ color: Colors.menuText }}>No tienes servicios entregados en este período.</Text>
         </View>
       ) : (
         <FlatList
           data={pendingServices}
           keyExtractor={(item) => (item.id ? String(item.id) : Math.random().toString())}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 20 }}
+          scrollEnabled={false}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.orderCard} onPress={() => { setSelectedService(item); setShowConfirmModal(true); }}>
-              <View style={styles.orderHeader}>
-                <View>
-                  <Text style={styles.orderNumber}>Servicio #{String(item.id).slice(-6)}</Text>
-                  <Text style={styles.orderDate}>{item.completedAt ? new Date(item.completedAt).toLocaleDateString('es-CO') : ''}</Text>
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.orderNumber}>Pedido {item.id || "N/A"}</Text>
+                  <Text style={styles.orderDate}>
+                    {item.completedAt
+                      ? new Date(item.completedAt).toLocaleDateString("es-CO")
+                      : item.createdAt
+                      ? new Date(item.createdAt).toLocaleDateString("es-CO")
+                      : "Pendiente"}
+                  </Text>
                 </View>
-                <View style={styles.statusContainer}>
-                  <View style={[styles.statusBadge, { backgroundColor: Colors.warning }]}>
-                    <Text style={styles.statusText}>Sin Pagar</Text>
-                  </View>
+                <View style={styles.amountColumn}>
+                  <Text style={styles.amountLabel}>Tu Ganancia</Text>
+                  <Text style={styles.amountValue}>
+                    {formatCurrency(
+                      parseFloat(item.priceDeliverySrv || item.price_delivery_srv || item.earnedByDelivery || item.amount || 0)
+                    )}
+                  </Text>
                 </View>
               </View>
 
-                  <View style={styles.orderBody}>
-                    <View style={styles.amountRow}>
-                      <Text style={styles.label}>Ganancia:</Text>
-                      <Text style={styles.amount}>{formatCurrency(item.earnedByDelivery ?? item.price_delivery_srv ?? item.amount ?? 0)}</Text>
-                    </View>
-                    { (item.notes || item.description) && (
-                      <View style={styles.descriptionRow}>
-                        <Text style={styles.label}>Detalles:</Text>
-                        <Text style={styles.description}>{item.notes || item.description}</Text>
-                      </View>
-                    )}
-                  </View>
-            </TouchableOpacity>
+              <View style={styles.cardBody}>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Tienda:</Text>
+                  <Text style={styles.infoValue} numberOfLines={1}>
+                    {item.storeName || item.store_name || "N/A"}
+                  </Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Dirección:</Text>
+                  <Text style={styles.infoValue} numberOfLines={2}>
+                    {item.destination || item.deliveryAddress || item.delivery_address || "N/A"}
+                  </Text>
+                </View>
+              </View>
+            </View>
           )}
         />
       )}
 
-      {/* Modal de confirmación (similar a History) */}
+      {/* Modal para solicitar corte de todos los servicios */}
       <Modal
-        visible={showConfirmModal}
+        visible={showCutModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowConfirmModal(false)}
+        onRequestClose={() => setShowCutModal(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Solicitar Prefactura</Text>
-              <TouchableOpacity onPress={() => setShowConfirmModal(false)}>
+              <Text style={styles.modalTitle}>Confirmar Solicitud de Corte</Text>
+              <TouchableOpacity onPress={() => setShowCutModal(false)}>
                 <Text style={styles.closeButton}>✕</Text>
               </TouchableOpacity>
             </View>
-            {selectedService && (
-              <>
-                <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 24 }}>
-                  <View style={styles.orderInfo}>
-                    <Text style={styles.orderInfoLabel}>Pedido #</Text>
-                    <Text style={styles.orderInfoValue}>{selectedService.id || selectedService.serviceId || 'N/D'}</Text>
-                  </View>
+            <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 24 }}>
+              <Text style={styles.infoTitle}>Servicios a incluir:</Text>
+              <Text style={styles.infoText}>Total: {pendingServices.length}</Text>
 
-                  <View style={styles.orderInfo}>
-                    <Text style={styles.orderInfoLabel}>Ganancia:</Text>
-                    <Text style={styles.orderInfoValue}>{formatCurrency(selectedService.earnedByDelivery ?? selectedService.price_delivery_srv ?? selectedService.price_delivery ?? selectedService.delivery_earning ?? 0)}</Text>
-                  </View>
-
-                  <View style={styles.orderInfo}>
-                    <Text style={styles.orderInfoLabel}>Tienda:</Text>
-                    <Text style={styles.orderInfoValue}>{selectedService.store_id || selectedService.storeId || selectedService.store || selectedService.store_name || 'N/A'}</Text>
-                  </View>
-
-                  <View style={styles.orderInfo}>
-                    <Text style={styles.orderInfoLabel}>Dirección:</Text>
-                    <Text style={styles.orderInfoValue}>{selectedService.deliveryAddress || selectedService.delivery_address || selectedService.delivery_address_text || 'N/D'}</Text>
-                  </View>
-
-                  <View style={styles.orderInfo}>
-                    <Text style={styles.orderInfoLabel}>Fecha entrega:</Text>
-                    <Text style={styles.orderInfoValue}>{selectedService.completedAt ? new Date(selectedService.completedAt).toLocaleString('es-CO') : ''}</Text>
-                  </View>
-
-                  <View style={styles.infoBox}>
-                    <Text style={styles.infoTitle}>ℹ️ Información</Text>
-                    <Text style={styles.infoText}>
-                      Al solicitar esta prefactura, se enviará una notificación al coordinador
-                      para que la revise y apruebe. Una vez aprobada, podrás recibir el pago.
+              <View style={{ marginVertical: 16 }}>
+                {pendingServices.map((service, idx) => (
+                  <View key={service.id} style={styles.cutServiceItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cutServiceId}>
+                        {idx + 1}. Servicio #{String(service.id).slice(-6)}
+                      </Text>
+                      <Text style={styles.cutServiceDate}>
+                        {service.completedAt ? new Date(service.completedAt).toLocaleDateString('es-CO') : ''}
+                      </Text>
+                    </View>
+                    <Text style={styles.cutServiceAmount}>
+                      {formatCurrency(
+                        service.priceDeliverySrv ??
+                          service.price_delivery_srv ??
+                          service.earnedByDelivery ??
+                          service.amount ??
+                          0
+                      )}
                     </Text>
                   </View>
-                </ScrollView>
+                ))}
+              </View>
 
-                <View style={styles.modalFooter}>
-                  <TouchableOpacity style={styles.cancelButton} onPress={() => setShowConfirmModal(false)} disabled={requesting}>
-                    <Text style={styles.cancelButtonText}>Cancelar</Text>
-                  </TouchableOpacity>
+              <View style={[styles.infoBox, { marginTop: 20 }]}>
+                <Text style={styles.infoTitle}>ℹ️ Total a solicitar:</Text>
+                <Text style={styles.cutTotalAmount}>
+                  {formatCurrency(
+                    pendingServices.reduce((sum, s) => {
+                      return (
+                        sum +
+                        (s.priceDeliverySrv ??
+                          s.price_delivery_srv ??
+                          s.earnedByDelivery ??
+                          s.amount ??
+                          0)
+                      );
+                    }, 0)
+                  )}
+                </Text>
+                <Text style={[styles.infoText, { marginTop: 12 }]}>
+                  El coordinador revisará tu solicitud y realizará el pago en los próximos días.
+                </Text>
+              </View>
+            </ScrollView>
 
-                  <TouchableOpacity style={[styles.confirmButton, requesting && styles.disabledButton]} onPress={handleRequestPayment} disabled={requesting}>
-                    {requesting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.confirmButtonText}>Solicitar Prefactura</Text>}
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowCutModal(false)}
+                disabled={requesting}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.confirmButton,
+                  requesting && styles.disabledButton,
+                ]}
+                onPress={handleRequestPayment}
+                disabled={requesting}
+              >
+                {requesting ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>
+                    Solicitar Corte
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -424,13 +506,23 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: Colors.activeMenuBackground,
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 16,
+    marginHorizontal: 12,
+    marginVertical: 8,
     borderRadius: 12,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.activeMenuText,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   cardHeader: {
-    marginBottom: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
   },
   cardTitle: {
     fontSize: 14,
@@ -446,10 +538,50 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.menuText,
   },
-  statsGrid: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    gap: 12,
+  cardBody: {
+    marginVertical: 8,
+  },
+  amountColumn: {
+    alignItems: "flex-end",
+  },
+  amountLabel: {
+    fontSize: 11,
+    color: "#B0B0B0",
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  amountValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: Colors.activeMenuText,
+  },
+  orderNumber: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  orderDate: {
+    fontSize: 12,
+    color: "#A0A0A0",
+    marginTop: 4,
+  },
+  infoRow: {
+    flexDirection: "row",
+    marginBottom: 10,
+    alignItems: "flex-start",
+  },
+  infoLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#B0B0B0",
+    marginRight: 12,
+    minWidth: 70,
+  },
+  infoValue: {
+    fontSize: 13,
+    color: "#E8E8E8",
+    fontWeight: "500",
+    flex: 1,
   },
   statCard: {
     backgroundColor: Colors.activeMenuBackground,
@@ -518,7 +650,7 @@ const styles = StyleSheet.create({
   },
   infoBox: {
     backgroundColor: "rgba(0, 255, 117, 0.1)",
-    marginHorizontal: 16,
+    marginHorizontal: 0,
     marginTop: 16,
     marginBottom: 24,
     padding: 12,
@@ -535,77 +667,6 @@ const styles = StyleSheet.create({
     color: Colors.success,
     lineHeight: 18,
   },
-  // Estilos para lista de servicios pendientes (reutilizados de History)
-  orderCard: {
-    backgroundColor: Colors.activeMenuBackground,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  orderHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.Border,
-  },
-  orderNumber: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.normalText,
-  },
-  orderDate: {
-    fontSize: 12,
-    color: Colors.menuText,
-    marginTop: 4,
-  },
-  statusContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  statusText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  orderBody: {
-    marginBottom: 12,
-  },
-  amountRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 13,
-    color: Colors.menuText,
-  },
-  amount: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: Colors.activeMenuText,
-  },
-  descriptionRow: {
-    marginTop: 8,
-  },
-  description: {
-    fontSize: 13,
-    color: Colors.normalText,
-    marginTop: 4,
-  },
-  // Modal styles (copied from History)
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -636,29 +697,6 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     marginBottom: 20,
-  },
-  orderInfo: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.Border,
-  },
-  orderInfoLabel: {
-    fontSize: 14,
-    color: Colors.menuText,
-    flex: 1,
-    flexBasis: '45%'
-  },
-  orderInfoValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.normalText,
-    flex: 1,
-    flexBasis: '55%',
-    textAlign: 'right',
-    flexShrink: 1,
-    maxWidth: '70%'
   },
   modalFooter: {
     flexDirection: "row",
@@ -694,5 +732,42 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
+  },
+  cutServiceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.Border,
+    backgroundColor: Colors.activeMenuBackground,
+  },
+  cutServiceId: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.normalText,
+  },
+  cutServiceDate: {
+    fontSize: 11,
+    color: Colors.menuText,
+    marginTop: 2,
+  },
+  cutServiceAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.activeMenuText,
+  },
+  cutTotalAmount: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: Colors.activeMenuText,
+    marginTop: 8,
+  },
+  statsGrid: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    gap: 12,
   },
 });

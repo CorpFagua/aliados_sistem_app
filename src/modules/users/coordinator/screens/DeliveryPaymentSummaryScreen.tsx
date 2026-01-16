@@ -6,10 +6,12 @@ import { fetchDeliveryServices, updateServiceData } from "../../../../services/s
 import { formatCurrency } from "../../../../services/payments";
 import { TextInput, TouchableOpacity, Modal, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { usePayments } from "../../../../hooks/usePayments";
 
 
 export default function DeliveryPaymentSummaryScreen({ delivery }) {
   const { session } = useAuth();
+  const { coordinatorPayServices } = usePayments(session?.access_token || null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unpaid, setUnpaid] = useState([]);
@@ -24,6 +26,7 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
   const [reference, setReference] = useState("");
   const [showCalendar, setShowCalendar] = useState<null | { field: "start" | "end" }>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -134,17 +137,38 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
   const handleConfirmPayment = async () => {
     if (!session?.access_token) return Alert.alert("Error", "No hay sesión");
     if (selectedIds.length === 0) return Alert.alert("Selecciona viajes", "Debes seleccionar al menos un viaje para generar el pago.");
+    
+    setProcessing(true);
     try {
-      // Marcar cada servicio como pagado (llamada PATCH /services/:id)
-      await Promise.all(selectedIds.map((id) => updateServiceData(id, { isPaid: true }, session.access_token)));
-      Alert.alert("Éxito", "Se marcaron los viajes como pagados");
+      console.log('\n🟦 [COORDINATOR] === handleConfirmPayment ===');
+      console.log(`📦 Service IDs: ${JSON.stringify(selectedIds)}`);
+      console.log(`💳 Método: ${paymentMethod}`);
+      console.log(`📌 Referencia: ${reference}`);
+
+      // Usar la nueva función que crea snapshot + marca como pagado
+      const result = await coordinatorPayServices(selectedIds, delivery.id);
+
+      if (!result) {
+        throw new Error('No se pudo procesar el pago');
+      }
+
+      console.log(`✅ Pago procesado exitosamente`);
+      
+      Alert.alert(
+        "Éxito", 
+        `Se generó la factura #${result.snapshot.id.slice(-8)} y se marcaron ${selectedIds.length} viaje${selectedIds.length !== 1 ? 's' : ''} como pagados`
+      );
+      
       setShowPayModal(false);
       setSelectedIds([]);
       setSelectAll(false);
+      setReference("");
       loadData();
-    } catch (err) {
-      console.error(err);
-      Alert.alert("Error", "No se pudo procesar el pago");
+    } catch (err: any) {
+      console.error('❌ Error:', err);
+      Alert.alert("Error", err.message || "No se pudo procesar el pago");
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -232,11 +256,23 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
             <TextInput placeholder="Referencia (opcional)" style={styles.input} value={reference} onChangeText={setReference} placeholderTextColor={Colors.menuText} />
 
             <View style={{ flexDirection: "row", gap: 12 }}>
-              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setShowPayModal(false)}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => setShowPayModal(false)}
+                disabled={processing}
+              >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={handleConfirmPayment}>
-                <Text style={styles.confirmButtonText}>Confirmar pago</Text>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton, processing && { opacity: 0.6 }]} 
+                onPress={handleConfirmPayment}
+                disabled={processing}
+              >
+                {processing ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>Confirmar pago</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>

@@ -43,6 +43,30 @@ export interface DeliveryPaymentRequest {
   notes?: string;
 }
 
+export interface PendingPaymentRequest {
+  id: string;
+  delivery_id: string;
+  snapshot_id: string;
+  status: string;
+  requested_at: string;
+  delivery: {
+    id: string;
+    name: string;
+    phone: string;
+    email: string;
+  };
+  snapshot: {
+    id: string;
+    user_id: string;
+    period: string;
+    services_ids: string[];
+    total_earned: number;
+    status: string;
+    created_at: string;
+  };
+  total_to_pay: number;
+}
+
 export interface StorePaymentRecord {
   id: string;
   store_id: string;
@@ -138,7 +162,12 @@ export function usePayments(token: string | null) {
    */
   const createPaymentRequest = useCallback(
     async (data: CreatePaymentRequestDTO): Promise<DeliveryPaymentRequest | null> => {
+      console.log('\n🟦 [HOOK] === createPaymentRequest ===');
+      console.log(`📌 Data: ${JSON.stringify(data)}`);
+      console.log(`🔐 Token: ${token ? '✅ disponible' : '❌ NO disponible'}`);
+
       if (!token) {
+        console.error('❌ [HOOK] No hay sesión activa');
         setError("No hay sesión activa");
         return null;
       }
@@ -147,16 +176,28 @@ export function usePayments(token: string | null) {
       setError(null);
 
       try {
-        const response = await api.post<DeliveryPaymentRequest>(
+        console.log('\n📤 [HOOK] Enviando POST a /payments/requests');
+        console.log(`📋 Body: ${JSON.stringify(data)}`);
+        console.log(`🔐 Headers: ${JSON.stringify(headers, null, 2)}`);
+
+        const response = await api.post<any>(
           "/payments/requests",
           data,
           { headers }
         );
-        return response.data;
+
+        console.log(`\n✅ [HOOK] Respuesta recibida:`, response.data);
+
+        const request = response.data?.data || response.data;
+        console.log(`📌 Request retornado:`, request);
+
+        return request;
       } catch (err: any) {
-        const message = err.response?.data?.message || "Error creando solicitud";
+        const message = err.response?.data?.message || err.message || "Error creando solicitud";
+        console.error("\n❌ [HOOK] Error en createPaymentRequest:", message);
+        console.error('   Status:', err.response?.status);
+        console.error('   Full error:', JSON.stringify(err.response?.data, null, 2));
         setError(message);
-        console.error("❌ Error en createPaymentRequest:", message);
         return null;
       } finally {
         setLoading(false);
@@ -196,6 +237,34 @@ export function usePayments(token: string | null) {
       const message = err.response?.data?.message || "Error obteniendo solicitudes";
       setError(message);
       console.error("❌ Error en getPaymentRequests:", message);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, [token, headers]);
+
+  /**
+   * Obtener solicitudes de pago pendientes (coordinador)
+   */
+  const getPendingPaymentRequests = useCallback(async (): Promise<PendingPaymentRequest[]> => {
+    if (!token) {
+      setError("No hay sesión activa");
+      return [];
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await api.get<{ ok: boolean; data: PendingPaymentRequest[] }>(
+        "/payments/requests/pending",
+        { headers }
+      );
+      return response.data.data || [];
+    } catch (err: any) {
+      const message = err.response?.data?.message || "Error obteniendo solicitudes pendientes";
+      setError(message);
+      console.error("❌ Error en getPendingPaymentRequests:", message);
       return [];
     } finally {
       setLoading(false);
@@ -310,7 +379,12 @@ export function usePayments(token: string | null) {
    */
   const createSnapshotFromServices = useCallback(
     async (services_ids: string[]): Promise<PaymentSnapshot | null> => {
+      console.log('\n🟦 [HOOK] === createSnapshotFromServices ===');
+      console.log(`📦 Service IDs: ${JSON.stringify(services_ids)}`);
+      console.log(`🔐 Token: ${token ? '✅ disponible' : '❌ NO disponible'}`);
+
       if (!token) {
+        console.error('❌ [HOOK] No hay sesión activa');
         setError("No hay sesión activa");
         return null;
       }
@@ -319,16 +393,28 @@ export function usePayments(token: string | null) {
       setError(null);
 
       try {
-        const response = await api.post<PaymentSnapshot>(
+        console.log('\n📤 [HOOK] Enviando POST a /payments/snapshots/from-services');
+        console.log(`📋 Body: ${JSON.stringify({ services_ids })}`);
+        console.log(`🔐 Headers: ${JSON.stringify(headers, null, 2)}`);
+
+        const response = await api.post<any>(
           "/payments/snapshots/from-services",
           { services_ids },
           { headers }
         );
-        return response.data;
+
+        console.log(`\n✅ [HOOK] Respuesta recibida:`, response.data);
+
+        const snapshot = response.data?.data || response.data;
+        console.log(`📌 Snapshot retornado:`, snapshot);
+
+        return snapshot;
       } catch (err: any) {
-        const message = err.response?.data || "Error creando snapshot";
+        const message = err.response?.data || err.message || "Error creando snapshot";
+        console.error("\n❌ [HOOK] Error en createSnapshotFromServices:", message);
+        console.error('   Status:', err.response?.status);
+        console.error('   Full error:', JSON.stringify(err.response?.data, null, 2));
         setError(message);
-        console.error("❌ Error en createSnapshotFromServices:", message);
         return null;
       } finally {
         setLoading(false);
@@ -538,6 +624,75 @@ export function usePayments(token: string | null) {
     }
   }, [token, headers]);
 
+  /**
+   * Pagar servicios como coordinador
+   * Crea snapshot y marca servicios como pagados
+   */
+  const coordinatorPayServices = useCallback(
+    async (serviceIds: string[], deliveryId: string): Promise<any | null> => {
+      if (!token) {
+        setError("No hay sesión activa");
+        return null;
+      }
+
+      if (!serviceIds || serviceIds.length === 0) {
+        setError("No hay servicios para pagar");
+        return null;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log('\n🟦 [COORDINATOR] === coordinatorPayServices ===');
+        console.log(`📦 Service IDs: ${JSON.stringify(serviceIds)}`);
+        console.log(`👤 Delivery ID: ${deliveryId}`);
+
+        // 1. Crear snapshot de pago
+        console.log('\n📸 Creando snapshot...');
+        const snapshotResponse = await api.post(
+          '/payments/snapshots/from-services',
+          { services_ids: serviceIds },
+          { headers }
+        );
+
+        const snapshot = snapshotResponse.data;
+        if (!snapshot || !snapshot.id) {
+          throw new Error('No se pudo crear snapshot');
+        }
+
+        console.log(`✅ Snapshot creado: ${snapshot.id}`);
+
+        // 2. Marcar servicios como pagados
+        console.log('\n📝 Marcando servicios como pagados...');
+        const markPaymentResponse = await api.patch(
+          '/payments/snapshots/mark-paid',
+          { 
+            snapshot_id: snapshot.id,
+            service_ids: serviceIds,
+            paid_by_role: 'coordinator'
+          },
+          { headers }
+        );
+
+        console.log(`✅ Servicios marcados como pagados`);
+
+        return {
+          snapshot,
+          marked: markPaymentResponse.data
+        };
+      } catch (err: any) {
+        const message = err.response?.data?.message || "Error procesando pago";
+        setError(message);
+        console.error("❌ Error en coordinatorPayServices:", message);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, headers]
+  );
+
   return {
     // Estado
     loading,
@@ -551,6 +706,7 @@ export function usePayments(token: string | null) {
     // Solicitudes
     createPaymentRequest,
     getPaymentRequests,
+    getPendingPaymentRequests,
     approvePaymentRequest,
     rejectPaymentRequest,
 
@@ -567,5 +723,6 @@ export function usePayments(token: string | null) {
     // Pagos
     createDeliveryPayment,
     getPaymentHistory,
+    coordinatorPayServices,
   };
 }

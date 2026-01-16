@@ -1,5 +1,5 @@
-import HistoryScreen from '@/modules/users/delivery/screens/HistoryScreen';
+import DeliveryHistoryScreen from '@/modules/users/delivery/screens/DeliveryHistoryScreen';
 
 export default function HistoryPage() {
-  return <HistoryScreen />;
+  return <DeliveryHistoryScreen />;
 }
