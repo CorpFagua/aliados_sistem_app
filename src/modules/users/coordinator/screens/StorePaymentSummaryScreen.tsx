@@ -56,6 +56,10 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   const [calendarMonth, setCalendarMonth] = useState(()=> new Date());
   const [selectAll, setSelectAll] = useState(false);
   const [selectedSnapshot, setSelectedSnapshot] = useState<Snapshot | null>(null);
+  const [chargingSnapshotId, setChargingSnapshotId] = useState<string | null>(null);
+  const [showChargeModal, setShowChargeModal] = useState(false);
+  const [chargeModalSnapshot, setChargeModalSnapshot] = useState<Snapshot | null>(null);
+  const [chargeNotes, setChargeNotes] = useState('');
 
   useEffect(()=>{ load(); },[session, storeId]);
 
@@ -66,16 +70,15 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       console.log(`\n🛒 [STORE-PAYMENT] Cargando datos de tienda: ${storeId}`);
       
       // Cargar servicios
-      console.log('📦 [STORE-PAYMENT] Cargando servicios sin pagar...');
+      console.log('📦 [STORE-PAYMENT] Cargando servicios en estado entregado...');
       const all = await fetchServices(session.access_token);
       const sUnpaid = all.filter((s)=> {
         const belongs = (s.storeId === storeId || s.profileStoreId === storeId);
-        const notPaid = !s.isPaid;
         const status = (s.status || '').toString().toLowerCase();
-        const allowed = status === 'entregado' || status === 'pago' || status === 'pagado' || status === 'paid';
-        return belongs && notPaid && allowed;
+        const isDelivered = status === 'entregado';
+        return belongs && isDelivered;
       });
-      console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios sin pagar encontrados`);
+      console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios en estado entregado encontrados`);
       setUnpaid(sUnpaid);
 
       // Cargar snapshots de tienda usando el hook
@@ -151,38 +154,143 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
 
   async function handleChargeSnapshot(snapshot: Snapshot){
     if (!session?.access_token) return Alert.alert('Error','No hay sesión');
+    
+    // Validar que el snapshot tenga servicios
+    console.log(`\n🔍 [SCREEN] === Validando snapshot antes de cobrar ===`);
+    console.log(`📌 Snapshot completo:`, JSON.stringify(snapshot, null, 2));
+    console.log(`📦 snapshot.services:`, snapshot.services);
+    console.log(`📦 Type of services:`, typeof snapshot.services);
+    console.log(`📦 Is Array:`, Array.isArray(snapshot.services));
+    
+    if (!snapshot.services || !Array.isArray(snapshot.services) || snapshot.services.length === 0) {
+      Alert.alert(
+        'Error',
+        'Esta prefactura no tiene servicios asociados. No se puede cobrar.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
 
-    Alert.alert(
-      'Cobrar Prefactura',
-      `¿Cobrar $${snapshot.total_amount} a la tienda?`,
-      [
-        { text: 'Cancelar', onPress: () => {} },
-        {
-          text: 'Cobrar',
-          onPress: async () => {
-            try {
-              console.log(`💳 [SCREEN] Cobrando snapshot usando hook: ${snapshot.id}`);
-              
-              const serviceIds = snapshot.services.map((s: any) => s.service_id);
-              console.log(`📤 [SCREEN] Service IDs a marcar como pagados:`, serviceIds);
-              
-              const result = await chargeStoreSnapshot(snapshot.id, serviceIds);
-              
-              if (!result) {
-                throw new Error('No se pudo cobrar el snapshot');
-              }
+    // Abrir modal en lugar de Alert
+    setChargeModalSnapshot(snapshot);
+    setShowChargeModal(true);
+  }
 
-              console.log(`✅ [SCREEN] Prefactura cobrada exitosamente`);
-              Alert.alert('Éxito', 'Prefactura cobrada exitosamente');
-              await load();
-            } catch (error: any) {
-              console.error('❌ [SCREEN] Error charging snapshot:', error);
-              Alert.alert('Error', 'No se pudo cobrar la prefactura');
-            }
-          },
-        },
-      ]
-    );
+  async function executeChargeSnapshot() {
+    if (!chargeModalSnapshot || !session?.access_token) {
+      Alert.alert('Error', 'No hay información del snapshot o sesión expirada');
+      return;
+    }
+
+    const snapshot = chargeModalSnapshot;
+    
+    // Validar servicios
+    if (!snapshot.services || snapshot.services.length === 0) {
+      Alert.alert('Error', 'El snapshot no tiene servicios asociados');
+      return;
+    }
+
+    setChargingSnapshotId(snapshot.id);
+    
+    try {
+      console.log(`\n💳 [SCREEN] === INICIANDO COBRO DE PREFACTURA ===`);
+      console.log(`📌 Snapshot ID: ${snapshot.id}`);
+      console.log(`💰 Monto total: $${snapshot.total_amount.toFixed(2)}`);
+      console.log(`📦 Cantidad de servicios: ${snapshot.services_count}`);
+      console.log(`� Notas: ${chargeNotes || 'ninguna'}`);
+      
+      // Extraer service_ids del array de servicios
+      console.log(`\n🔍 [SCREEN] Analizando estructura de servicios:`);
+      console.log(`   Snapshot.services:`, JSON.stringify(snapshot.services, null, 2));
+      
+      const serviceIds = snapshot.services
+        .map((s: any) => {
+          console.log(`   Procesando servicio:`, s);
+          const id = s.service_id || s.id;
+          console.log(`   - ID extraído: ${id} (type: ${typeof id})`);
+          console.log(`   - service_id field: ${s.service_id}`);
+          console.log(`   - id field: ${s.id}`);
+          return id;
+        })
+        .filter((id: any) => {
+          const isValid = Boolean(id) && typeof id === 'string' && id.trim() !== '';
+          console.log(`   Validando ID ${id}: ${isValid}`);
+          return isValid;
+        });
+      
+      console.log(`📤 [SCREEN] Service IDs extraídos (${serviceIds.length}):`, serviceIds);
+      
+      if (!serviceIds || serviceIds.length === 0) {
+        throw new Error('No se encontraron service_ids válidos en esta prefactura');
+      }
+      
+      console.log(`⏳ [SCREEN] Enviando solicitud de cobro al servidor...`);
+      const result = await chargeStoreSnapshot(snapshot.id, serviceIds, chargeNotes);
+      
+      if (!result) {
+        throw new Error('No se recibió respuesta del servidor');
+      }
+
+      console.log(`✅ [SCREEN] === COBRO EXITOSO ===`);
+      console.log(`📊 Resultado:`, JSON.stringify(result, null, 2));
+      
+      // Validar que los servicios fueron actualizados
+      if (result.services_count !== serviceIds.length) {
+        console.warn(`⚠️ [SCREEN] Servicios actualizados (${result.services_count}) != solicitados (${serviceIds.length})`);
+      }
+      
+      // Actualizar el snapshot en el estado local a 'paid'
+      console.log(`🔄 [SCREEN] Actualizando snapshot en estado local...`);
+      setSnapshots(prevSnapshots => 
+        prevSnapshots.map(snap => 
+          snap.id === snapshot.id 
+            ? { ...snap, status: 'paid' as const, paid_at: new Date().toISOString() }
+            : snap
+        )
+      );
+      
+      // Cerrar modal
+      setShowChargeModal(false);
+      setChargeModalSnapshot(null);
+      setChargingSnapshotId(null);
+      setChargeNotes('');
+      
+      // Mostrar éxito y recargar
+      Alert.alert(
+        '✓ Prefactura Cobrada',
+        `Prefactura #${snapshot.id.slice(-8)} cobrada exitosamente.\n\n💰 Monto: $${snapshot.total_amount.toFixed(2)}\n📦 Servicios: ${snapshot.services_count}`,
+        [{ 
+          text: 'OK', 
+          onPress: () => {
+            console.log(`🔄 [SCREEN] Recargando datos...`);
+            load();
+          }
+        }]
+      );
+    } catch (error: any) {
+      console.error(`\n❌ [SCREEN] === ERROR EN COBRO ===`);
+      console.error(`Error completo:`, error);
+      
+      setChargingSnapshotId(null);
+      
+      const errorMsg = error?.response?.data?.message 
+        || error?.response?.data?.error
+        || error?.message 
+        || 'Error desconocido al cobrar prefactura';
+      
+      console.error(`📝 Mensaje de error: ${errorMsg}`);
+      
+      Alert.alert(
+        '❌ Error al Cobrar',
+        `No se pudo cobrar la prefactura #${snapshot.id.slice(-8)}:\n\n${errorMsg}`,
+        [{ text: 'OK' }]
+      );
+    }
+  }
+
+  function handleChargeCancel() {
+    setShowChargeModal(false);
+    setChargeModalSnapshot(null);
   }
 
   if (loading) return <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><ActivityIndicator color={Colors.activeMenuText} /></View>;
@@ -270,10 +378,15 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
 
       {item.status === 'pending' && (
         <TouchableOpacity
-          style={styles.chargeButton}
+          style={[styles.chargeButton, chargingSnapshotId === item.id && styles.chargeButtonLoading]}
           onPress={() => handleChargeSnapshot(item)}
+          disabled={chargingSnapshotId === item.id}
         >
-          <Text style={styles.chargeButtonText}>Cobrar</Text>
+          {chargingSnapshotId === item.id ? (
+            <ActivityIndicator color={Colors.Background} size="small" />
+          ) : (
+            <Text style={styles.chargeButtonText}>Cobrar</Text>
+          )}
         </TouchableOpacity>
       )}
     </TouchableOpacity>
@@ -419,6 +532,78 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={() => { if (showCalendar?.field === 'start') setStartDate(''); else setEndDate(''); }}>
                 <Text style={styles.confirmButtonText}>Limpiar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Charge Snapshot Modal - Detalles */}
+      <Modal visible={showChargeModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Confirmar Cobro de Prefactura</Text>
+            
+            {chargeModalSnapshot && (
+              <>
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={styles.label}>ID Prefactura:</Text>
+                  <Text style={styles.modalText}>#{chargeModalSnapshot.id.slice(-8)}</Text>
+                </View>
+
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={styles.label}>Período:</Text>
+                  <Text style={styles.modalText}>{chargeModalSnapshot.period_start} a {chargeModalSnapshot.period_end}</Text>
+                </View>
+
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={styles.label}>Monto Total:</Text>
+                  <Text style={[styles.modalText, { fontSize: 18, fontWeight: '700', color: Colors.activeMenuText }]}>
+                    ${chargeModalSnapshot.total_amount.toFixed(2)}
+                  </Text>
+                </View>
+
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={styles.label}>Cantidad de Servicios:</Text>
+                  <Text style={styles.modalText}>{chargeModalSnapshot.services_count}</Text>
+                </View>
+
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={styles.label}>Notas (opcional):</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Agregar notas sobre el pago..."
+                    placeholderTextColor={Colors.menuText}
+                    value={chargeNotes}
+                    onChangeText={setChargeNotes}
+                    multiline
+                  />
+                </View>
+              </>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => {
+                  setShowChargeModal(false);
+                  setChargeModalSnapshot(null);
+                  setChargeNotes('');
+                }}
+                disabled={chargingSnapshotId !== null}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={executeChargeSnapshot}
+                disabled={chargingSnapshotId !== null}
+              >
+                {chargingSnapshotId ? (
+                  <ActivityIndicator color={Colors.Background} size="small" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>Cobrar</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -714,6 +899,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+  },
+  chargeButtonLoading: {
+    opacity: 0.7,
   },
   chargeButtonText: {
     color: '#fff',

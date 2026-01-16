@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl, Modal, Alert } from "react-native";
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl, Modal, Alert, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../../../constans/colors";
 import { usePayments, PendingPaymentRequest } from "../../../../hooks/usePayments";
@@ -16,6 +16,9 @@ export default function PaymentRequestsListScreen() {
   const [selectedRequest, setSelectedRequest] = useState<PendingPaymentRequest | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "transferencia" | "cheque" | "otro">("efectivo");
+  const [reference, setReference] = useState("");
+  const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
 
   useEffect(() => {
     loadRequests();
@@ -38,10 +41,12 @@ export default function PaymentRequestsListScreen() {
     if (!selectedRequest) return;
     setActionLoading(true);
     try {
-      await approvePaymentRequest(selectedRequest.id);
-      Alert.alert("Éxito", "Solicitud aprobada correctamente");
+      await approvePaymentRequest(selectedRequest.id, paymentMethod, reference);
+      Alert.alert("Éxito", "Solicitud aprobada y marcada como pagada correctamente");
       setShowDetailModal(false);
+      setShowPaymentMethodModal(false);
       setSelectedRequest(null);
+      setReference("");
       await loadRequests();
     } catch (err) {
       Alert.alert("Error", "No se pudo aprobar la solicitud");
@@ -214,18 +219,100 @@ export default function PaymentRequestsListScreen() {
 
                   <TouchableOpacity
                     style={[styles.button, styles.approveButton]}
-                    onPress={handleApprove}
+                    onPress={() => setShowPaymentMethodModal(true)}
                     disabled={actionLoading}
                   >
                     {actionLoading ? (
                       <ActivityIndicator color={Colors.Background} size="small" />
                     ) : (
-                      <Text style={styles.approveButtonText}>Aprobar</Text>
+                      <Text style={styles.approveButtonText}>Aprobar y Pagar</Text>
                     )}
                   </TouchableOpacity>
                 </View>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showPaymentMethodModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPaymentMethodModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              onPress={() => setShowPaymentMethodModal(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color={Colors.normalText} />
+            </TouchableOpacity>
+
+            <Text style={styles.modalTitle}>Método de pago</Text>
+
+            <View style={styles.detailSection}>
+              <Text style={styles.detailLabel}>Selecciona el método de pago</Text>
+              
+              {["efectivo", "transferencia", "cheque", "otro"].map((method) => (
+                <TouchableOpacity
+                  key={method}
+                  style={[
+                    styles.methodOption,
+                    paymentMethod === method && styles.methodOptionSelected,
+                  ]}
+                  onPress={() => setPaymentMethod(method as any)}
+                >
+                  <View
+                    style={[
+                      styles.methodRadio,
+                      paymentMethod === method && styles.methodRadioSelected,
+                    ]}
+                  >
+                    {paymentMethod === method && (
+                      <View style={styles.methodRadioDot} />
+                    )}
+                  </View>
+                  <Text style={styles.methodText}>
+                    {method.charAt(0).toUpperCase() + method.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.detailSection}>
+              <Text style={styles.detailLabel}>Referencia (opcional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ej: número de transferencia, cheque, etc."
+                placeholderTextColor={Colors.menuText}
+                value={reference}
+                onChangeText={setReference}
+              />
+            </View>
+
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.button, styles.rejectButton]}
+                onPress={() => setShowPaymentMethodModal(false)}
+                disabled={actionLoading}
+              >
+                <Text style={styles.rejectButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.approveButton]}
+                onPress={handleApprove}
+                disabled={actionLoading}
+              >
+                {actionLoading ? (
+                  <ActivityIndicator color={Colors.Background} size="small" />
+                ) : (
+                  <Text style={styles.approveButtonText}>Confirmar Pago</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -437,6 +524,56 @@ const styles = StyleSheet.create({
   approveButtonText: {
     color: Colors.Background,
     fontWeight: "bold",
+    fontSize: 14,
+  },
+  methodOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: Colors.activeMenuBackground,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  methodOptionSelected: {
+    borderColor: Colors.activeMenuText,
+    backgroundColor: Colors.activeMenuText + "15",
+  },
+  methodRadio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.menuText,
+    marginRight: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  methodRadioSelected: {
+    borderColor: Colors.activeMenuText,
+  },
+  methodRadioDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.activeMenuText,
+  },
+  methodText: {
+    fontSize: 14,
+    color: Colors.normalText,
+    fontWeight: "500",
+  },
+  input: {
+    backgroundColor: Colors.activeMenuBackground,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+    color: Colors.normalText,
+    borderWidth: 1,
+    borderColor: Colors.menuText + "30",
     fontSize: 14,
   },
 });

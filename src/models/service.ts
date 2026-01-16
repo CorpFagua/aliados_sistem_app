@@ -23,7 +23,7 @@ export interface Service {
   createdAt: Date;
 
   // Estado
-  status?: "disponible" | "asignado" | "en_ruta" | "entregado" | "cancelado";
+  status?: "disponible" | "asignado" | "en_ruta" | "entregado" | "pago" | "pagado" | "paid" | "cancelado";
 
   // Paquetería
   pickup?: string | null;                    // pickup_address

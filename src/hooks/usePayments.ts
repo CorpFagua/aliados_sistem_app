@@ -272,9 +272,14 @@ export function usePayments(token: string | null) {
 
   /**
    * Aprobar solicitud de pago (coordinador)
+   * Marca como PAGADA y ejecuta todo el proceso de pago
    */
   const approvePaymentRequest = useCallback(
-    async (requestId: string, notes?: string): Promise<DeliveryPaymentRequest | null> => {
+    async (
+      requestId: string,
+      paymentMethod?: "efectivo" | "transferencia" | "cheque" | "otro",
+      reference?: string
+    ): Promise<DeliveryPaymentRequest | null> => {
       if (!token) {
         setError("No hay sesión activa");
         return null;
@@ -284,16 +289,27 @@ export function usePayments(token: string | null) {
       setError(null);
 
       try {
+        console.log('\n🟢 [HOOK] Aprobando solicitud de pago');
+        console.log('   Request ID:', requestId);
+        console.log('   Payment Method:', paymentMethod);
+        console.log('   Reference:', reference);
+
         const response = await api.patch<DeliveryPaymentRequest>(
           `/payments/requests/${requestId}/approve`,
-          { notes },
+          { 
+            payment_method: paymentMethod,
+            reference
+          },
           { headers }
         );
+
+        console.log('✅ Solicitud aprobada exitosamente');
         return response.data;
       } catch (err: any) {
-        const message = err.response?.data?.message || "Error aprobando solicitud";
+        const message = err.response?.data?.error || err.response?.data?.message || err.message || "Error aprobando solicitud";
         setError(message);
         console.error("❌ Error en approvePaymentRequest:", message);
+        console.error('   Full error:', JSON.stringify(err.response?.data, null, 2));
         return null;
       } finally {
         setLoading(false);
@@ -745,12 +761,23 @@ export function usePayments(token: string | null) {
           { headers }
         );
         
+        console.log(`✅ [HOOK] Respuesta completa del servidor:`, JSON.stringify(response.data, null, 2));
         console.log(`✅ [HOOK] Snapshots de tienda recibidos:`, response.data.data);
+        
+        if (response.data.data && Array.isArray(response.data.data)) {
+          response.data.data.forEach((snap: any, idx: number) => {
+            console.log(`\n📌 [HOOK] Snapshot #${idx}: ${snap.id}`);
+            console.log(`   Services count: ${snap.services_count}`);
+            console.log(`   Services array:`, snap.services);
+          });
+        }
+        
         return response.data.data || [];
       } catch (err: any) {
         const message = err.response?.data?.message || "Error obteniendo snapshots de tienda";
         setError(message);
         console.error("❌ [HOOK] Error en getStorePaymentSnapshots:", message);
+        console.error("❌ [HOOK] Error completo:", err);
         return [];
       } finally {
         setLoading(false);
@@ -804,11 +831,25 @@ export function usePayments(token: string | null) {
 
   /**
    * Cobrar snapshot de tienda
+   * Marca el snapshot como pagado y actualiza los servicios a status 'pago'
    */
   const chargeStoreSnapshot = useCallback(
-    async (snapshotId: string, serviceIds: string[]): Promise<any | null> => {
+    async (snapshotId: string, serviceIds: string[], chargeNotes?: string): Promise<any | null> => {
       if (!token) {
         setError("No hay sesión activa");
+        console.error("❌ [HOOK] No token available");
+        return null;
+      }
+
+      if (!snapshotId) {
+        setError("Snapshot ID requerido");
+        console.error("❌ [HOOK] No snapshotId provided");
+        return null;
+      }
+
+      if (!serviceIds || serviceIds.length === 0) {
+        setError("Se requiere al menos un servicio");
+        console.error("❌ [HOOK] No service IDs provided");
         return null;
       }
 
@@ -816,24 +857,52 @@ export function usePayments(token: string | null) {
       setError(null);
 
       try {
-        console.log(`💳 [HOOK] Cobrando snapshot: ${snapshotId}`);
-        console.log(`📤 [HOOK] Service IDs: ${serviceIds}`);
+        console.log(`\n💳 [HOOK] === Cobrando Snapshot de Tienda ===`);
+        console.log(`📌 Snapshot ID: ${snapshotId}`);
+        console.log(`📦 Service IDs (${serviceIds.length}):`, serviceIds);
+        console.log(`📝 Notas: ${chargeNotes || 'ninguna'}`);
+        console.log(`🔑 Token: ${token.substring(0, 20)}...`);
+
+        const payload = {
+          service_ids: serviceIds,
+          notes: chargeNotes || 'Cobrado desde aplicación móvil',
+        };
+
+        console.log(`📤 [HOOK] Enviando payload:`, JSON.stringify(payload, null, 2));
+        console.log(`🌐 [HOOK] Endpoint: PATCH /payments/snapshots/store/${snapshotId}/charge`);
 
         const response = await api.patch<any>(
           `/payments/snapshots/store/${snapshotId}/charge`,
-          {
-            service_ids: serviceIds,
-            notes: 'Cobrado',
-          },
+          payload,
           { headers }
         );
 
-        console.log(`✅ [HOOK] Snapshot cobrado exitosamente:`, response.data);
-        return response.data || null;
+        console.log(`\n✅ [HOOK] === Respuesta del Servidor ===`);
+        console.log(`📊 Status Code: ${response.status}`);
+        console.log(`💾 Response Data:`, JSON.stringify(response.data, null, 2));
+
+        if (response.data?.ok) {
+          console.log(`🎉 [HOOK] Snapshot cobrado exitosamente`);
+          console.log(`📌 Result:`, response.data.data);
+          return response.data.data || response.data;
+        } else {
+          const errorMsg = response.data?.error || 'Error desconocido en la respuesta';
+          setError(errorMsg);
+          console.error(`❌ [HOOK] Error: ${errorMsg}`);
+          return null;
+        }
       } catch (err: any) {
-        const message = err.response?.data?.message || "Error cobrando snapshot";
+        console.error(`\n❌ [HOOK] === Error en chargeStoreSnapshot ===`);
+        console.error(`Error Object:`, err);
+        
+        if (err.response) {
+          console.error(`Status: ${err.response.status}`);
+          console.error(`Response Data:`, err.response.data);
+        }
+        
+        const message = err.response?.data?.message || err.response?.data?.error || err.message || "Error cobrando snapshot";
         setError(message);
-        console.error("❌ [HOOK] Error en chargeStoreSnapshot:", message);
+        console.error(`📝 Error Message: ${message}`);
         return null;
       } finally {
         setLoading(false);

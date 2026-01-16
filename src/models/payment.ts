@@ -5,6 +5,18 @@
  */
 
 // ================================================================
+//  ESTADOS DE SERVICIO
+// ================================================================
+// Estados que puede tener un servicio en el ciclo de vida:
+// - 'disponible': Creado pero no asignado
+// - 'asignado': Asignado a un domiciliario
+// - 'en_ruta': En proceso de entrega
+// - 'entregado': Completado por el domiciliario (listo para prefactura)
+// - 'pago' | 'pagado' | 'paid': Pagado por la tienda (actualizado al cobrar snapshot)
+// - 'cancelado': Cancelado/No completado
+export type ServicePaymentStatus = 'disponible' | 'asignado' | 'en_ruta' | 'entregado' | 'pago' | 'pagado' | 'paid' | 'cancelado';
+
+// ================================================================
 //  RESUMEN DE GANANCIAS
 // ================================================================
 export interface DeliveryPaymentSummary {
