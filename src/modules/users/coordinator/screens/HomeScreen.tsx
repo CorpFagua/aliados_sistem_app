@@ -6,8 +6,9 @@ import {
   TouchableOpacity,
   ScrollView,
   useWindowDimensions,
+  ActivityIndicator,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { LinearGradient } from "expo-linear-gradient";
 import ServiceFormModal from "../components/ServiceFormModalCoordinator";
@@ -40,12 +41,14 @@ export default function HomeScreen() {
     Tomados: [],
     "En ruta": [],
   });
+  const [loading, setLoading] = useState(true);
 
   // ⚡ Traer servicios del backend
   useEffect(() => {
     if (!session) return;
 
     const loadServices = async () => {
+      setLoading(true);
       try {
         const data = await fetchServices(session.access_token);
 
@@ -58,6 +61,8 @@ export default function HomeScreen() {
         setPedidos(grouped);
       } catch (err) {
         console.error(err);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -143,14 +148,52 @@ export default function HomeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {isMobile &&
-          getFilteredPedidos(activeTab).map((pedido) => (
-            <CoordinatorOrderCard
-              key={pedido.id}
-              pedido={pedido}
-              onPress={() => setSelectedOrder(pedido)}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.iconActive} />
+            <Text style={styles.loadingText}>Cargando servicios...</Text>
+          </View>
+        ) : isMobile && getFilteredPedidos(activeTab).length === 0 ? (
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons
+              name={
+                activeTab === "Disponibles"
+                  ? "package-variant"
+                  : activeTab === "Tomados"
+                  ? "checkbox-marked-circle-outline"
+                  : "truck-fast"
+              }
+              size={48}
+              color={Colors.normalText}
+              style={styles.emptyStateIcon}
             />
-          ))}
+            <Text style={styles.emptyStateTitle}>
+              {activeTab === "Disponibles"
+                ? "No hay servicios disponibles"
+                : activeTab === "Tomados"
+                ? "No hay servicios tomados"
+                : "No hay servicios en ruta"}
+            </Text>
+            <Text style={styles.emptyStateText}>
+              {activeTab === "Disponibles"
+                ? "Los nuevos servicios aparecerán aquí"
+                : activeTab === "Tomados"
+                ? "Asigna una zona para ver servicios aquí"
+                : "Los servicios en ruta aparecerán aquí"}
+            </Text>
+          </View>
+        ) : (
+          <>
+            {isMobile &&
+              getFilteredPedidos(activeTab).map((pedido) => (
+                <CoordinatorOrderCard
+                  key={pedido.id}
+                  pedido={pedido}
+                  onPress={() => setSelectedOrder(pedido)}
+                />
+              ))}
+          </>
+        )}
 
         {(isTablet || isLargeScreen) && (
           <View style={styles.columnsWrapper}>
@@ -164,13 +207,41 @@ export default function HomeScreen() {
               >
                 <Text style={styles.columnTitle}>{tab}</Text>
                 <View style={styles.columnInner}>
-                  {getFilteredPedidos(tab).map((pedido) => (
-                    <CoordinatorOrderCard
-                      key={pedido.id}
-                      pedido={pedido}
-                      onPress={() => setSelectedOrder(pedido)}
-                    />
-                  ))}
+                  {loading ? (
+                    <View style={styles.loadingColumn}>
+                      <ActivityIndicator size="small" color={Colors.iconActive} />
+                      <Text style={styles.loadingColumnText}>Cargando...</Text>
+                    </View>
+                  ) : getFilteredPedidos(tab).length === 0 ? (
+                    <View style={styles.emptyColumn}>
+                      <MaterialCommunityIcons
+                        name={
+                          tab === "Disponibles"
+                            ? "package-variant"
+                            : tab === "Tomados"
+                            ? "checkbox-marked-circle-outline"
+                            : "truck-fast"
+                        }
+                        size={36}
+                        color={Colors.menuText}
+                      />
+                      <Text style={styles.emptyColumnText}>
+                        {tab === "Disponibles"
+                          ? "No hay disponibles"
+                          : tab === "Tomados"
+                          ? "No hay tomados"
+                          : "No hay en ruta"}
+                      </Text>
+                    </View>
+                  ) : (
+                    getFilteredPedidos(tab).map((pedido) => (
+                      <CoordinatorOrderCard
+                        key={pedido.id}
+                        pedido={pedido}
+                        onPress={() => setSelectedOrder(pedido)}
+                      />
+                    ))
+                  )}
                 </View>
               </View>
             ))}
@@ -276,6 +347,62 @@ const styles = StyleSheet.create({
   },
   scrollContent: { paddingBottom: 120, paddingHorizontal: 12 },
   scrollContentDesktop: { paddingBottom: 40, paddingHorizontal: 20 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 100,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+    color: Colors.menuText,
+  },
+  loadingColumn: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  loadingColumnText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: Colors.menuText,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 80,
+  },
+  emptyStateIcon: {
+    marginBottom: 12,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: Colors.normalText,
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 13,
+    color: Colors.menuText,
+    textAlign: "center",
+    paddingHorizontal: 32,
+  },
+  emptyColumn: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  emptyColumnIcon: {
+    fontSize: 36,
+    marginBottom: 8,
+  },
+  emptyColumnText: {
+    fontSize: 12,
+    color: Colors.menuText,
+    textAlign: "center",
+  },
   columnsWrapper: {
     flexDirection: "row",
     alignItems: "flex-start",

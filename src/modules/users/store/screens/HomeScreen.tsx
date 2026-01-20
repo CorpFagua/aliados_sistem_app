@@ -6,8 +6,9 @@ import {
   TouchableOpacity,
   ScrollView,
   useWindowDimensions,
+  ActivityIndicator,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { LinearGradient } from "expo-linear-gradient";
 import ServiceFormModal from "../components/ServiceFormModal";
@@ -30,6 +31,7 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState("Disponibles");
   const [selectedOrder, setSelectedOrder] = useState<Service | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // 👇 Estado de pedidos tipado
   const [pedidos, setPedidos] = useState<Record<string, Service[]>>({
@@ -44,6 +46,7 @@ export default function HomeScreen() {
 
     const loadServices = async () => {
       try {
+        setLoading(true);
         const data = await fetchServices(session.access_token);
 
         const grouped: Record<string, Service[]> = {
@@ -55,74 +58,136 @@ export default function HomeScreen() {
         setPedidos(grouped);
       } catch (err) {
         console.error(err);
+      } finally {
+        setLoading(false);
       }
     };
 
     loadServices();
   }, [session]);
 
+  const EmptyState = ({ tabName }: { tabName: string }) => {
+    const getEmptyIcon = () => {
+      switch (tabName) {
+        case "Disponibles":
+          return "package-variant";
+        case "Tomados":
+          return "checkbox-marked-circle-outline";
+        case "En ruta":
+          return "truck-fast";
+        default:
+          return "package-variant";
+      }
+    };
+
+    const getEmptyMessage = () => {
+      switch (tabName) {
+        case "Disponibles":
+          return "No hay servicios disponibles";
+        case "Tomados":
+          return "No hay servicios tomados";
+        case "En ruta":
+          return "No hay servicios en ruta";
+        default:
+          return "No hay datos";
+      }
+    };
+
+    return (
+      <View style={styles.emptyContainer}>
+        <MaterialCommunityIcons
+          name={getEmptyIcon()}
+          size={56}
+          color={Colors.menuText}
+          style={{ marginBottom: 12 }}
+        />
+        <Text style={styles.emptyText}>{getEmptyMessage()}</Text>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      {/* Tabs móviles */}
-      {isMobile && (
-        <View style={styles.tabsWrapper}>
-          <View style={styles.tabs}>
-            {TABS.map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                style={[styles.tabButton, activeTab === tab && styles.activeTabButton]}
-                onPress={() => setActiveTab(tab)}
-              >
-                <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-                  {tab}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+      {/* Loading State */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.iconActive} />
         </View>
-      )}
+      ) : (
+        <>
+          {/* Tabs móviles */}
+          {isMobile && (
+            <View style={styles.tabsWrapper}>
+              <View style={styles.tabs}>
+                {TABS.map((tab) => (
+                  <TouchableOpacity
+                    key={tab}
+                    style={[styles.tabButton, activeTab === tab && styles.activeTabButton]}
+                    onPress={() => setActiveTab(tab)}
+                  >
+                    <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                      {tab}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
 
-      {/* Listado */}
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          (isTablet || isLargeScreen) && styles.scrollContentDesktop,
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {isMobile &&
-          pedidos[activeTab].map((pedido) => (
-            <StoreOrderCard
-              key={pedido.id}
-              pedido={pedido}
-              onPress={() => setSelectedOrder(pedido)}
-              showCreatedAt
-            />
-          ))}
-
-        {(isTablet || isLargeScreen) && (
-          <View style={styles.columnsWrapper}>
-            {TABS.map((tab, idx) => (
-              <View
-                key={tab}
-                style={[styles.column, idx < TABS.length - 1 && styles.columnSpacing]}
-              >
-                <Text style={styles.columnTitle}>{tab}</Text>
-                <View style={styles.columnInner}>
-                  {pedidos[tab].map((pedido) => (
+          {/* Listado */}
+          <ScrollView
+            contentContainerStyle={[
+              styles.scrollContent,
+              (isTablet || isLargeScreen) && styles.scrollContentDesktop,
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            {isMobile && (
+              <>
+                {pedidos[activeTab].length === 0 ? (
+                  <EmptyState tabName={activeTab} />
+                ) : (
+                  pedidos[activeTab].map((pedido) => (
                     <StoreOrderCard
                       key={pedido.id}
                       pedido={pedido}
                       onPress={() => setSelectedOrder(pedido)}
                       showCreatedAt
                     />
-                  ))}
-                </View>
+                  ))
+                )}
+              </>
+            )}
+
+            {(isTablet || isLargeScreen) && (
+              <View style={styles.columnsWrapper}>
+                {TABS.map((tab, idx) => (
+                  <View
+                    key={tab}
+                    style={[styles.column, idx < TABS.length - 1 && styles.columnSpacing]}
+                  >
+                    <Text style={styles.columnTitle}>{tab}</Text>
+                    <View style={styles.columnInner}>
+                      {pedidos[tab].length === 0 ? (
+                        <EmptyState tabName={tab} />
+                      ) : (
+                        pedidos[tab].map((pedido) => (
+                          <StoreOrderCard
+                            key={pedido.id}
+                            pedido={pedido}
+                            onPress={() => setSelectedOrder(pedido)}
+                            showCreatedAt
+                          />
+                        ))
+                      )}
+                    </View>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+            )}
+          </ScrollView>
+        </>
+      )}
 
       {/* Modal detalle */}
       <OrderDetailModal
@@ -165,6 +230,22 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.Background },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  emptyText: {
+    color: Colors.menuText,
+    fontSize: 16,
+    fontWeight: "500",
+  },
   tabsWrapper: { paddingTop: 10, paddingBottom: 12 },
   tabs: {
     flexDirection: "row",
