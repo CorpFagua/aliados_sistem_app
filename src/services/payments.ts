@@ -13,6 +13,7 @@ import { api, authHeaders } from "../lib/api";
 export interface DeliveryEarningsDTO {
   delivery_id: string;
   current_period_earnings: number;
+  total_unpaid_earnings: number;
   total_earnings: number;
   total_paid: number;
   total_pending: number;
