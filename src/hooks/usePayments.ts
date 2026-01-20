@@ -2,6 +2,22 @@ import { useState, useCallback } from "react";
 import { api, authHeaders } from "../lib/api";
 
 // ================================================================
+//  TIPOS DE RESULTADO (Sin Excepciones)
+// ================================================================
+export interface ApiResult<T> {
+  success: boolean;
+  data?: T;
+  restricted?: boolean;
+  reason?: string;
+  message?: string;
+  error?: {
+    status: number;
+    code: string;
+    message: string;
+  };
+}
+
+// ================================================================
 //  MODELOS DE PAGOS
 // ================================================================
 export interface DeliveryEarnings {
@@ -405,46 +421,77 @@ export function usePayments(token: string | null) {
 
   /**
    * Crear snapshot a partir de servicios (utilizado por domiciliarios)
+   * ⚠️ IMPORTANTE: NO lanza excepciones. Retorna ApiResult<PaymentSnapshot>
    */
   const createSnapshotFromServices = useCallback(
-    async (services_ids: string[]): Promise<PaymentSnapshot | null> => {
-      console.log('\n🟦 [HOOK] === createSnapshotFromServices ===');
-      console.log(`📦 Service IDs: ${JSON.stringify(services_ids)}`);
-      console.log(`🔐 Token: ${token ? '✅ disponible' : '❌ NO disponible'}`);
+    async (services_ids: string[]): Promise<ApiResult<PaymentSnapshot>> => {
+      console.log('\n🟦 [HOOK] createSnapshotFromServices: iniciando...');
 
       if (!token) {
-        console.error('❌ [HOOK] No hay sesión activa');
+        console.log('❌ No hay sesión activa');
         setError("No hay sesión activa");
-        return null;
+        return {
+          success: false,
+          error: { status: 401, code: 'NO_SESSION', message: 'No hay sesión activa' }
+        };
       }
 
       setLoading(true);
       setError(null);
 
       try {
-        console.log('\n📤 [HOOK] Enviando POST a /payments/snapshots/from-services');
-        console.log(`📋 Body: ${JSON.stringify({ services_ids })}`);
-        console.log(`🔐 Headers: ${JSON.stringify(headers, null, 2)}`);
-
+        console.log(`📤 [HOOK] POST /payments/snapshots/from-services`);
         const response = await api.post<any>(
           "/payments/snapshots/from-services",
           { services_ids },
           { headers }
         );
 
-        console.log(`\n✅ [HOOK] Respuesta recibida:`, response.data);
-
+        console.log(`✅ [HOOK] Respuesta recibida: ${response.status}`);
+        console.log(`   ok: ${response.data?.ok}`);
+        console.log(`   allowed: ${response.data?.allowed}`);
+        
+        // ⚠️ IMPORTANTE: Verificar si ok=false (restricción, no error HTTP)
+        if (response.data?.ok === false && response.data?.allowed === false) {
+          console.log(`⏳ [HOOK] Restricción detectada: ${response.data?.reason}`);
+          
+          // Esto es una restricción válida, NO es un error
+          return {
+            success: false,
+            restricted: true,
+            reason: response.data?.reason,
+            message: response.data?.message,
+            error: undefined
+          };
+        }
+        
+        // ✅ Éxito normal
         const snapshot = response.data?.data || response.data;
-        console.log(`📌 Snapshot retornado:`, snapshot);
+        console.log(`📌 [HOOK] Snapshot ID: ${snapshot?.id}`);
 
-        return snapshot;
+        return { success: true, data: snapshot };
+
       } catch (err: any) {
-        const message = err.response?.data || err.message || "Error creando snapshot";
-        console.error("\n❌ [HOOK] Error en createSnapshotFromServices:", message);
-        console.error('   Status:', err.response?.status);
-        console.error('   Full error:', JSON.stringify(err.response?.data, null, 2));
-        setError(message);
-        return null;
+        console.log(`\n⚠️ [HOOK] Error en solicitud`);
+        
+        // 🔐 Extraer información del error - Intentar de múltiples formas
+        const status = err?.response?.status || err?.status || 500;
+        const errorData = err?.response?.data || err?.data || {};
+        const errorMessage = errorData?.error || errorData?.message || err?.message || "Error creando snapshot";
+        const errorCode = errorData?.code || err?.code || 'UNKNOWN_ERROR';
+        
+        console.log(`   Status: ${status}`);
+        console.log(`   Code: ${errorCode}`);
+        console.log(`   Message: ${errorMessage}`);
+        
+        setError(errorMessage);
+        
+        // Retornar error como resultado, NO lanzar excepción
+        return {
+          success: false,
+          restricted: false,
+          error: { status, code: errorCode, message: errorMessage }
+        };
       } finally {
         setLoading(false);
       }

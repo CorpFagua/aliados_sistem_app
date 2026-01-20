@@ -28,7 +28,7 @@ type TabType = "delivered" | "invoices";
 
 export default function DeliveryHistoryScreen() {
   const { session, profile } = useAuth();
-  const { getPaymentSnapshots } = usePayments(session?.access_token || null);
+  const { getDeliveryPaymentSnapshots } = usePayments(session?.access_token || null);
 
   const [activeTab, setActiveTab] = useState<TabType>("delivered");
   const [unpaidOrders, setUnpaidOrders] = useState<any[]>([]);
@@ -96,13 +96,16 @@ export default function DeliveryHistoryScreen() {
   };
 
   const loadPaymentSnapshots = async () => {
-    if (!session?.access_token) return;
+    if (!session?.access_token || !profile?.id) return;
 
     try {
       console.log("📄 [HistoryScreen] Cargando facturas (snapshots)...");
-      const data = await getPaymentSnapshots({ limit: 100 });
+      const data = await getDeliveryPaymentSnapshots(profile.id);
       const arr = Array.isArray(data) ? data : [];
       console.log(`✅ Facturas obtenidas: ${arr.length}`);
+      if (arr.length > 0) {
+        console.log("📋 Primera factura:", JSON.stringify(arr[0], null, 2));
+      }
       setPaymentSnapshots(arr);
     } catch (err) {
       console.warn("⚠️ No se pudieron cargar facturas", err);
@@ -163,7 +166,9 @@ export default function DeliveryHistoryScreen() {
     </TouchableOpacity>
   );
 
-  const renderInvoiceItem = ({ item }: { item: any }) => (
+  const renderInvoiceItem = ({ item }: { item: any }) => {
+    console.log("🎨 [renderInvoiceItem]", item);
+    return (
     <TouchableOpacity
       style={styles.card}
       onPress={() => {
@@ -209,12 +214,16 @@ export default function DeliveryHistoryScreen() {
       <View style={styles.cardBody}>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Período:</Text>
-          <Text style={styles.infoValue}>{item.period || "N/A"}</Text>
+          <Text style={styles.infoValue}>
+            {item.period_start && item.period_end
+              ? `${new Date(item.period_start).toLocaleDateString("es-CO")} - ${new Date(item.period_end).toLocaleDateString("es-CO")}`
+              : item.period || "N/A"}
+          </Text>
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Servicios:</Text>
           <Text style={styles.infoValue}>
-            {item.services_ids?.length || 0}
+            {item.services_count || item.services?.length || 0}
           </Text>
         </View>
       </View>
@@ -222,11 +231,12 @@ export default function DeliveryHistoryScreen() {
       <View style={styles.invoiceTotalContainer}>
         <Text style={styles.invoiceTotalLabel}>Total:</Text>
         <Text style={styles.invoiceTotalAmount}>
-          {formatCurrency(item.total_earned || 0)}
+          {formatCurrency(item.total_amount || item.total_earned || 0)}
         </Text>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   if (loading && unpaidOrders.length === 0 && paymentSnapshots.length === 0) {
     return (
@@ -561,7 +571,7 @@ export default function DeliveryHistoryScreen() {
                           },
                         ]}
                       >
-                        {formatCurrency(selectedOrder.total_earned || 0)}
+                        {formatCurrency(selectedOrder.total_amount || selectedOrder.total_earned || 0)}
                       </Text>
                     </View>
 
@@ -572,13 +582,15 @@ export default function DeliveryHistoryScreen() {
                       <View style={styles.detailItem}>
                         <Text style={styles.detailLabel}>Período</Text>
                         <Text style={styles.detailValue}>
-                          {selectedOrder.period || "N/A"}
+                          {selectedOrder.period_start && selectedOrder.period_end
+                            ? `${new Date(selectedOrder.period_start).toLocaleDateString("es-CO")} - ${new Date(selectedOrder.period_end).toLocaleDateString("es-CO")}`
+                            : selectedOrder.period || "N/A"}
                         </Text>
                       </View>
                       <View style={styles.detailItem}>
                         <Text style={styles.detailLabel}>Servicios Incluidos</Text>
                         <Text style={styles.detailValue}>
-                          {selectedOrder.services_ids?.length || 0}
+                          {selectedOrder.services_count || selectedOrder.services?.length || selectedOrder.services_ids?.length || 0}
                         </Text>
                       </View>
                       <View style={styles.detailItem}>

@@ -11,6 +11,7 @@ import {
   FlatList,
   Modal,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useAuth } from "../../../../providers/AuthProvider";
@@ -57,28 +58,70 @@ const getCutoffStatus = () => {
   const isValidDay = day === 15 || day === lastDayOfMonth;
   const isValidHour = hour >= 22;
 
+  // Generar clave única para hoy (YYYY-MM-DD)
+  const todayKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
   if (!isValidDay) {
     const nextDay = day < 15 ? 15 : lastDayOfMonth;
     return {
       available: false,
+      isValidDay: false,
+      isValidHour: false,
       reason: `Cortes disponibles el ${nextDay}`,
       message: `Próximo corte: ${nextDay}/${month + 1}/${year}`,
+      todayKey,
     };
   }
 
   if (!isValidHour) {
     return {
       available: false,
+      isValidDay: true,
+      isValidHour: false,
       reason: `Disponible a partir de las 22:00`,
       message: `Hora actual: ${hour}:${String(minute).padStart(2, '0')}`,
+      todayKey,
     };
   }
 
   return {
     available: true,
+    isValidDay: true,
+    isValidHour: true,
     reason: `✅ Corte disponible`,
     message: `${hour}:${String(minute).padStart(2, '0')} - Horario permitido`,
+    todayKey,
   };
+};
+
+/**
+ * Guardar que se hizo una petición de corte hoy
+ */
+const saveTodaysCutRequest = async (todayKey: string) => {
+  try {
+    await AsyncStorage.setItem(
+      `cutRequest_${todayKey}`,
+      JSON.stringify({ timestamp: new Date().toISOString() })
+    );
+    console.log(`✅ [STORAGE] Petición de corte guardada para: ${todayKey}`);
+  } catch (err) {
+    console.error('❌ [STORAGE] Error guardando petición:', err);
+  }
+};
+
+/**
+ * Verificar si ya se hizo una petición hoy
+ */
+const checkTodaysCutRequest = async (todayKey: string): Promise<boolean> => {
+  try {
+    const stored = await AsyncStorage.getItem(`cutRequest_${todayKey}`);
+    const alreadyRequested = !!stored;
+    console.log(`🔍 [STORAGE] ¿Ya se hizo petición hoy? ${alreadyRequested}`);
+    return alreadyRequested;
+  } catch (err) {
+    console.error('❌ [STORAGE] Error verificando petición:', err);
+    return false;
+  }
 };
 
 // ================================================================
@@ -120,11 +163,13 @@ export default function DeliveryEarningsScreen() {
   const [requesting, setRequesting] = useState(false);
   const [showCutModal, setShowCutModal] = useState(false);
   const [cutoffInfo, setCutoffInfo] = useState<any>(getCutoffStatus());
+  const [alreadyRequestedToday, setAlreadyRequestedToday] = useState(false);
 
   useEffect(() => {
     if (session?.access_token) {
       loadEarnings();
       loadPendingServices();
+      checkCutRequestStatus();
       // Actualizar estado de corte cada minuto
       const interval = setInterval(() => {
         setCutoffInfo(getCutoffStatus());
@@ -132,6 +177,15 @@ export default function DeliveryEarningsScreen() {
       return () => clearInterval(interval);
     }
   }, [session?.access_token]);
+
+  /**
+   * Verificar si ya se hizo una petición de corte hoy
+   */
+  const checkCutRequestStatus = async () => {
+    const cutoffStatus = getCutoffStatus();
+    const alreadyRequested = await checkTodaysCutRequest(cutoffStatus.todayKey);
+    setAlreadyRequestedToday(alreadyRequested);
+  };
 
   const loadEarnings = async () => {
     if (!session?.access_token) return;
@@ -219,46 +273,87 @@ export default function DeliveryEarningsScreen() {
       return;
     }
 
-    // ⚠️ TEMPORALMENTE DESACTIVADA LA VALIDACIÓN DE HORARIO PARA PRUEBAS
-    // const status = getCutoffStatus();
-    // if (!status.available) {
-    //   Alert.alert('Corte no disponible', `${status.reason}\n${status.message}`);
-    //   return;
-    // }
+    // Verificar si ya se hizo una petición hoy
+    if (alreadyRequestedToday) {
+      Alert.alert(
+        '⏳ Ya se solicitó hoy',
+        'Ya has hecho una solicitud de corte hoy. Solo se permite una petición por día.'
+      );
+      return;
+    }
 
     setRequesting(true);
+    
     try {
-      console.log('\n🟦 [EARNINGS] === handleRequestCut ===');
-      console.log(`📦 Servicios a solicitar: ${pendingServices.length}`);
-
+      console.log('\n🟦 [SCREEN] handleRequestPayment iniciado');
       const serviceIds = pendingServices.map(s => s.id);
-      console.log(`📌 IDs: ${JSON.stringify(serviceIds)}`);
-
-      console.log('\n📸 [EARNINGS] Creando snapshot...');
-      const snapshot = await createSnapshotFromServices(serviceIds);
-      console.log(`📌 Snapshot retornado:`, snapshot);
-
-      if (!snapshot || !snapshot.id) {
-        console.error('❌ [EARNINGS] Snapshot sin ID válido');
-        throw new Error('No se pudo crear snapshot');
+      
+      // ✅ Llamar hook - Devuelve resultado (nunca lanza excepciones)
+      const result = await createSnapshotFromServices(serviceIds);
+      console.log(`📦 [SCREEN] Resultado:`, JSON.stringify(result));
+      
+      // ⏳ RESTRICCIÓN: No se puede procesar (snapshot duplicado, etc)
+      if (result.restricted) {
+        console.log(`⏳ [SCREEN] Restricción: ${result.reason}`);
+        
+        const dateMatch = result.message.match(/\((\d{4}-\d{2}-\d{2}) a (\d{4}-\d{2}-\d{2})\)/);
+        let periodText = '';
+        if (dateMatch) {
+          const startDate = new Date(dateMatch[1]);
+          const endDate = new Date(dateMatch[2]);
+          periodText = ` (${startDate.getDate()} al ${endDate.getDate()} de ${startDate.toLocaleString('es-CO', { month: 'long' })})`;
+        }
+        
+        Alert.alert(
+          '⏳ Corte Pendiente',
+          `Ya tienes una solicitud de corte activa en este período${periodText}.\n\nNo puedes crear otra factura hasta que el coordinador la revise y procese.`
+        );
+        setRequesting(false);
+        return;
+      }
+      
+      // ❌ ERROR: Algo salió mal
+      if (!result.success) {
+        console.log(`❌ [SCREEN] Error:`, result.error);
+        const { status, message } = result.error || {};
+        
+        // Mostrar mensaje de error
+        Alert.alert('⚠️ Error', message || 'No se pudo procesar la solicitud');
+        setRequesting(false);
+        return;
       }
 
-      console.log(`\n📤 [EARNINGS] Creando payment request con snapshot ID: ${snapshot.id}`);
+      // ✅ ÉXITO: Snapshot creado correctamente
+      console.log(`✅ [SCREEN] Snapshot creado: ${result.data?.id}`);
+      
+      const snapshot = result.data;
+      if (!snapshot?.id) {
+        Alert.alert('⚠️ Error', 'Snapshot sin ID válido. Intenta de nuevo.');
+        setRequesting(false);
+        return;
+      }
+
+      // Crear payment request
       await createPaymentRequest({ snapshot_id: snapshot.id });
 
-      console.log(`\n✅ [EARNINGS] Corte solicitado exitosamente`);
+      // ✅ GUARDAR EN STORAGE QUE SE HIZO LA PETICIÓN HOY
+      const cutoffStatus = getCutoffStatus();
+      await saveTodaysCutRequest(cutoffStatus.todayKey);
+      setAlreadyRequestedToday(true);
+
       Alert.alert(
-        'Éxito',
+        '✅ Éxito',
         `Solicitud de corte enviada con ${serviceIds.length} servicio${serviceIds.length !== 1 ? 's' : ''}.\n\nEl coordinador tiene 7 días para revisar y procesar tu pago.`
       );
+      
       setShowCutModal(false);
       loadPendingServices();
       loadEarnings();
+      setRequesting(false);
+      
     } catch (err: any) {
-      console.error('\n❌ [EARNINGS] Error:', err);
-      const message = err.message || 'No se pudo solicitar el corte';
-      Alert.alert('Error', message);
-    } finally {
+      console.error('❌ [SCREEN] Error no esperado:', err);
+      Alert.alert('⚠️ Error Inesperado', 'Por favor, intenta más tarde.');
       setRequesting(false);
     }
   };
@@ -407,15 +502,26 @@ export default function DeliveryEarningsScreen() {
         <TouchableOpacity 
           style={[
             styles.requestButton,
-            totalMonthServices === 0 && styles.requestButtonDisabled
+            !cutoffInfo.available && styles.requestButtonDisabled,
+            alreadyRequestedToday && styles.requestButtonDisabled,
+            (totalMonthServices === 0) && styles.requestButtonDisabled,
           ]} 
           onPress={() => setShowCutModal(true)}
-          disabled={totalMonthServices === 0}
+          disabled={!cutoffInfo.available || alreadyRequestedToday || totalMonthServices === 0}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <MaterialCommunityIcons name="cash-check" size={20} color={Colors.Background} />
+            <MaterialCommunityIcons 
+              name={alreadyRequestedToday ? "check-circle" : "cash-check"} 
+              size={20} 
+              color={Colors.Background} 
+            />
             <Text style={styles.requestButtonText}>
-              {requesting ? "Procesando..." : `Solicitar Corte${totalMonthServices > 0 ? ` (${totalMonthServices})` : ' - Sin servicios'}`}
+              {alreadyRequestedToday 
+                ? '✅ Corte solicitado hoy' 
+                : requesting 
+                  ? "Procesando..." 
+                  : `Solicitar Corte${totalMonthServices > 0 ? ` (${totalMonthServices})` : ' - Sin servicios'}`
+              }
             </Text>
           </View>
         </TouchableOpacity>
@@ -543,7 +649,11 @@ export default function DeliveryEarningsScreen() {
 
               {pendingServices.map((service, idx) => (
                 <View key={service.id} style={styles.modalServiceItem}>
-                  <View style={styles.modalServiceNumber}>{idx + 1}</View>
+                  <View style={styles.modalServiceNumber}>
+                    <Text style={{ color: Colors.Background, fontWeight: '700', fontSize: 13 }}>
+                      {idx + 1}
+                    </Text>
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.modalServiceId}>
                       Servicio #{String(service.id).slice(-6)}
