@@ -176,17 +176,25 @@ export default function DeliveryEarningsScreen() {
       const services = await fetchDeliveryServices(session.access_token);
       console.log(`📦 Total servicios obtenidos: ${services.length}`);
 
-      // Filtrar solo servicios entregados y NO PAGADOS
+      // Mostrar todos los servicios para debugging
+      console.log("\n🔍 TODOS LOS SERVICIOS OBTENIDOS:");
+      services.forEach((s: any, idx: number) => {
+        console.log(`  ${idx + 1}. ID: ${s.id}`);
+        console.log(`     - Estado: ${s.status}`);
+        console.log(`     - isPaid: ${s.isPaid} (tipo: ${typeof s.isPaid})`);
+        console.log(`     - Monto: $${s.earnedByDelivery || s.price_delivery_srv || s.priceDeliverySrv || s.amount || 0}`);
+      });
+
+      // Filtrar servicios: estado "entregado" o "pago" AND no pagados
+      // NO importa si no hay ganancias
       const unpaid = services.filter((s: any) => {
-        const delivered = 
-          s.status === "entregado" || 
-          s.status === "delivered" || 
-          s.status === "completed";
+        // Estados válidos: entregado o pago
+        const isDelivered = s.status === "entregado" || s.status === "pago";
 
-        const notPaid = s.is_paid !== true && s.is_paid !== 'true' && s.paid !== true && s.paid !== 'true';
-        const hasEarnings = (s.earnedByDelivery || s.price_delivery_srv || s.priceDeliverySrv || s.amount || 0) > 0;
+        // No pagado: cualquier cosa que no sea true (includes false and undefined)
+        const notPaid = s.isPaid !== true;
 
-        return delivered && notPaid && hasEarnings;
+        return isDelivered && notPaid;
       });
 
       console.log(`\n📋 Servicios sin pagar encontrados: ${unpaid.length}`);
@@ -194,6 +202,7 @@ export default function DeliveryEarningsScreen() {
         console.log(`  ${idx + 1}. ID: ${s.id}`);
         console.log(`     - Monto: $${s.earnedByDelivery || s.price_delivery_srv || s.priceDeliverySrv || s.amount || 0}`);
         console.log(`     - Estado: ${s.status}`);
+        console.log(`     - isPaid: ${s.isPaid}`);
         console.log(`     - Completado: ${s.completedAt || 'N/A'}`);
       });
 

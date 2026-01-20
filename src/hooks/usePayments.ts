@@ -112,15 +112,28 @@ export function usePayments(token: string | null) {
     setError(null);
 
     try {
-      const response = await api.get<DeliveryEarnings>(
+      console.log("🔄 [HOOK] Llamando a /payments/delivery-earnings...");
+      const response = await api.get<any>(
         "/payments/delivery-earnings",
         { headers }
       );
-      return response.data;
+      
+      console.log("📊 [HOOK] Respuesta raw:", JSON.stringify(response.data, null, 2));
+      
+      // Extraer data si viene envuelto en { ok: true, data: {...} }
+      const data = response.data?.data || response.data;
+      console.log("📊 [HOOK] Data extraída del hook:", JSON.stringify(data, null, 2));
+      
+      // Validar que tenga las propiedades necesarias
+      if (!data || typeof data !== 'object') {
+        throw new Error(`Invalid earnings data: ${JSON.stringify(data)}`);
+      }
+      
+      return data as DeliveryEarnings;
     } catch (err: any) {
-      const message = err.response?.data?.message || "Error obteniendo ganancias";
+      const message = err.response?.data?.message || err.message || "Error obteniendo ganancias";
       setError(message);
-      console.error("❌ Error en getDeliveryEarnings:", message);
+      console.error("❌ Error en getDeliveryEarnings:", message, err);
       return null;
     } finally {
       setLoading(false);

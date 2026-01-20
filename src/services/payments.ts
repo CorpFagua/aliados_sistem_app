@@ -81,11 +81,17 @@ export interface PaymentHistoryItemDTO {
  */
 export async function getDeliveryEarnings(token: string): Promise<DeliveryEarningsDTO> {
   try {
-    const response = await api.get<DeliveryEarningsDTO>(
+    const response = await api.get<{ ok: boolean; data: DeliveryEarningsDTO }>(
       "/payments/delivery-earnings",
       { headers: authHeaders(token) }
     );
-    return response.data;
+    console.log("📊 [PAYMENTS.TS] Respuesta raw:", JSON.stringify(response.data, null, 2));
+    
+    // Extraer data si viene envuelto en { ok: true, data: {...} }
+    const data = response.data?.data || response.data;
+    console.log("📊 [PAYMENTS.TS] Data extraída:", JSON.stringify(data, null, 2));
+    
+    return data as DeliveryEarningsDTO;
   } catch (error: any) {
     console.error("❌ Error getDeliveryEarnings:", error.response?.data || error.message);
     throw error;
