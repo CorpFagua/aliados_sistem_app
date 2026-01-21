@@ -16,6 +16,7 @@ import { fetchServices } from "../../../../services/services";
 import { Colors } from "../../../../constans/colors";
 import { useRouter } from "expo-router";
 import AntDesign from "@expo/vector-icons/AntDesign";
+import { usePayments } from "../../../../hooks/usePayments";
 
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat("es-CO", {
@@ -28,13 +29,19 @@ const formatCurrency = (amount: number): string => {
 export default function StoreHistoryScreen() {
   const { session } = useAuth();
   const { back } = useRouter();
+  const { getStorePaymentSnapshots } = usePayments(session?.access_token || null);
+  
   const [allServices, setAllServices] = useState<any[]>([]);
+  const [snapshots, setSnapshots] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingSnapshots, setLoadingSnapshots] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"deliveries" | "invoices">("deliveries");
+  const [activeTab, setActiveTab] = useState<"deliveries" | "invoices" | "snapshots">("deliveries");
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [selectedSnapshot, setSelectedSnapshot] = useState<any | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showSnapshotModal, setShowSnapshotModal] = useState(false);
 
   useEffect(() => {
     if (session?.access_token) {
@@ -42,6 +49,14 @@ export default function StoreHistoryScreen() {
       loadServices();
     }
   }, [session?.access_token]);
+
+  // Cargar snapshots cuando se cambia a esa tab
+  useEffect(() => {
+    if (activeTab === "snapshots" && session?.access_token) {
+      console.log("📋 [StoreHistory] Tab snapshots activa, cargando...");
+      loadSnapshots();
+    }
+  }, [activeTab, session?.access_token]);
 
   const loadServices = async () => {
     if (!session?.access_token) {
@@ -64,6 +79,29 @@ export default function StoreHistoryScreen() {
     } finally {
       setRefreshing(false);
       setLoading(false);
+    }
+  };
+
+  const loadSnapshots = async () => {
+    if (!session?.access_token) {
+      setError("No hay sesión activa");
+      return;
+    }
+
+    setLoadingSnapshots(true);
+    try {
+      console.log("📋 [StoreHistory] Llamando a getStorePaymentSnapshots...");
+      // Sin parámetro storeId - el backend lo extrae del perfil
+      const data = await getStorePaymentSnapshots();
+      console.log(`✅ [StoreHistory] Snapshots recibidos: ${data.length}`);
+      setSnapshots(data);
+    } catch (err: any) {
+      const message = err.response?.data?.message || err.response?.data?.error || err.message || "Error al cargar snapshots";
+      console.error("❌ Error en loadSnapshots:", err);
+      setError(message);
+      setSnapshots([]);
+    } finally {
+      setLoadingSnapshots(false);
     }
   };
 
@@ -119,6 +157,55 @@ export default function StoreHistoryScreen() {
           <Text style={styles.infoValue} numberOfLines={1}>
             {item.assignedDeliveryName || "Sin asignar"}
           </Text>
+        </View>
+      </View>
+
+      <View style={styles.tapIndicator}>
+        <Text style={styles.tapText}>Ver detalles  ›</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderSnapshotCard = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={styles.orderCard}
+      onPress={() => {
+        setSelectedSnapshot(item);
+        setShowSnapshotModal(true);
+      }}
+      activeOpacity={0.7}
+    >
+      <View style={styles.orderHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.orderNumber}>Pre-factura {item.id?.slice(-8) || "N/A"}</Text>
+          <Text style={styles.orderDate}>
+            {item.period_start && item.period_end
+              ? `${item.period_start} a ${item.period_end}`
+              : new Date(item.created_at).toLocaleDateString("es-CO")}
+          </Text>
+        </View>
+        <View style={styles.amountColumn}>
+          <Text style={styles.amountLabel}>Total</Text>
+          <Text style={styles.amountValue}>{formatCurrency(item.total_amount || 0)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.orderBody}>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>Estado:</Text>
+          <Text
+            style={[
+              styles.infoValue,
+              { color: item.status === "paid" ? "#4caf50" : "#ff9800" },
+            ]}
+          >
+            {item.status === "paid" ? "Pagada" : "Pendiente"}
+          </Text>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>Servicios:</Text>
+          <Text style={styles.infoValue}>{item.services_count || 0}</Text>
         </View>
       </View>
 
@@ -194,10 +281,36 @@ export default function StoreHistoryScreen() {
             Facturas Pendientes ({invoiceServices.length})
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === "snapshots" && styles.activeTab]}
+          onPress={() => setActiveTab("snapshots")}
+        >
+          <Text style={[styles.tabText, activeTab === "snapshots" && styles.activeTabText]}>
+            Pre-facturas {loadingSnapshots && "⏳"} ({snapshots.length})
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
-      {currentData.length === 0 ? (
+      {activeTab === "snapshots" ? (
+        loadingSnapshots ? (
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <ActivityIndicator size="large" color={Colors.activeMenuText} />
+            <Text style={{ marginTop: 10, color: Colors.menuText }}>Cargando pre-facturas...</Text>
+          </View>
+        ) : snapshots.length === 0 ? (
+          renderEmptyState("Sin pre-facturas")
+        ) : (
+          <FlatList
+            data={snapshots}
+            keyExtractor={(item) => item.id || Math.random().toString()}
+            renderItem={renderSnapshotCard}
+            contentContainerStyle={styles.listContainer}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadSnapshots} />}
+          />
+        )
+      ) : currentData.length === 0 ? (
         renderEmptyState(
           activeTab === "deliveries" ? "Sin pedidos entregados" : "Sin facturas pendientes"
         )
@@ -352,6 +465,148 @@ export default function StoreHistoryScreen() {
             )}
 
             <TouchableOpacity style={styles.closeModalButton} onPress={() => setShowModal(false)}>
+              <Text style={styles.closeModalButtonText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de detalles de Pre-factura */}
+      <Modal
+        visible={showSnapshotModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSnapshotModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Detalles Pre-factura</Text>
+              <TouchableOpacity onPress={() => setShowSnapshotModal(false)} style={{ padding: 8 }}>
+                <Text style={styles.closeButton}>×</Text>
+              </TouchableOpacity>
+            </View>
+
+            {selectedSnapshot && (
+              <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 24 }}>
+                {/* Resumen */}
+                <View style={styles.summarySection}>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Pre-factura</Text>
+                    <Text style={styles.summaryValue}>{selectedSnapshot.id?.slice(-8) || "N/D"}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Total</Text>
+                    <Text style={[styles.summaryValue, { color: Colors.activeMenuText, fontSize: 18, fontWeight: "700" }]}>
+                      {formatCurrency(selectedSnapshot.total_amount || 0)}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Estado</Text>
+                    <Text
+                      style={[
+                        styles.summaryValue,
+                        { color: selectedSnapshot.status === "paid" ? "#4caf50" : "#ff9800" },
+                      ]}
+                    >
+                      {selectedSnapshot.status === "paid" ? "Pagada" : "Pendiente"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.divider} />
+
+                {/* Período */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Período de Facturación</Text>
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Desde</Text>
+                    <Text style={styles.detailValue}>{selectedSnapshot.period_start || "N/A"}</Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Hasta</Text>
+                    <Text style={styles.detailValue}>{selectedSnapshot.period_end || "N/A"}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.divider} />
+
+                {/* Información de Pago */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Información de Pago</Text>
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Total a Cobrar</Text>
+                    <Text style={[styles.detailValue, { color: Colors.activeMenuText, fontWeight: "700", fontSize: 15 }]}>
+                      {formatCurrency(selectedSnapshot.total_amount || 0)}
+                    </Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Estado</Text>
+                    <Text
+                      style={[
+                        styles.detailValue,
+                        { color: selectedSnapshot.status === "paid" ? "#4caf50" : "#ff9800" },
+                      ]}
+                    >
+                      {selectedSnapshot.status === "paid" ? "Pagada" : "Pendiente"}
+                    </Text>
+                  </View>
+                  {selectedSnapshot.notes && (
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Notas</Text>
+                      <Text style={styles.detailValue}>{selectedSnapshot.notes}</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.divider} />
+
+                {/* Servicios incluidos */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Servicios Incluidos ({selectedSnapshot.services_count || 0})</Text>
+                  {selectedSnapshot.services && selectedSnapshot.services.length > 0 ? (
+                    selectedSnapshot.services.map((service: any, idx: number) => (
+                      <View key={idx} style={styles.detailItem}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.detailLabel}>Servicio {idx + 1}</Text>
+                          <Text style={{ fontSize: 12, color: "#A8A8A8", marginTop: 2 }}>
+                            ID: {service.service_id || "N/A"}
+                          </Text>
+                        </View>
+                        <Text style={styles.detailValue}>{formatCurrency(service.store_charge || 0)}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={{ color: Colors.menuText, fontSize: 13 }}>Sin servicios asociados</Text>
+                  )}
+                </View>
+
+                {selectedSnapshot.created_at && (
+                  <>
+                    <View style={styles.divider} />
+                    <View style={styles.section}>
+                      <Text style={styles.sectionTitle}>Información Adicional</Text>
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Creada el</Text>
+                        <Text style={styles.detailValue}>
+                          {new Date(selectedSnapshot.created_at).toLocaleString("es-CO")}
+                        </Text>
+                      </View>
+                      {selectedSnapshot.paid_at && (
+                        <View style={styles.detailItem}>
+                          <Text style={styles.detailLabel}>Pagada el</Text>
+                          <Text style={styles.detailValue}>
+                            {new Date(selectedSnapshot.paid_at).toLocaleString("es-CO")}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </>
+                )}
+              </ScrollView>
+            )}
+
+            <TouchableOpacity style={styles.closeModalButton} onPress={() => setShowSnapshotModal(false)}>
               <Text style={styles.closeModalButtonText}>Cerrar</Text>
             </TouchableOpacity>
           </View>

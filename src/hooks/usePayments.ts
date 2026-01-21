@@ -806,7 +806,7 @@ export function usePayments(token: string | null) {
    * Obtener snapshots de pago de una tienda
    */
   const getStorePaymentSnapshots = useCallback(
-    async (storeId: string): Promise<any[]> => {
+    async (storeId?: string): Promise<any[]> => {
       if (!token) {
         setError("No hay sesión activa");
         return [];
@@ -816,9 +816,16 @@ export function usePayments(token: string | null) {
       setError(null);
 
       try {
-        console.log(`🔄 [HOOK] Pidiendo snapshots de tienda: ${storeId}`);
+        // Si viene storeId, usarlo en path; si no, usar /current para que el backend lo extraiga del perfil
+        const url = storeId && storeId.trim() 
+          ? `/payments/snapshots/store/${storeId}/history?status=all`
+          : `/payments/snapshots/store/current/history?status=all`; // Backend extrae del perfil
+
+        console.log(`🔄 [HOOK] Pidiendo snapshots de tienda. URL: ${url}`);
+        console.log(`🔄 [HOOK] Store ID parámetro: ${storeId || '(vacío - se usa del perfil)'}`);
+        
         const response = await api.get<{ ok: boolean; data: any[] }>(
-          `/payments/snapshots/store/${storeId}/history?status=all`,
+          url,
           { headers }
         );
         
