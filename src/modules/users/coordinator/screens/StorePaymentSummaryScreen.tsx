@@ -570,42 +570,92 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       }}
     >
       <View style={styles.snapshotHeader}>
-        <Text style={styles.snapshotId}>Factura #{item.id.slice(-8)}</Text>
-        <Text
-          style={[
-            styles.statusBadge,
-            item.status === 'paid'
-              ? styles.statusBadgePaid
-              : styles.statusBadgePending,
-          ]}
-        >
-          {item.status === 'paid' ? '✓ Cobrado' : '⏳ Pendiente'}
-        </Text>
+        <View>
+          <Text style={styles.snapshotId}>Factura #{item.id.slice(-8)}</Text>
+          <Text style={styles.snapshotPeriod}>
+            {item.period_start} a {item.period_end}
+          </Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <View
+            style={[
+              styles.statusBadge,
+              item.status === 'paid'
+                ? styles.statusBadgePaid
+                : styles.statusBadgePending,
+            ]}
+          >
+            <Ionicons
+              name={item.status === 'paid' ? 'checkmark-circle' : 'time-outline'}
+              size={16}
+              color={item.status === 'paid' ? '#4CAF50' : '#FFC107'}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={[styles.statusBadgeText, { color: item.status === 'paid' ? '#4CAF50' : '#FFC107' }]}>
+              {item.status === 'paid' ? 'Cobrado' : 'Pendiente'}
+            </Text>
+          </View>
+        </View>
       </View>
 
       <View style={styles.snapshotDetails}>
-        <Text style={styles.snapshotAmount}>${item.total_amount.toFixed(2)}</Text>
-        <Text style={styles.snapshotPeriod}>
-          {item.period_start} a {item.period_end}
-        </Text>
-        <Text style={styles.snapshotServices}>
-          {item.services_count} servicio{item.services_count !== 1 ? 's' : ''}
-        </Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Text style={styles.snapshotAmount}>${item.total_amount.toFixed(2)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(244, 197, 66, 0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+            <Ionicons name="document-text" size={14} color={Colors.activeMenuText} />
+            <Text style={styles.snapshotServices}>
+              {item.services_count} servicio{item.services_count !== 1 ? 's' : ''}
+            </Text>
+          </View>
+        </View>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
         {item.status === 'pending' && (
           <TouchableOpacity
-            style={[styles.chargeButton, chargingSnapshotId === item.id && styles.chargeButtonLoading]}
+            style={[styles.chargeButton, styles.chargeButtonActive, chargingSnapshotId === item.id && styles.chargeButtonLoading]}
             onPress={() => handleChargeSnapshot(item)}
             disabled={chargingSnapshotId === item.id}
           >
             {chargingSnapshotId === item.id ? (
-              <ActivityIndicator color={Colors.Background} size="small" />
+              <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text style={styles.chargeButtonText}>Cobrar</Text>
+              <>
+                <Ionicons name="card" size={14} color="#fff" style={{ marginRight: 6 }} />
+                <Text style={styles.chargeButtonText}>Cobrar</Text>
+              </>
             )}
           </TouchableOpacity>
+        )}
+
+        {item.services && item.services.length > 0 && (
+          <>
+            <TouchableOpacity
+              style={[styles.chargeButton, styles.chargeButtonSecondary]}
+              onPress={() => {
+                const serviceIds = item.services
+                  .map((s: any) => s.service_id || s.id)
+                  .filter(Boolean);
+                handleViewServicesDetail(serviceIds);
+              }}
+            >
+              <Ionicons name="eye" size={14} color={Colors.activeMenuText} style={{ marginRight: 6 }} />
+              <Text style={[styles.chargeButtonText, { color: Colors.activeMenuText }]}>Detalles</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.chargeButton, styles.chargeButtonSecondary]}
+              onPress={() => {
+                const serviceIds = item.services
+                  .map((s: any) => s.service_id || s.id)
+                  .filter(Boolean);
+                handleDownloadExcel(serviceIds);
+              }}
+            >
+              <Ionicons name="download" size={14} color={Colors.activeMenuText} style={{ marginRight: 6 }} />
+              <Text style={[styles.chargeButtonText, { color: Colors.activeMenuText }]}>Descargar</Text>
+            </TouchableOpacity>
+          </>
         )}
         
         <TouchableOpacity
@@ -614,10 +664,10 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
           disabled={deletingSnapshotId === item.id}
         >
           {deletingSnapshotId === item.id ? (
-            <ActivityIndicator color={Colors.Background} size="small" />
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
             <>
-              <Ionicons name="trash-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+              <Ionicons name="trash-outline" size={14} color="#fff" style={{ marginRight: 6 }} />
               <Text style={styles.deleteButtonText}>Eliminar</Text>
             </>
           )}
@@ -1378,79 +1428,106 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   snapshotCard: {
-    backgroundColor: Colors.activeMenuBackground,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
     borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   snapshotCardPending: {
     borderLeftColor: '#FFC107',
+    backgroundColor: 'rgba(255, 193, 7, 0.04)',
   },
   snapshotCardPaid: {
     borderLeftColor: '#4CAF50',
-    opacity: 0.7,
+    backgroundColor: 'rgba(76, 175, 80, 0.04)',
   },
   snapshotHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   snapshotId: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: Colors.normalText,
   },
   statusBadge: {
-    fontSize: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  statusBadgeText: {
+    fontSize: 12,
     fontWeight: '600',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
   },
   statusBadgePending: {
-    backgroundColor: '#FFF3CD',
-    color: '#856404',
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 193, 7, 0.3)',
   },
   statusBadgePaid: {
-    backgroundColor: '#D4EDDA',
-    color: '#155724',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
   },
   snapshotDetails: {
-    marginBottom: 10,
+    marginBottom: 12,
   },
   snapshotAmount: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: Colors.activeMenuText,
-    marginBottom: 4,
   },
   snapshotPeriod: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.menuText,
-    marginBottom: 2,
+    marginTop: 2,
   },
   snapshotServices: {
-    fontSize: 12,
-    color: Colors.menuText,
+    fontSize: 11,
+    color: Colors.normalText,
+    fontWeight: '500',
   },
   chargeButton: {
-    backgroundColor: Colors.activeMenuText,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 6,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 36,
+    flexDirection: 'row',
+  },
+  chargeButtonActive: {
+    backgroundColor: '#F4C542',
+    shadowColor: '#F4C542',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  chargeButtonSecondary: {
+    backgroundColor: 'rgba(244, 197, 66, 0.1)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(244, 197, 66, 0.3)',
+    flex: 1,
   },
   chargeButtonLoading: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   chargeButtonText: {
-    color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+    color: '#fff',
   },
   duplicateModalHeader: {
     flexDirection: 'row',
