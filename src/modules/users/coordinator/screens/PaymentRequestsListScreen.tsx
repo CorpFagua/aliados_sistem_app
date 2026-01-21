@@ -19,6 +19,8 @@ export default function PaymentRequestsListScreen() {
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "transferencia" | "cheque" | "otro">("efectivo");
   const [reference, setReference] = useState("");
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   useEffect(() => {
     loadRequests();
@@ -41,7 +43,7 @@ export default function PaymentRequestsListScreen() {
     if (!selectedRequest) return;
     setActionLoading(true);
     try {
-      await approvePaymentRequest(selectedRequest.id, paymentMethod, reference);
+      await approvePaymentRequest(selectedRequest.request_id, paymentMethod, reference);
       Alert.alert("Éxito", "Solicitud aprobada y marcada como pagada correctamente");
       setShowDetailModal(false);
       setShowPaymentMethodModal(false);
@@ -57,31 +59,25 @@ export default function PaymentRequestsListScreen() {
 
   const handleReject = async () => {
     if (!selectedRequest) return;
-    Alert.prompt(
-      "Rechazar solicitud",
-      "Ingresa un motivo (opcional)",
-      [
-        { text: "Cancelar", onPress: () => {}, style: "cancel" },
-        {
-          text: "Rechazar",
-          onPress: async (reason) => {
-            setActionLoading(true);
-            try {
-              await rejectPaymentRequest(selectedRequest.id, reason);
-              Alert.alert("Éxito", "Solicitud rechazada");
-              setShowDetailModal(false);
-              setSelectedRequest(null);
-              await loadRequests();
-            } catch (err) {
-              Alert.alert("Error", "No se pudo rechazar la solicitud");
-            } finally {
-              setActionLoading(false);
-            }
-          },
-        },
-      ],
-      "plain-text"
-    );
+    setShowRejectModal(true);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!selectedRequest) return;
+    setActionLoading(true);
+    try {
+      await rejectPaymentRequest(selectedRequest.request_id, rejectReason);
+      Alert.alert("Éxito", "Solicitud cancelada");
+      setShowDetailModal(false);
+      setShowRejectModal(false);
+      setSelectedRequest(null);
+      setRejectReason("");
+      await loadRequests();
+    } catch (err) {
+      Alert.alert("Error", "No se pudo cancelar la solicitud");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const renderRequestCard = ({ item }: { item: PendingPaymentRequest }) => (
@@ -213,7 +209,7 @@ export default function PaymentRequestsListScreen() {
                     disabled={actionLoading}
                   >
                     <Text style={styles.rejectButtonText}>
-                      {actionLoading ? "Procesando..." : "Rechazar"}
+                      {actionLoading ? "Procesando..." : "Cancelar"}
                     </Text>
                   </TouchableOpacity>
 
@@ -310,6 +306,77 @@ export default function PaymentRequestsListScreen() {
                   <ActivityIndicator color={Colors.Background} size="small" />
                 ) : (
                   <Text style={styles.approveButtonText}>Confirmar Pago</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showRejectModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!actionLoading) {
+            setShowRejectModal(false);
+            setRejectReason("");
+          }
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              onPress={() => {
+                if (!actionLoading) {
+                  setShowRejectModal(false);
+                  setRejectReason("");
+                }
+              }}
+              style={styles.closeButton}
+              disabled={actionLoading}
+            >
+              <Ionicons name="close" size={24} color={Colors.normalText} />
+            </TouchableOpacity>
+
+            <Text style={styles.modalTitle}>Cancelar solicitud</Text>
+
+            <View style={styles.detailSection}>
+              <Text style={styles.detailLabel}>Motivo del rechazo (opcional)</Text>
+              <TextInput
+                style={[styles.input, styles.rejectInput]}
+                placeholder="Ingresa un motivo de cancelación..."
+                placeholderTextColor={Colors.menuText}
+                value={rejectReason}
+                onChangeText={setRejectReason}
+                multiline
+                editable={!actionLoading}
+              />
+            </View>
+
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.button, styles.approveButton]}
+                onPress={() => {
+                  if (!actionLoading) {
+                    setShowRejectModal(false);
+                    setRejectReason("");
+                  }
+                }}
+                disabled={actionLoading}
+              >
+                <Text style={styles.approveButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.rejectButton]}
+                onPress={handleConfirmReject}
+                disabled={actionLoading}
+              >
+                {actionLoading ? (
+                  <ActivityIndicator color={Colors.error} size="small" />
+                ) : (
+                  <Text style={styles.rejectButtonText}>Confirmar cancelación</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -575,5 +642,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.menuText + "30",
     fontSize: 14,
+  },
+  rejectInput: {
+    minHeight: 100,
+    textAlignVertical: "top",
   },
 });

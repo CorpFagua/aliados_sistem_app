@@ -75,7 +75,7 @@ export default function DeliveryHistoryScreen() {
       const unpaid = services.filter((service: any) => {
         const isDelivered =
           service.status === "entregado" ||
-          service.status === "delivered" ||
+          service.status === "pago" ||
           service.completedAt;
         const isUnpaid = !service.isPaid;
         return isDelivered && isUnpaid;
@@ -196,6 +196,8 @@ export default function DeliveryHistoryScreen() {
                     ? Colors.success
                     : item.status === "approved"
                     ? Colors.activeMenuText
+                    : item.status === "cancelled"
+                    ? "#ef4444"
                     : Colors.warning,
               },
             ]}
@@ -205,6 +207,8 @@ export default function DeliveryHistoryScreen() {
                 ? "Pagada"
                 : item.status === "approved"
                 ? "Aprobada"
+                : item.status === "cancelled"
+                ? "Cancelada"
                 : "Pendiente"}
             </Text>
           </View>
@@ -545,6 +549,8 @@ export default function DeliveryHistoryScreen() {
                                 ? Colors.success
                                 : selectedOrder.status === "approved"
                                 ? Colors.activeMenuText
+                                : selectedOrder.status === "cancelled"
+                                ? "#ef4444"
                                 : Colors.warning,
                           },
                         ]}
@@ -554,6 +560,8 @@ export default function DeliveryHistoryScreen() {
                             ? "Pagada"
                             : selectedOrder.status === "approved"
                             ? "Aprobada"
+                            : selectedOrder.status === "cancelled"
+                            ? "Cancelada"
                             : "Pendiente"}
                         </Text>
                       </View>
@@ -574,6 +582,24 @@ export default function DeliveryHistoryScreen() {
                         {formatCurrency(selectedOrder.total_amount || selectedOrder.total_earned || 0)}
                       </Text>
                     </View>
+
+                    {selectedOrder.status === "cancelled" && selectedOrder.notes && (
+                      <View style={[styles.detailSection, { backgroundColor: "#fee2e2", borderRadius: 8, padding: 12, borderBottomWidth: 0, marginBottom: 16 }]}>
+                        <Text style={[styles.detailLabel, { color: "#991b1b" }]}>Motivo de Cancelación</Text>
+                        <Text style={[styles.detailValue, { color: "#7f1d1d", marginTop: 8 }]}>
+                          {selectedOrder.notes}
+                        </Text>
+                      </View>
+                    )}
+
+                    {selectedOrder.notes && selectedOrder.status !== "cancelled" && (
+                      <View style={[styles.detailSection, { backgroundColor: "rgba(100, 200, 255, 0.1)", borderRadius: 8, padding: 12, borderBottomWidth: 0, marginBottom: 16 }]}>
+                        <Text style={[styles.detailLabel, { color: Colors.activeMenuText }]}>Notas</Text>
+                        <Text style={[styles.detailValue, { color: Colors.activeMenuText, marginTop: 8 }]}>
+                          {selectedOrder.notes}
+                        </Text>
+                      </View>
+                    )}
 
                     <View style={styles.divider} />
 

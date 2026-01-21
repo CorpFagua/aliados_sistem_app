@@ -60,6 +60,11 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   const [showChargeModal, setShowChargeModal] = useState(false);
   const [chargeModalSnapshot, setChargeModalSnapshot] = useState<Snapshot | null>(null);
   const [chargeNotes, setChargeNotes] = useState('');
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateServicesInfo, setDuplicateServicesInfo] = useState<{
+    duplicateServiceIds: string[];
+    duplicateServiceNames: string[];
+  } | null>(null);
 
   useEffect(()=>{ load(); },[session, storeId]);
 
@@ -134,6 +139,29 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       
       const newSnapshot = await createStoreSnapshot(storeId, selectedIds, totalAmount);
       
+      // 🔍 Verificar si la respuesta es un error de duplicados
+      if (newSnapshot && newSnapshot.ok === false && newSnapshot.reason === 'SERVICES_ALREADY_IN_STORE_SNAPSHOT') {
+        console.warn('⚠️ [SCREEN] Servicios duplicados detectados:', newSnapshot.duplicateServiceIds);
+        
+        // Preparar información de servicios duplicados
+        const duplicateCount = newSnapshot.duplicateServiceIds.length;
+        const duplicateServiceNames = newSnapshot.duplicateServiceIds
+          .map((id: string) => {
+            const service = unpaid.find(s => s.id === id);
+            return service ? `Viaje #${String(id).slice(-6)}` : `ID: ${id.slice(-6)}`;
+          });
+        
+        // Mostrar modal de duplicados
+        setDuplicateServicesInfo({
+          duplicateServiceIds: newSnapshot.duplicateServiceIds,
+          duplicateServiceNames: duplicateServiceNames,
+        });
+        setShowDuplicateModal(true);
+        setShowPayModal(false);
+        setProcessingPayment(false);
+        return;
+      }
+
       if (!newSnapshot) {
         throw new Error('No se pudo crear el snapshot');
       }
@@ -146,7 +174,8 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       await load();
     }catch(e: any){
       console.error('❌ [SCREEN] Error:', e);
-      Alert.alert('Error', e.message || 'No se pudo crear la prefactura');
+      const errorMsg = e?.response?.data?.message || e.message || 'No se pudo crear la prefactura';
+      Alert.alert('Error', errorMsg);
     }finally{ 
       setProcessingPayment(false); 
     }
@@ -609,6 +638,64 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
           </View>
         </View>
       </Modal>
+
+      {/* Modal de Servicios Duplicados */}
+      <Modal visible={showDuplicateModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, { maxWidth: 500 }]}>
+            <View style={styles.duplicateModalHeader}>
+              <Ionicons name="warning" size={28} color="#FF9800" />
+              <Text style={styles.duplicateModalTitle}>Servicios Duplicados</Text>
+            </View>
+
+            <Text style={styles.duplicateModalSubtitle}>
+              {duplicateServicesInfo?.duplicateServiceIds.length || 0} servicio(s) ya han sido facturado(s) a esta tienda
+            </Text>
+
+            <View style={styles.duplicateServicesList}>
+              {duplicateServicesInfo?.duplicateServiceNames.map((name: string, idx: number) => (
+                <View key={idx} style={styles.duplicateServiceItem}>
+                  <Ionicons name="alert-circle" size={18} color="#FF9800" style={{ marginRight: 8 }} />
+                  <Text style={styles.duplicateServiceName}>{name}</Text>
+                </View>
+              ))}
+            </View>
+
+            <Text style={styles.duplicateModalText}>
+              Deselecciona estos servicios para poder crear la prefactura sin problemas.
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => {
+                  setShowDuplicateModal(false);
+                  setDuplicateServicesInfo(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cerrar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={() => {
+                  if (duplicateServicesInfo?.duplicateServiceIds) {
+                    const newSelected = selectedIds.filter(
+                      id => !duplicateServicesInfo.duplicateServiceIds.includes(id)
+                    );
+                    setSelectedIds(newSelected);
+                    setSelectAll(false);
+                    setShowDuplicateModal(false);
+                    setDuplicateServicesInfo(null);
+                    console.log(`✅ [SCREEN] Servicios duplicados removidos. Nuevas selecciones: ${newSelected.length}`);
+                  }
+                }}
+              >
+                <Text style={styles.confirmButtonText}>Deseleccionar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -909,5 +996,47 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  duplicateModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    justifyContent: 'center',
+  },
+  duplicateModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FF9800',
+    marginLeft: 8,
+  },
+  duplicateModalSubtitle: {
+    fontSize: 14,
+    color: Colors.normalText,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  duplicateServicesList: {
+    backgroundColor: 'rgba(255, 152, 0, 0.08)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+  },
+  duplicateServiceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  duplicateServiceName: {
+    color: Colors.normalText,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  duplicateModalText: {
+    color: Colors.menuText,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
   },
 });
