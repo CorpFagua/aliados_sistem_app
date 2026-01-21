@@ -74,9 +74,12 @@ export default function OrderDetailModal({
                 size={22}
                 color={Colors.gradientStart}
               />
-              <Text style={styles.modalTitle}>
-                {pedido.storeName || "Sin tienda"}
-              </Text>
+              <View>
+                <Text style={styles.modalTitle}>
+                  {pedido.storeName || "Sin tienda"}
+                </Text>
+                <Text style={styles.serviceId}>#{pedido.id.slice(-4)}</Text>
+              </View>
             </View>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={Colors.normalText} />
@@ -92,7 +95,7 @@ export default function OrderDetailModal({
               <Ionicons name="map-outline" size={18} color={Colors.menuText} />
               <Text style={styles.infoText}>
                 <Text style={styles.label}>Zona: </Text>
-                {pedido.zoneId || "Sin zona"}
+                {pedido.zoneName || pedido.zoneId || "Sin zona"}
               </Text>
             </View>
 
@@ -267,6 +270,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: Colors.normalText,
+  },
+  serviceId: {
+    fontSize: 12,
+    color: Colors.menuText,
+    fontWeight: "500",
+    marginTop: 2,
   },
   modalBody: {
     marginBottom: 16,

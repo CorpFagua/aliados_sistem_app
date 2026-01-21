@@ -257,37 +257,38 @@ export default function OrderRow({
           onPress={onPress}
           activeOpacity={0.9}
         >
-          <View style={styles.left}>
-            {pedido.storeName && (
-              <Text style={styles.store}>{pedido.storeName}</Text>
-            )}
+          <View style={styles.contentRow}>
+            {/* Columna izquierda: información principal */}
+            <View style={styles.left}>
+              {pedido.storeName && (
+                <Text style={styles.store}>{pedido.storeName}</Text>
+              )}
 
-            <Text style={styles.destination}>
-              <Ionicons
-                name="location-outline"
-                size={14}
-                color={Colors.menuText}
-              />{" "}
-              {pedido.destination}
-            </Text>
+              <Text style={styles.destination}>
+                <Ionicons
+                  name="location-outline"
+                  size={14}
+                  color={Colors.menuText}
+                />{" "}
+                {pedido.destination}
+              </Text>
 
-            <View style={styles.detailLine}>
               <Text style={styles.zone}>
                 <Ionicons
                   name="map-outline"
                   size={14}
                   color={Colors.menuText}
                 />{" "}
-                {pedido.zoneId || "Sin zona"}
+                {pedido.zoneName || pedido.zoneId || "Sin zona"}
               </Text>
+            </View>
 
+            {/* Columna derecha: ID y tiempo */}
+            <View style={styles.right}>
+              <Text style={styles.orderId}>
+                #{pedido.id.slice(-4)}
+              </Text>
               <View style={styles.timeBox}>
-                <Ionicons
-                  name="time-outline"
-                  size={14}
-                  color={tiempoColors[estado]}
-                  style={{ marginRight: 6 }}
-                />
                 <Text
                   style={[styles.timeText, { color: tiempoColors[estado] }]}
                 >
@@ -295,19 +296,6 @@ export default function OrderRow({
                 </Text>
               </View>
             </View>
-          </View>
-
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: tiempoColors[estado] + "20" },
-            ]}
-          >
-            <Text style={[styles.statusText, { color: tiempoColors[estado] }]}>
-              {pedido.prepTime != null
-                ? `${pedido.prepTime} min`
-                : pedido.status}
-            </Text>
           </View>
         </TouchableOpacity>
       </ReanimatedSwipeable>
@@ -327,20 +315,33 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.Border,
     backgroundColor: Colors.activeMenuBackground,
   },
-  left: { flex: 1, marginRight: 8 },
+  contentRow: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  left: { flex: 1, marginRight: 12 },
+  right: {
+    alignItems: "flex-end",
+    justifyContent: "flex-start",
+  },
   store: {
     fontSize: 16,
     fontWeight: "700",
     color: Colors.normalText,
-    marginBottom: 2,
+    marginBottom: 6,
   },
-  destination: { fontSize: 14, color: Colors.normalText, marginBottom: 4 },
-  detailLine: { flexDirection: "row", alignItems: "center", gap: 12 },
+  orderId: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.normalText,
+    marginBottom: 4,
+  },
+  destination: { fontSize: 14, color: Colors.normalText, marginBottom: 6 },
   zone: { fontSize: 13, color: Colors.menuText },
   timeBox: { flexDirection: "row", alignItems: "center" },
-  timeText: { fontSize: 13, fontWeight: "500" },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusText: { fontSize: 13, fontWeight: "600" },
+  timeText: { fontSize: 13, fontWeight: "600" },
 
   // acciones swipe
   actionContainer: {
