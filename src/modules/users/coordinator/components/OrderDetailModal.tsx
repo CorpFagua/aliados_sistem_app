@@ -14,7 +14,8 @@ import { updateServiceStatus } from "@/services/services";
 import AssignDeliveryModal from "./AssignDeliveryModal";
 import AssignZoneModal from "./AssignZoneModal";
 import ServiceFormModal from "./ServiceFormModalCoordinator";
-import TransferDeliveryModal from "./TransferDeliveryModal"; // 🟢 Importar modal de transferencia
+import TransferDeliveryModal from "./TransferDeliveryModal";
+import CancelServiceModal from "../../../../components/CancelServiceModal";
 import { Service } from "@/models/service";
 import ChatModal from "@/components/ChatModal";
 import { getServiceType } from "@/utils/serviceTypeUtils";
@@ -37,7 +38,8 @@ export default function OrderDetailModal({
   const [showZoneModal, setShowZoneModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
-  const [showTransferModal, setShowTransferModal] = useState(false); // 🟢 Estado para modal de transferencia
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   if (!pedido) return null;
 
@@ -317,6 +319,17 @@ export default function OrderDetailModal({
               {renderActionButton()}
               {renderTransferButton()} {/* 🟢 Mostrar botón de transferencia */}
 
+              {/* 🔴 BOTÓN CANCELAR SERVICIO - Coordinator siempre puede (excepto entregado, pago, cancelado) */}
+              {pedido.status !== "entregado" && pedido.status !== "pago" && pedido.status !== "cancelado" && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: "#FF3B30" }]}
+                  onPress={() => setShowCancelModal(true)}
+                >
+                  <Ionicons name="close-circle-outline" size={18} color="#fff" />
+                  <Text style={[styles.actionText, { color: "#fff" }]}>Cancelar</Text>
+                </TouchableOpacity>
+              )}
+
               {/* 🟢 BOTÓN CHAT */}
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: "#FFD54F" }]}
@@ -336,7 +349,7 @@ export default function OrderDetailModal({
                     size={18}
                     color="#000"
                   />
-                  <Text style={styles.actionText}>Cancelar</Text>
+                  <Text style={styles.actionText}>Rechazar</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -394,6 +407,17 @@ export default function OrderDetailModal({
             token={session.access_token}
             userId={session.user.id}
             onClose={() => setShowChatModal(false)}
+          />
+
+          <CancelServiceModal
+            visible={showCancelModal}
+            pedido={pedido}
+            onClose={() => setShowCancelModal(false)}
+            onSuccess={() => {
+              setShowCancelModal(false);
+              onClose();
+              onRefresh?.();
+            }}
           />
         </View>
       </View>

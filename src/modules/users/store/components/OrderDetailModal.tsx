@@ -10,11 +10,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import ChatModal from "@/components/ChatModal";
+import CancelServiceModal from "../../../../components/CancelServiceModal";
 import { useAuth } from "@/providers/AuthProvider";''
-export default function OrderDetailModal({ visible, onClose, pedido }) {
+export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }) {
   if (!pedido) return null;
 
   const [chatVisible, setChatVisible] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const { session, profile } = useAuth();
 
   return (
@@ -100,17 +102,28 @@ export default function OrderDetailModal({ visible, onClose, pedido }) {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.price}>$ {pedido.price}</Text>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => setChatVisible(true)}
-            >
-              <Ionicons
-                name="chatbubble-ellipses-outline"
-                size={18}
-                color="#000"
-              />
-              <Text style={styles.actionText}>Chatear</Text>
-            </TouchableOpacity>
+            <View style={styles.actionRow}>
+              {pedido.status === "disponible" && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: "#FF3B30" }]}
+                  onPress={() => setShowCancelModal(true)}
+                >
+                  <Ionicons name="close-circle-outline" size={18} color="#fff" />
+                  <Text style={[styles.actionText, { color: "#fff" }]}>Cancelar</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => setChatVisible(true)}
+              >
+                <Ionicons
+                  name="chatbubble-ellipses-outline"
+                  size={18}
+                  color="#000"
+                />
+                <Text style={styles.actionText}>Chatear</Text>
+              </TouchableOpacity>
+            </View>
 
             <ChatModal
               visible={chatVisible}
@@ -118,6 +131,17 @@ export default function OrderDetailModal({ visible, onClose, pedido }) {
               serviceId={pedido.id}
               token={session.access_token}
               userId={profile.id}
+            />
+
+            <CancelServiceModal
+              visible={showCancelModal}
+              pedido={pedido}
+              onClose={() => setShowCancelModal(false)}
+              onSuccess={() => {
+                setShowCancelModal(false);
+                onClose();
+                onRefresh?.();
+              }}
             />
           </View>
         </View>
@@ -204,6 +228,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.gradientStart,
   },
+  actionRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -212,6 +240,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 12,
+    flex: 1,
+    justifyContent: "center",
   },
   actionText: {
     color: "#000",

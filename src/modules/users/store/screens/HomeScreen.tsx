@@ -194,6 +194,18 @@ export default function HomeScreen() {
         visible={!!selectedOrder}
         pedido={selectedOrder}
         onClose={() => setSelectedOrder(null)}
+        onRefresh={() => {
+          if (session) {
+            fetchServices(session.access_token).then((data) => {
+              const grouped: Record<string, Service[]> = {
+                Disponibles: data.filter((s) => s.status === "disponible"),
+                Tomados: data.filter((s) => s.status === "asignado"),
+                "En ruta": data.filter((s) => s.status === "en_ruta"),
+              };
+              setPedidos(grouped);
+            });
+          }
+        }}
       />
 
       {/* Botón FAB */}

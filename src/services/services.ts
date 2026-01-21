@@ -151,3 +151,27 @@ export async function updateServiceData(
     throw err;
   }
 }
+
+// --- Cancelar un servicio ---
+export async function cancelService(
+  serviceId: string,
+  reason: string,
+  token: string
+): Promise<Service> {
+  try {
+    const res = await api.post<{ ok: boolean; data: ServiceResponse }>(
+      `/services/${serviceId}/cancel`,
+      { reason },
+      {
+        headers: authHeaders(token),
+      }
+    );
+
+    if (!res.data.ok) throw res.data;
+
+    return toService(res.data.data);
+  } catch (err: any) {
+    console.error("❌ Error cancelando servicio:", err.response?.data || err.message);
+    throw err;
+  }
+}

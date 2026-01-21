@@ -72,7 +72,7 @@ export default function CoordinatorOrderCard({ pedido, onPress }: Props) {
                 { backgroundColor: serviceTypeColor + "22", borderColor: serviceTypeColor + "55" },
               ]}
             >
-              <Ionicons name={serviceTypeIcon} size={12} color={serviceTypeColor} />
+              <Ionicons name={serviceTypeIcon as any} size={12} color={serviceTypeColor} />
               <Text style={[styles.serviceTypeText, { color: serviceTypeColor }]}>
                 {serviceTypeLabel}
               </Text>
