@@ -16,7 +16,7 @@ import { fetchServices } from "../../../../services/services";
 import { Colors } from "../../../../constans/colors";
 import { useRouter } from "expo-router";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import { usePayments } from "../../../../hooks/usePayments";
+import { usePayments, useServicesDetail } from "../../../../hooks/usePayments";
 
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat("es-CO", {
@@ -30,6 +30,7 @@ export default function StoreHistoryScreen() {
   const { session } = useAuth();
   const { back } = useRouter();
   const { getStorePaymentSnapshots } = usePayments(session?.access_token || null);
+  const { getServicesDetail, downloadServicesExcel, loading: loadingServicesDetail } = useServicesDetail(session?.access_token || null);
   
   const [allServices, setAllServices] = useState<any[]>([]);
   const [snapshots, setSnapshots] = useState<any[]>([]);
@@ -42,6 +43,10 @@ export default function StoreHistoryScreen() {
   const [selectedSnapshot, setSelectedSnapshot] = useState<any | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showSnapshotModal, setShowSnapshotModal] = useState(false);
+  
+  // Estados para el modal de servicios detallados
+  const [servicesDetail, setServicesDetail] = useState<any[]>([]);
+  const [showServicesDetailModal, setShowServicesDetailModal] = useState(false);
 
   useEffect(() => {
     if (session?.access_token) {
@@ -165,6 +170,36 @@ export default function StoreHistoryScreen() {
       </View>
     </TouchableOpacity>
   );
+
+  const handleViewServicesDetail = async (serviceIds: string[]) => {
+    if (serviceIds.length === 0) {
+      setError("No hay servicios para mostrar");
+      return;
+    }
+
+    try {
+      const details = await getServicesDetail(serviceIds);
+      setServicesDetail(details);
+      setShowServicesDetailModal(true);
+    } catch (err: any) {
+      setError("Error al cargar detalles de servicios");
+      console.error(err);
+    }
+  };
+
+  const handleDownloadExcel = async (serviceIds: string[]) => {
+    if (serviceIds.length === 0) {
+      setError("No hay servicios para descargar");
+      return;
+    }
+
+    try {
+      await downloadServicesExcel(serviceIds, `servicios-${Date.now()}.xlsx`);
+    } catch (err: any) {
+      setError("Error al descargar Excel");
+      console.error(err);
+    }
+  };
 
   const renderSnapshotCard = ({ item }: { item: any }) => (
     <TouchableOpacity
@@ -606,7 +641,148 @@ export default function StoreHistoryScreen() {
               </ScrollView>
             )}
 
+            {selectedSnapshot && selectedSnapshot.services && selectedSnapshot.services.length > 0 && (
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                <TouchableOpacity
+                  style={[styles.closeModalButton, { flex: 1 }]}
+                  onPress={() => {
+                    const serviceIds = selectedSnapshot.services.map((s: any) => s.service_id).filter(Boolean);
+                    handleViewServicesDetail(serviceIds);
+                    setShowSnapshotModal(false);
+                  }}
+                >
+                  <Text style={styles.closeModalButtonText}>Ver Detalles</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.closeModalButton, { flex: 1, backgroundColor: '#2196F3' }]}
+                  onPress={() => {
+                    const serviceIds = selectedSnapshot.services.map((s: any) => s.service_id).filter(Boolean);
+                    handleDownloadExcel(serviceIds);
+                  }}
+                  disabled={loadingServicesDetail}
+                >
+                  <Text style={styles.closeModalButtonText}>
+                    {loadingServicesDetail ? '⏳ Descargando...' : '📥 Descargar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <TouchableOpacity style={styles.closeModalButton} onPress={() => setShowSnapshotModal(false)}>
+              <Text style={styles.closeModalButtonText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Servicios Detallados */}
+      <Modal
+        visible={showServicesDetailModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowServicesDetailModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Detalles de Servicios</Text>
+              <TouchableOpacity onPress={() => setShowServicesDetailModal(false)} style={{ padding: 8 }}>
+                <Text style={styles.closeButton}>×</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loadingServicesDetail ? (
+              <View style={{ justifyContent: 'center', alignItems: 'center', paddingVertical: 40 }}>
+                <ActivityIndicator size="large" color={Colors.activeMenuText} />
+                <Text style={{ marginTop: 10, color: Colors.menuText }}>Cargando detalles...</Text>
+              </View>
+            ) : servicesDetail.length > 0 ? (
+              <FlatList
+                data={servicesDetail}
+                keyExtractor={(item, idx) => item.id || idx.toString()}
+                renderItem={({ item }) => (
+                  <View style={styles.serviceDetailCard}>
+                    <View style={{ marginBottom: 8 }}>
+                      <Text style={[styles.sectionTitle, { marginBottom: 4 }]}>
+                        Servicio: {item.id?.slice(-8)}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: Colors.menuText }}>
+                        Estado: <Text style={{ color: Colors.activeMenuText, fontWeight: '600' }}>{item.status}</Text>
+                      </Text>
+                    </View>
+
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Cliente</Text>
+                      <Text style={styles.detailValue}>{item.client_name || 'N/A'}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Teléfono</Text>
+                      <Text style={styles.detailValue}>{item.client_phone || 'N/A'}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Dirección Entrega</Text>
+                      <Text style={styles.detailValue}>{item.delivery_address || 'N/A'}</Text>
+                    </View>
+                    {item.pickup_address && (
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Dirección Recogida</Text>
+                        <Text style={styles.detailValue}>{item.pickup_address}</Text>
+                      </View>
+                    )}
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Zona</Text>
+                      <Text style={styles.detailValue}>{item.zone_name || 'N/A'}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Domiciliario</Text>
+                      <Text style={styles.detailValue}>{item.assigned_delivery_name || 'Sin asignar'}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Precio Cliente</Text>
+                      <Text style={styles.detailValue}>{formatCurrency(item.price || 0)}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Total a Cobrar</Text>
+                      <Text style={styles.detailValue}>{formatCurrency(item.total_to_collect || 0)}</Text>
+                    </View>
+                    {item.payment_method && (
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Método Pago</Text>
+                        <Text style={styles.detailValue}>{item.payment_method}</Text>
+                      </View>
+                    )}
+                    {item.notes && (
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Notas</Text>
+                        <Text style={styles.detailValue}>{item.notes}</Text>
+                      </View>
+                    )}
+                    <View style={styles.detailItem}>
+                      <Text style={styles.detailLabel}>Creado</Text>
+                      <Text style={styles.detailValue}>
+                        {item.created_at ? new Date(item.created_at).toLocaleString('es-CO') : 'N/A'}
+                      </Text>
+                    </View>
+                    {item.completed_at && (
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Entregado</Text>
+                        <Text style={styles.detailValue}>
+                          {new Date(item.completed_at).toLocaleString('es-CO')}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+                contentContainerStyle={{ paddingBottom: 100 }}
+              />
+            ) : (
+              <Text style={{ textAlign: 'center', color: Colors.menuText, marginVertical: 20 }}>
+                No hay servicios disponibles
+              </Text>
+            )}
+
+            <TouchableOpacity style={styles.closeModalButton} onPress={() => setShowServicesDetailModal(false)}>
               <Text style={styles.closeModalButtonText}>Cerrar</Text>
             </TouchableOpacity>
           </View>
@@ -914,5 +1090,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#fff",
+  },
+  serviceDetailCard: {
+    backgroundColor: Colors.activeMenuBackground,
+    marginHorizontal: 12,
+    marginVertical: 8,
+    borderRadius: 12,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.activeMenuText,
   },
 });

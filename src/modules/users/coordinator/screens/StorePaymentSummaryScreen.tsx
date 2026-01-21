@@ -6,7 +6,7 @@ import { formatCurrency } from '../../../../services/payments';
 import { Colors } from '../../../../constans/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
-import { usePayments } from '../../../../hooks/usePayments';
+import { usePayments, useServicesDetail } from '../../../../hooks/usePayments';
 
 type Params = {
   StorePaymentSummary: {
@@ -35,6 +35,7 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   const navigation = useNavigation();
   const { session } = useAuth();
   const { getStorePaymentSnapshots, createStoreSnapshot, chargeStoreSnapshot, deleteSnapshot } = usePayments(session?.access_token || null);
+  const { getServicesDetail, downloadServicesExcel, loading: loadingServicesDetail } = useServicesDetail(session?.access_token || null);
   
   const routeParams = (route && (route.params as any)) || {};
   const storeId = store?.id ?? routeParams.storeId;
@@ -71,6 +72,10 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   const [deleteConfirmationCode, setDeleteConfirmationCode] = useState('');
   const [deletingSnapshotId, setDeletingSnapshotId] = useState<string | null>(null);
   const [loadedTabs, setLoadedTabs] = useState<{ due: boolean; history: boolean }>({ due: false, history: false });
+  
+  // Estados para servicios detallados
+  const [servicesDetail, setServicesDetail] = useState<any[]>([]);
+  const [showServicesDetailModal, setShowServicesDetailModal] = useState(false);
 
   // Cargar datos cuando cambia el tab activo
   useEffect(() => {
@@ -133,6 +138,36 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       setRefreshing(false); 
     }
   }
+
+  const handleViewServicesDetail = async (serviceIds: string[]) => {
+    if (serviceIds.length === 0) {
+      Alert.alert('Error', 'No hay servicios para mostrar');
+      return;
+    }
+
+    try {
+      const details = await getServicesDetail(serviceIds);
+      setServicesDetail(details);
+      setShowServicesDetailModal(true);
+    } catch (err: any) {
+      Alert.alert('Error', 'Error al cargar detalles de servicios');
+      console.error(err);
+    }
+  };
+
+  const handleDownloadExcel = async (serviceIds: string[]) => {
+    if (serviceIds.length === 0) {
+      Alert.alert('Error', 'No hay servicios para descargar');
+      return;
+    }
+
+    try {
+      await downloadServicesExcel(serviceIds, `servicios-tienda-${Date.now()}.xlsx`);
+    } catch (err: any) {
+      Alert.alert('Error', 'Error al descargar Excel');
+      console.error(err);
+    }
+  };
 
   async function load(){
     if (!session?.access_token || !storeId) return;
@@ -794,6 +829,40 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
               </>
             )}
 
+            {/* Botones para ver detalles y descargar */}
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+              <TouchableOpacity 
+                style={[styles.modalButton, { flex: 1, backgroundColor: Colors.activeMenuText }]}
+                onPress={() => {
+                  if (chargeModalSnapshot?.services && chargeModalSnapshot.services.length > 0) {
+                    const serviceIds = chargeModalSnapshot.services
+                      .map((s: any) => s.service_id || s.id)
+                      .filter(Boolean);
+                    handleViewServicesDetail(serviceIds);
+                  } else {
+                    Alert.alert('Error', 'No hay servicios para mostrar');
+                  }
+                }}
+              >
+                <Text style={{ color: Colors.Background, fontWeight: '600' }}>Ver Detalles</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, { flex: 1, backgroundColor: Colors.activeMenuText }]}
+                onPress={() => {
+                  if (chargeModalSnapshot?.services && chargeModalSnapshot.services.length > 0) {
+                    const serviceIds = chargeModalSnapshot.services
+                      .map((s: any) => s.service_id || s.id)
+                      .filter(Boolean);
+                    handleDownloadExcel(serviceIds);
+                  } else {
+                    Alert.alert('Error', 'No hay servicios para descargar');
+                  }
+                }}
+              >
+                <Text style={{ color: Colors.Background, fontWeight: '600' }}>📥 Descargar</Text>
+              </TouchableOpacity>
+            </View>
+
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]} 
@@ -818,6 +887,126 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Detalles de Servicios */}
+      <Modal visible={showServicesDetailModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, { maxHeight: '90%', flex: 0.9 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Detalles de Servicios</Text>
+              <TouchableOpacity onPress={() => setShowServicesDetailModal(false)}>
+                <Text style={styles.closeButton}>×</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {loadingServicesDetail ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={Colors.activeMenuText} />
+                <Text style={{ marginTop: 10, color: Colors.menuText }}>Cargando servicios...</Text>
+              </View>
+            ) : servicesDetail.length > 0 ? (
+              <FlatList
+                data={servicesDetail}
+                keyExtractor={(item, index) => item.id || index.toString()}
+                renderItem={({ item }) => (
+                  <View style={styles.serviceDetailCard}>
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={styles.detailLabel}>ID Servicio</Text>
+                      <Text style={styles.detailValue}>{item.id || 'N/A'}</Text>
+                    </View>
+                    
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={styles.detailLabel}>Estado</Text>
+                      <Text style={styles.detailValue}>{item.status || 'N/A'}</Text>
+                    </View>
+
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={styles.detailLabel}>Cliente</Text>
+                      <Text style={styles.detailValue}>{item.client_name || 'N/A'}</Text>
+                    </View>
+
+                    {item.phone && (
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={styles.detailLabel}>Teléfono</Text>
+                        <Text style={styles.detailValue}>{item.phone}</Text>
+                      </View>
+                    )}
+
+                    {item.delivery_address && (
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={styles.detailLabel}>Dirección Entrega</Text>
+                        <Text style={styles.detailValue}>{item.delivery_address}</Text>
+                      </View>
+                    )}
+
+                    {item.zone_name && (
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={styles.detailLabel}>Zona</Text>
+                        <Text style={styles.detailValue}>{item.zone_name}</Text>
+                      </View>
+                    )}
+
+                    {item.delivery_name && (
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={styles.detailLabel}>Domiciliario</Text>
+                        <Text style={styles.detailValue}>{item.delivery_name}</Text>
+                      </View>
+                    )}
+
+                    {item.price !== undefined && (
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={styles.detailLabel}>Valor Servicio</Text>
+                        <Text style={styles.detailValue}>${(item.price || 0).toFixed(2)}</Text>
+                      </View>
+                    )}
+
+                    {item.price_delivery_srv !== undefined && (
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={styles.detailLabel}>Valor Domicilio</Text>
+                        <Text style={styles.detailValue}>${(item.price_delivery_srv || 0).toFixed(2)}</Text>
+                      </View>
+                    )}
+
+                    {item.total_to_collect !== undefined && (
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={styles.detailLabel}>Total a Cobrar</Text>
+                        <Text style={[styles.detailValue, { fontWeight: '700', color: Colors.activeMenuText }]}>
+                          ${(item.total_to_collect || 0).toFixed(2)}
+                        </Text>
+                      </View>
+                    )}
+
+                    {item.is_paid !== undefined && (
+                      <View style={{ marginBottom: 12 }}>
+                        <Text style={styles.detailLabel}>Estado de Pago</Text>
+                        <Text style={[styles.detailValue, { color: item.is_paid ? '#10b981' : '#ef4444' }]}>
+                          {item.is_paid ? 'Pagado' : 'Pendiente'}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View style={{ marginBottom: 0 }}>
+                      <Text style={styles.detailLabel}>Creado</Text>
+                      <Text style={styles.detailValue}>
+                        {item.created_at ? new Date(item.created_at).toLocaleString('es-CO') : 'N/A'}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+                contentContainerStyle={{ paddingBottom: 100 }}
+              />
+            ) : (
+              <Text style={{ textAlign: 'center', color: Colors.menuText, marginVertical: 20 }}>
+                No hay servicios disponibles
+              </Text>
+            )}
+
+            <TouchableOpacity style={styles.closeModalButton} onPress={() => setShowServicesDetailModal(false)}>
+              <Text style={styles.closeModalButtonText}>Cerrar</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1400,4 +1589,50 @@ const styles = StyleSheet.create({
     color: Colors.Background,
     fontWeight: '700',
   },
-});
+  serviceDetailCard: {
+    backgroundColor: Colors.Border,
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 12,
+    marginVertical: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.activeMenuText,
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: Colors.menuText,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  detailValue: {
+    fontSize: 14,
+    color: Colors.normalText,
+    fontWeight: '500',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.Border,
+  },
+  closeButton: {
+    fontSize: 32,
+    color: Colors.menuText,
+    fontWeight: '300',
+  },
+  closeModalButton: {
+    backgroundColor: Colors.activeMenuText,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  closeModalButtonText: {
+    color: Colors.Background,
+    fontWeight: '700',
+    fontSize: 14,
+  },});

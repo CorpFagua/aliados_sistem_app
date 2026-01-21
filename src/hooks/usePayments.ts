@@ -1062,3 +1062,106 @@ export function usePayments(token: string | null) {
     deleteSnapshot,
   };
 }
+
+/**
+ * Hook para obtener detalles de servicios (separado para no interferir con usePayments)
+ */
+export function useServicesDetail(token: string | null) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const headers = authHeaders(token || '');
+
+  const getServicesDetail = useCallback(
+    async (serviceIds: string[]): Promise<any[]> => {
+      if (!token) {
+        setError("No hay sesión activa");
+        return [];
+      }
+
+      if (!serviceIds || serviceIds.length === 0) {
+        setError("No service IDs provided");
+        return [];
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const idsString = serviceIds.join(',');
+        console.log(`🔄 [HOOK] Obteniendo detalles de ${serviceIds.length} servicios`);
+        
+        const response = await api.get<{ ok: boolean; data: any[] }>(
+          `/services/detail?ids=${idsString}`,
+          { headers }
+        );
+
+        console.log(`✅ [HOOK] Servicios detallados recibidos:`, response.data.data);
+        return response.data.data || [];
+      } catch (err: any) {
+        const message = err.response?.data?.error || "Error obteniendo detalles de servicios";
+        setError(message);
+        console.error("❌ [HOOK] Error:", message);
+        return [];
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, headers]
+  );
+
+  const downloadServicesExcel = useCallback(
+    async (serviceIds: string[], filename?: string) => {
+      if (!token) {
+        setError("No hay sesión activa");
+        return;
+      }
+
+      if (!serviceIds || serviceIds.length === 0) {
+        setError("No service IDs provided");
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const idsString = serviceIds.join(',');
+        console.log(`📥 [HOOK] Descargando Excel de ${serviceIds.length} servicios`);
+        
+        const response = await api.get(
+          `/services/detail/excel?ids=${idsString}`,
+          { 
+            headers,
+            responseType: 'blob'
+          }
+        );
+
+        // Crear URL y descargar
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename || `servicios-${Date.now()}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.parentElement?.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        console.log(`✅ [HOOK] Excel descargado exitosamente`);
+      } catch (err: any) {
+        const message = err.response?.data?.error || "Error descargando Excel";
+        setError(message);
+        console.error("❌ [HOOK] Error:", message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, headers]
+  );
+
+  return {
+    loading,
+    error,
+    getServicesDetail,
+    downloadServicesExcel,
+  };
+}
