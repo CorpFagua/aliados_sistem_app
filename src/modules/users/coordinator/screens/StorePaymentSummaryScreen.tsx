@@ -34,13 +34,14 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   const route = useRoute<RouteProp<Params,'StorePaymentSummary'>>();
   const navigation = useNavigation();
   const { session } = useAuth();
-  const { getStorePaymentSnapshots, createStoreSnapshot, chargeStoreSnapshot } = usePayments(session?.access_token || null);
+  const { getStorePaymentSnapshots, createStoreSnapshot, chargeStoreSnapshot, deleteSnapshot } = usePayments(session?.access_token || null);
   
   const routeParams = (route && (route.params as any)) || {};
   const storeId = store?.id ?? routeParams.storeId;
   const storeName = store?.name ?? routeParams.storeName;
 
-  const [loading, setLoading] = useState(false);
+  const [loadingUnpaid, setLoadingUnpaid] = useState(false);
+  const [loadingSnapshots, setLoadingSnapshots] = useState(false);
   const [unpaid, setUnpaid] = useState<any[]>([]);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -65,14 +66,80 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     duplicateServiceIds: string[];
     duplicateServiceNames: string[];
   } | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [snapshotToDelete, setSnapshotToDelete] = useState<Snapshot | null>(null);
+  const [deleteConfirmationCode, setDeleteConfirmationCode] = useState('');
+  const [deletingSnapshotId, setDeletingSnapshotId] = useState<string | null>(null);
+  const [loadedTabs, setLoadedTabs] = useState<{ due: boolean; history: boolean }>({ due: false, history: false });
 
-  useEffect(()=>{ load(); },[session, storeId]);
+  // Cargar datos cuando cambia el tab activo
+  useEffect(() => {
+    if (!session?.access_token || !storeId) return;
+    
+    if (activeTab === 'due' && !loadedTabs.due) {
+      loadUnpaid();
+    } else if (activeTab === 'history' && !loadedTabs.history) {
+      loadSnapshots();
+    }
+  }, [activeTab, session, storeId]);
+
+  async function loadUnpaid(){
+    if (!session?.access_token || !storeId) return;
+    setLoadingUnpaid(true);
+    try{
+      console.log(`\n🛒 [STORE-PAYMENT] Cargando servicios en estado entregado para tienda: ${storeId}`);
+      
+      const all = await fetchServices(session.access_token);
+      const sUnpaid = all.filter((s)=> {
+        const belongs = (s.storeId === storeId || s.profileStoreId === storeId);
+        const status = (s.status || '').toString().toLowerCase();
+        const isDelivered = status === 'entregado';
+        return belongs && isDelivered;
+      });
+      console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios en estado entregado encontrados`);
+      setUnpaid(sUnpaid);
+      setLoadedTabs(prev => ({ ...prev, due: true }));
+    }catch(e){
+      console.error('❌ [STORE-PAYMENT] Error en loadUnpaid:', e);
+      setUnpaid([]);
+    }finally{ 
+      setLoadingUnpaid(false); 
+      setRefreshing(false); 
+    }
+  }
+
+  async function loadSnapshots(){
+    if (!session?.access_token || !storeId) return;
+    setLoadingSnapshots(true);
+    try{
+      console.log(`\n📋 [STORE-PAYMENT] Cargando snapshots para tienda: ${storeId}`);
+      
+      const snapshotsData = await getStorePaymentSnapshots(storeId);
+      console.log(`✅ [STORE-PAYMENT] ${snapshotsData?.length || 0} snapshots obtenidos`);
+      
+      if (snapshotsData && snapshotsData.length > 0) {
+        snapshotsData.forEach((snap: any, idx: number) => {
+          console.log(`  [Snapshot ${idx}]: ID=${snap.id}, Status=${snap.status}, Services=${snap.services_count}`);
+        });
+      }
+      
+      setSnapshots(snapshotsData || []);
+      setLoadedTabs(prev => ({ ...prev, history: true }));
+    }catch(e){
+      console.error('❌ [STORE-PAYMENT] Error en loadSnapshots:', e);
+      setSnapshots([]);
+    }finally{ 
+      setLoadingSnapshots(false); 
+      setRefreshing(false); 
+    }
+  }
 
   async function load(){
     if (!session?.access_token || !storeId) return;
-    setLoading(true);
+    setLoadingUnpaid(true);
+    setLoadingSnapshots(true);
     try{
-      console.log(`\n🛒 [STORE-PAYMENT] Cargando datos de tienda: ${storeId}`);
+      console.log(`\n🛒 [STORE-PAYMENT] Cargando todos los datos de tienda: ${storeId}`);
       
       // Cargar servicios
       console.log('📦 [STORE-PAYMENT] Cargando servicios en estado entregado...');
@@ -85,37 +152,26 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       });
       console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios en estado entregado encontrados`);
       setUnpaid(sUnpaid);
+      setLoadingUnpaid(false);
 
       // Cargar snapshots de tienda usando el hook
       console.log('📋 [STORE-PAYMENT] Cargando snapshots del hook...');
       try {
         const snapshotsData = await getStorePaymentSnapshots(storeId);
         console.log(`✅ [STORE-PAYMENT] ${snapshotsData?.length || 0} snapshots obtenidos`);
-        console.log('📊 [STORE-PAYMENT] Raw snapshots data:', JSON.stringify(snapshotsData, null, 2));
-        
-        if (snapshotsData && snapshotsData.length > 0) {
-          snapshotsData.forEach((snap: any, idx: number) => {
-            console.log(`\n  [Snapshot ${idx}]:`);
-            console.log(`    ID: ${snap.id}`);
-            console.log(`    Period: ${snap.period_start} a ${snap.period_end}`);
-            console.log(`    Total: ${snap.total_amount}`);
-            console.log(`    Services count: ${snap.services_count}`);
-            console.log(`    Status: ${snap.status}`);
-            console.log(`    Services array:`, snap.services);
-          });
-        }
-        
         setSnapshots(snapshotsData || []);
       } catch (snapErr) {
         console.error('❌ [STORE-PAYMENT] Error loading snapshots:', snapErr);
         setSnapshots([]);
       }
+      setLoadingSnapshots(false);
     }catch(e){
       console.error('❌ [STORE-PAYMENT] Error en load:', e);
       setUnpaid([]); 
       setSnapshots([]);
+      setLoadingUnpaid(false);
+      setLoadingSnapshots(false);
     }finally{ 
-      setLoading(false); 
       setRefreshing(false); 
     }
   }
@@ -268,15 +324,21 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
         console.warn(`⚠️ [SCREEN] Servicios actualizados (${result.services_count}) != solicitados (${serviceIds.length})`);
       }
       
-      // Actualizar el snapshot en el estado local a 'paid'
+      // ✅ Actualizar el snapshot en el estado local a 'paid' INMEDIATAMENTE
       console.log(`🔄 [SCREEN] Actualizando snapshot en estado local...`);
-      setSnapshots(prevSnapshots => 
-        prevSnapshots.map(snap => 
-          snap.id === snapshot.id 
-            ? { ...snap, status: 'paid' as const, paid_at: new Date().toISOString() }
-            : snap
-        )
+      const updatedSnapshots = snapshots.map(snap => 
+        snap.id === snapshot.id 
+          ? { ...snap, status: 'paid' as const, paid_at: new Date().toISOString() }
+          : snap
       );
+      setSnapshots(updatedSnapshots);
+      
+      // Limpiar también de la lista de "Por Cobrar" si la hay
+      const revertedIds = snapshot.services?.map((s: any) => s.service_id) || [];
+      const cleanedUnpaid = unpaid.filter(u => !revertedIds.includes(u.id));
+      setUnpaid(cleanedUnpaid);
+      
+      console.log(`✅ [SCREEN] Estado local actualizado: snapshots=${updatedSnapshots.length}, unpaid=${cleanedUnpaid.length}`);
       
       // Cerrar modal
       setShowChargeModal(false);
@@ -284,16 +346,12 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       setChargingSnapshotId(null);
       setChargeNotes('');
       
-      // Mostrar éxito y recargar
+      // Mostrar éxito - NO recargar automáticamente
       Alert.alert(
         '✓ Prefactura Cobrada',
         `Prefactura #${snapshot.id.slice(-8)} cobrada exitosamente.\n\n💰 Monto: $${snapshot.total_amount.toFixed(2)}\n📦 Servicios: ${snapshot.services_count}`,
         [{ 
-          text: 'OK', 
-          onPress: () => {
-            console.log(`🔄 [SCREEN] Recargando datos...`);
-            load();
-          }
+          text: 'OK'
         }]
       );
     } catch (error: any) {
@@ -322,7 +380,102 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     setChargeModalSnapshot(null);
   }
 
-  if (loading) return <View style={{flex:1, justifyContent:'center', alignItems:'center'}}><ActivityIndicator color={Colors.activeMenuText} /></View>;
+  function openDeleteModal(snapshot: Snapshot) {
+    console.log(`🗑️ [SCREEN] Abriendo modal de eliminación para snapshot: ${snapshot.id}`);
+    setSnapshotToDelete(snapshot);
+    setDeleteConfirmationCode('');
+    setShowDeleteModal(true);
+  }
+
+  async function executeDeleteSnapshot() {
+    if (!snapshotToDelete || !session?.access_token) {
+      Alert.alert('Error', 'No hay información del snapshot o sesión expirada');
+      return;
+    }
+
+    const snapshot = snapshotToDelete;
+    const last6Digits = snapshot.id.slice(-6);
+
+    // Validar código de confirmación
+    if (snapshot.status === 'paid' && deleteConfirmationCode !== last6Digits) {
+      Alert.alert(
+        'Código Incorrecto',
+        `Debes ingresar los últimos 6 dígitos del snapshot: ${last6Digits}`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    setDeletingSnapshotId(snapshot.id);
+
+    try {
+      console.log(`\n🗑️ [SCREEN] === ELIMINANDO SNAPSHOT ===`);
+      console.log(`📌 Snapshot ID: ${snapshot.id}`);
+      console.log(`💾 Status: ${snapshot.status}`);
+
+      const result = await deleteSnapshot(snapshot.id);
+
+      if (!result) {
+        throw new Error('No se recibió respuesta del servidor');
+      }
+
+      console.log(`✅ [SCREEN] === SNAPSHOT ELIMINADO ===`);
+      console.log(`📊 Resultado:`, JSON.stringify(result, null, 2));
+
+      // Cerrar modal
+      setShowDeleteModal(false);
+      setSnapshotToDelete(null);
+      setDeleteConfirmationCode('');
+      setDeletingSnapshotId(null);
+
+      // ✅ Actualizar estado local: Eliminar de snapshots INMEDIATAMENTE
+      console.log(`🔄 [SCREEN] Eliminando snapshot del estado local...`);
+      const updatedSnapshots = snapshots.filter(snap => snap.id !== snapshot.id);
+      setSnapshots(updatedSnapshots);
+      console.log(`✅ [SCREEN] Snapshots actualizados: ${updatedSnapshots.length} restantes`);
+
+      // Si estaba pagada y servicios fueron revertidos, agregarlos de vuelta a "Por Cobrar"
+      if (snapshot.status === 'paid' && snapshot.services && snapshot.services.length > 0) {
+        console.log(`🔄 [SCREEN] Restaurando ${snapshot.services.length} servicios a "Por Cobrar"...`);
+        // Esto se hará en la próxima carga o se puede hacer aquí
+        // Por ahora, simplemente indicar al usuario que recargue
+      }
+
+      // Mostrar mensaje de éxito - NO recargar automáticamente
+      let successMsg = `Prefactura #${snapshot.id.slice(-8)} eliminada exitosamente.`;
+      if (snapshot.status === 'paid') {
+        successMsg += `\n\n${result.services_reverted} servicios revertidos a "entregado".`;
+      }
+
+      Alert.alert(
+        '✓ Prefactura Eliminada',
+        successMsg,
+        [
+          {
+            text: 'OK'
+          }
+        ]
+      );
+    } catch (error: any) {
+      console.error(`\n❌ [SCREEN] === ERROR EN ELIMINACIÓN ===`);
+      console.error(`Error completo:`, error);
+
+      setDeletingSnapshotId(null);
+
+      const errorMsg = error?.response?.data?.message
+        || error?.response?.data?.error
+        || error?.message
+        || 'Error desconocido al eliminar prefactura';
+
+      console.error(`📝 Mensaje de error: ${errorMsg}`);
+
+      Alert.alert(
+        '❌ Error al Eliminar',
+        `No se pudo eliminar la prefactura #${snapshot.id.slice(-8)}:\n\n${errorMsg}`,
+        [{ text: 'OK' }]
+      );
+    }
+  }
 
   // Calendar helpers
   const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
@@ -405,19 +558,36 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
         </Text>
       </View>
 
-      {item.status === 'pending' && (
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        {item.status === 'pending' && (
+          <TouchableOpacity
+            style={[styles.chargeButton, chargingSnapshotId === item.id && styles.chargeButtonLoading]}
+            onPress={() => handleChargeSnapshot(item)}
+            disabled={chargingSnapshotId === item.id}
+          >
+            {chargingSnapshotId === item.id ? (
+              <ActivityIndicator color={Colors.Background} size="small" />
+            ) : (
+              <Text style={styles.chargeButtonText}>Cobrar</Text>
+            )}
+          </TouchableOpacity>
+        )}
+        
         <TouchableOpacity
-          style={[styles.chargeButton, chargingSnapshotId === item.id && styles.chargeButtonLoading]}
-          onPress={() => handleChargeSnapshot(item)}
-          disabled={chargingSnapshotId === item.id}
+          style={[styles.deleteButton, deletingSnapshotId === item.id && styles.deleteButtonLoading]}
+          onPress={() => openDeleteModal(item)}
+          disabled={deletingSnapshotId === item.id}
         >
-          {chargingSnapshotId === item.id ? (
+          {deletingSnapshotId === item.id ? (
             <ActivityIndicator color={Colors.Background} size="small" />
           ) : (
-            <Text style={styles.chargeButtonText}>Cobrar</Text>
+            <>
+              <Ionicons name="trash-outline" size={14} color="#fff" style={{ marginRight: 4 }} />
+              <Text style={styles.deleteButtonText}>Eliminar</Text>
+            </>
           )}
         </TouchableOpacity>
-      )}
+      </View>
     </TouchableOpacity>
   );
 
@@ -470,20 +640,32 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
             </TouchableOpacity>
           </View>
 
-          <FlatList
-            data={applyDateFilter(unpaid)}
-            renderItem={renderService}
-            keyExtractor={i=>i.id}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{ setRefreshing(true); load(); }} />}
-            contentContainerStyle={{ paddingTop: 8, paddingBottom: 20 }}
-            ListEmptyComponent={<Text style={styles.emptyStateText}>No hay servicios pendientes.</Text>}
-          />
+          {loadingUnpaid ? (
+            <View style={{flex:1, justifyContent:'center', alignItems:'center', paddingVertical:40}}>
+              <ActivityIndicator color={Colors.activeMenuText} size="large" />
+              <Text style={{color:Colors.menuText, marginTop:12}}>Cargando servicios...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={applyDateFilter(unpaid)}
+              renderItem={renderService}
+              keyExtractor={i=>i.id}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{ setRefreshing(true); loadUnpaid(); }} />}
+              contentContainerStyle={{ paddingTop: 8, paddingBottom: 20 }}
+              ListEmptyComponent={<Text style={styles.emptyStateText}>No hay servicios pendientes.</Text>}
+            />
+          )}
 
           <View style={styles.footerRow}>
             <Text style={{color:Colors.menuText}}>Total seleccionado:</Text>
             <Text style={{color:Colors.activeMenuText, fontWeight:'bold'}}>{formatCurrency(totalSelectedAmount())}</Text>
           </View>
         </>
+      ) : loadingSnapshots ? (
+        <View style={{flex:1, justifyContent:'center', alignItems:'center', paddingVertical:40}}>
+          <ActivityIndicator color={Colors.activeMenuText} size="large" />
+          <Text style={{color:Colors.menuText, marginTop:12}}>Cargando historial...</Text>
+        </View>
       ) : (
         <FlatList
           data={snapshots}
@@ -491,7 +673,8 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
           keyExtractor={i=>i.id}
           contentContainerStyle={{ paddingTop: 8, paddingBottom: 20 }}
           ListEmptyComponent={<Text style={styles.emptyStateText}>No hay historial de prefacturas.</Text>}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{ setRefreshing(true); load(); }} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{ setRefreshing(true); loadSnapshots(); }} />}
+          extraData={snapshots}
         />
       )}
 
@@ -691,6 +874,89 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
                 }}
               >
                 <Text style={styles.confirmButtonText}>Deseleccionar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Eliminación de Snapshot */}
+      <Modal visible={showDeleteModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, { maxWidth: 500 }]}>
+            <View style={styles.deleteModalHeader}>
+              <Ionicons name="trash" size={28} color="#D32F2F" />
+              <Text style={styles.deleteModalTitle}>Eliminar Prefactura</Text>
+            </View>
+
+            {snapshotToDelete && (
+              <>
+                <Text style={styles.deleteModalSubtitle}>
+                  ¿Estás seguro de que deseas eliminar esta prefactura?
+                </Text>
+
+                <View style={styles.deleteSnapshotInfo}>
+                  <Text style={styles.deleteInfoLabel}>ID Prefactura:</Text>
+                  <Text style={styles.deleteInfoValue}>#{snapshotToDelete.id.slice(-8)}</Text>
+
+                  <Text style={styles.deleteInfoLabel}>Monto:</Text>
+                  <Text style={styles.deleteInfoValue}>${snapshotToDelete.total_amount.toFixed(2)}</Text>
+
+                  <Text style={styles.deleteInfoLabel}>Estado:</Text>
+                  <Text style={[styles.deleteInfoValue, { color: snapshotToDelete.status === 'paid' ? '#4CAF50' : '#FFC107' }]}>
+                    {snapshotToDelete.status === 'paid' ? 'Cobrada' : 'Pendiente'}
+                  </Text>
+                </View>
+
+                {snapshotToDelete.status === 'paid' && (
+                  <View style={styles.deleteWarning}>
+                    <Ionicons name="warning" size={18} color="#FF9800" style={{ marginRight: 8 }} />
+                    <Text style={styles.deleteWarningText}>
+                      Se revertirán {snapshotToDelete.services_count} servicios a "entregado"
+                    </Text>
+                  </View>
+                )}
+
+                {snapshotToDelete.status === 'paid' && (
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={styles.deleteConfirmLabel}>
+                      Ingresa los últimos 6 dígitos del snapshot para confirmar:
+                    </Text>
+                    <TextInput
+                      style={styles.deleteConfirmInput}
+                      placeholder={snapshotToDelete.id.slice(-6)}
+                      placeholderTextColor={Colors.menuText}
+                      value={deleteConfirmationCode}
+                      onChangeText={setDeleteConfirmationCode}
+                      maxLength={6}
+                    />
+                  </View>
+                )}
+              </>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowDeleteModal(false);
+                  setSnapshotToDelete(null);
+                  setDeleteConfirmationCode('');
+                }}
+                disabled={deletingSnapshotId !== null}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.deleteConfirmButton]}
+                onPress={executeDeleteSnapshot}
+                disabled={deletingSnapshotId !== null}
+              >
+                {deletingSnapshotId ? (
+                  <ActivityIndicator color={Colors.Background} size="small" />
+                ) : (
+                  <Text style={styles.deleteConfirmButtonText}>Eliminar</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -1038,5 +1304,100 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     textAlign: 'center',
+  },
+  deleteButton: {
+    backgroundColor: '#D32F2F',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+    flexDirection: 'row',
+  },
+  deleteButtonLoading: {
+    opacity: 0.7,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  deleteModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    justifyContent: 'center',
+  },
+  deleteModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#D32F2F',
+    marginLeft: 8,
+  },
+  deleteModalSubtitle: {
+    fontSize: 14,
+    color: Colors.normalText,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  deleteSnapshotInfo: {
+    backgroundColor: 'rgba(211, 47, 47, 0.08)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#D32F2F',
+  },
+  deleteInfoLabel: {
+    fontSize: 12,
+    color: Colors.menuText,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  deleteInfoValue: {
+    fontSize: 14,
+    color: Colors.normalText,
+    fontWeight: '600',
+  },
+  deleteWarning: {
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteWarningText: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.normalText,
+  },
+  deleteConfirmLabel: {
+    fontSize: 13,
+    color: Colors.menuText,
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  deleteConfirmInput: {
+    backgroundColor: Colors.Border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: Colors.normalText,
+    fontSize: 14,
+    textAlign: 'center',
+    letterSpacing: 2,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  deleteConfirmButton: {
+    backgroundColor: '#D32F2F',
+  },
+  deleteConfirmButtonText: {
+    color: Colors.Background,
+    fontWeight: '700',
   },
 });

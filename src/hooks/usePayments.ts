@@ -972,6 +972,49 @@ export function usePayments(token: string | null) {
     [token, headers]
   );
 
+  /**
+   * Eliminar snapshot (prefactura)
+   * Si está en estado 'paid': revierte los servicios a 'entregado'
+   * Si está en estado 'pending': solo elimina el snapshot
+   */
+  const deleteSnapshot = useCallback(
+    async (snapshotId: string): Promise<any | null> => {
+      if (!token) {
+        setError("No hay sesión activa");
+        return null;
+      }
+
+      if (!snapshotId) {
+        setError("Snapshot ID requerido");
+        return null;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log(`\n🗑️ [HOOK] === Eliminando Snapshot ===`);
+        console.log(`📌 Snapshot ID: ${snapshotId}`);
+
+        const response = await api.delete<any>(
+          `/payments/snapshots/${snapshotId}`,
+          { headers }
+        );
+
+        console.log(`✅ [HOOK] Snapshot eliminado:`, response.data.data);
+        return response.data.data || response.data;
+      } catch (err: any) {
+        const message = err.response?.data?.error || err.message || "Error eliminando snapshot";
+        setError(message);
+        console.error("❌ [HOOK] Error en deleteSnapshot:", message);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, headers]
+  );
+
   return {
     // Estado
     loading,
@@ -1007,5 +1050,8 @@ export function usePayments(token: string | null) {
     createDeliveryPayment,
     getPaymentHistory,
     coordinatorPayServices,
+
+    // Eliminar snapshots
+    deleteSnapshot,
   };
 }
