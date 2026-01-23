@@ -41,7 +41,7 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
       const allServices = await fetchDeliveryServices(session.access_token, delivery.id);
       console.log(`📦 [SERVICES] Servicios obtenidos para delivery ${delivery.id}:`, allServices);
       const unpaidData = allServices.filter(
-        s => s.assignedDelivery === delivery.id && s.status === "entregado" && !s.isPaid
+        s => s.assignedDelivery === delivery.id && (s.status === "entregado" || s.status === "pago") && !s.isPaid
       );
       setUnpaid(unpaidData);
 
