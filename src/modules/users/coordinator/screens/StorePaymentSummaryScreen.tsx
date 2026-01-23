@@ -66,6 +66,10 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   const [duplicateServicesInfo, setDuplicateServicesInfo] = useState<{
     duplicateServiceIds: string[];
     duplicateServiceNames: string[];
+    duplicateDetails?: any[];
+    isPending?: boolean;
+    isPaid?: boolean;
+    snapshotStatus?: string;
   } | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [snapshotToDelete, setSnapshotToDelete] = useState<Snapshot | null>(null);
@@ -234,18 +238,26 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       if (newSnapshot && newSnapshot.ok === false && newSnapshot.reason === 'SERVICES_ALREADY_IN_STORE_SNAPSHOT') {
         console.warn('⚠️ [SCREEN] Servicios duplicados detectados:', newSnapshot.duplicateServiceIds);
         
-        // Preparar información de servicios duplicados
-        const duplicateCount = newSnapshot.duplicateServiceIds.length;
-        const duplicateServiceNames = newSnapshot.duplicateServiceIds
+        // Preparar información detallada de servicios duplicados
+        const duplicateDetails = newSnapshot.duplicateServiceIds
           .map((id: string) => {
             const service = unpaid.find(s => s.id === id);
-            return service ? `Viaje #${String(id).slice(-6)}` : `ID: ${id.slice(-6)}`;
+            return {
+              id: id,
+              name: `Viaje #${id.slice(-4)}`,
+              status: service?.status || 'N/A',
+              amount: service?.price || service?.total_to_collect || 0,
+            };
           });
         
         // Mostrar modal de duplicados
         setDuplicateServicesInfo({
           duplicateServiceIds: newSnapshot.duplicateServiceIds,
-          duplicateServiceNames: duplicateServiceNames,
+          duplicateServiceNames: duplicateDetails.map(d => d.name),
+          duplicateDetails: duplicateDetails,
+          isPending: newSnapshot.isPending || false,
+          isPaid: newSnapshot.isPaid || false,
+          snapshotStatus: newSnapshot.duplicateSnapshotStatus || 'unknown',
         });
         setShowDuplicateModal(true);
         setShowPayModal(false);
@@ -1061,33 +1073,79 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
         </View>
       </Modal>
 
-      {/* Modal de Servicios Duplicados */}
-      <Modal visible={showDuplicateModal} transparent animationType="fade">
+      {/* Modal de Servicios Duplicados - MEJORADO */}
+      <Modal visible={showDuplicateModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modal, { maxWidth: 500 }]}>
+          <View style={[styles.modal, { maxWidth: 420 }]}>
+            {/* Header */}
             <View style={styles.duplicateModalHeader}>
-              <Ionicons name="warning" size={28} color="#FF9800" />
+              <View style={styles.duplicateIconContainer}>
+                <Ionicons name="warning" size={32} color="#FF9800" />
+              </View>
               <Text style={styles.duplicateModalTitle}>Servicios Duplicados</Text>
             </View>
 
-            <Text style={styles.duplicateModalSubtitle}>
-              {duplicateServicesInfo?.duplicateServiceIds.length || 0} servicio(s) ya han sido facturado(s) a esta tienda
-            </Text>
-
-            <View style={styles.duplicateServicesList}>
-              {duplicateServicesInfo?.duplicateServiceNames.map((name: string, idx: number) => (
-                <View key={idx} style={styles.duplicateServiceItem}>
-                  <Ionicons name="alert-circle" size={18} color="#FF9800" style={{ marginRight: 8 }} />
-                  <Text style={styles.duplicateServiceName}>{name}</Text>
+            {/* Info Box */}
+            <View style={styles.duplicateInfoBox}>
+              {duplicateServicesInfo?.isPending && (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={styles.duplicateModalSubtitle}>
+                    ⏳ {duplicateServicesInfo?.duplicateServiceIds.length || 0} servicio(s) está(n) en una solicitud de cobro pendiente de aprobación
+                  </Text>
                 </View>
-              ))}
+              )}
+              {duplicateServicesInfo?.isPaid && (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={styles.duplicateModalSubtitle}>
+                    ✓ {duplicateServicesInfo?.duplicateServiceIds.length || 0} servicio(s) ya ha(n) sido cobrado(s)
+                  </Text>
+                </View>
+              )}
+              {!duplicateServicesInfo?.isPending && !duplicateServicesInfo?.isPaid && (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={styles.duplicateModalSubtitle}>
+                    {duplicateServicesInfo?.duplicateServiceIds.length || 0} servicio(s) ya está(n) en otra factura de tienda
+                  </Text>
+                </View>
+              )}
             </View>
 
-            <Text style={styles.duplicateModalText}>
-              Deselecciona estos servicios para poder crear la prefactura sin problemas.
-            </Text>
+            {/* Lista de servicios duplicados */}
+            {duplicateServicesInfo && duplicateServicesInfo.duplicateDetails && duplicateServicesInfo.duplicateDetails.length > 0 && (
+              <View style={styles.duplicateServicesList}>
+                {duplicateServicesInfo.duplicateDetails.map((detail: any, idx: number) => (
+                  <View key={idx} style={styles.duplicateServiceItemContainer}>
+                    <View style={styles.duplicateServiceItemLeft}>
+                      <Ionicons name="alert-circle" size={18} color="#FF9800" />
+                      <View style={{ marginLeft: 12, flex: 1 }}>
+                        <Text style={styles.duplicateServiceName}>{detail.name}</Text>
+                        <Text style={styles.duplicateServiceDetail}>
+                          Estado: {detail.status}
+                        </Text>
+                        <Text style={styles.duplicateServiceAmount}>
+                          ${detail.amount.toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
 
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+            {/* Explicación */}
+            <View style={styles.duplicateWarningBox}>
+              <Ionicons name="information-circle" size={20} color={Colors.activeMenuText} />
+              <Text style={styles.duplicateWarningText}>
+                {duplicateServicesInfo?.isPending
+                  ? 'Deselecciona estos servicios para continuar. O espera a que se apruebe la solicitud pendiente.'
+                  : duplicateServicesInfo?.isPaid
+                  ? 'Estos servicios ya fueron cobrados y no se pueden cobrar nuevamente.'
+                  : 'Deselecciona estos servicios para continuar con la facturación.'}
+              </Text>
+            </View>
+
+            {/* Botones */}
+            <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]} 
                 onPress={() => {
@@ -1095,25 +1153,26 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
                   setDuplicateServicesInfo(null);
                 }}
               >
-                <Text style={styles.cancelButtonText}>Cerrar</Text>
+                <Text style={styles.cancelButtonText}>Descartar</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={() => {
-                  if (duplicateServicesInfo?.duplicateServiceIds) {
-                    const newSelected = selectedIds.filter(
+              {duplicateServicesInfo?.isPending && (
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.confirmButton]} 
+                  onPress={() => {
+                    // Deseleccionar los duplicados
+                    const newSelection = selectedIds.filter(
                       id => !duplicateServicesInfo.duplicateServiceIds.includes(id)
                     );
-                    setSelectedIds(newSelected);
+                    setSelectedIds(newSelection);
                     setSelectAll(false);
                     setShowDuplicateModal(false);
                     setDuplicateServicesInfo(null);
-                    console.log(`✅ [SCREEN] Servicios duplicados removidos. Nuevas selecciones: ${newSelected.length}`);
-                  }
-                }}
-              >
-                <Text style={styles.confirmButtonText}>Deseleccionar</Text>
-              </TouchableOpacity>
+                    console.log(`✅ [SCREEN] Servicios duplicados removidos. Nuevas selecciones: ${newSelection.length}`);
+                  }}
+                >
+                  <Text style={styles.confirmButtonText}>Deseleccionar</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -1570,6 +1629,64 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     textAlign: 'center',
+  },
+  duplicateIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 152, 0, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  duplicateInfoBox: {
+    backgroundColor: 'rgba(255, 152, 0, 0.08)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+  },
+  duplicateServiceItemContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 152, 0, 0.1)',
+  },
+  duplicateServiceItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+  },
+  duplicateServiceDetail: {
+    fontSize: 12,
+    color: Colors.menuText,
+    marginTop: 2,
+  },
+  duplicateServiceAmount: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FF9800',
+    marginTop: 4,
+  },
+  duplicateWarningBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.activeMenuText,
+  },
+  duplicateWarningText: {
+    color: Colors.normalText,
+    fontSize: 12,
+    lineHeight: 16,
+    marginLeft: 10,
+    flex: 1,
   },
   deleteButton: {
     backgroundColor: '#D32F2F',

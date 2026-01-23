@@ -740,24 +740,54 @@ export function usePayments(token: string | null) {
           { headers }
         );
 
-        const { snapshot, payment } = paymentResponse.data?.data || {};
+        // 🔍 Verificar si la respuesta es exitosa (ok: true) o error de negocio (ok: false, allowed: false)
+        const responseData = paymentResponse.data;
         
-        if (!snapshot || !snapshot.id) {
-          throw new Error('No se pudo crear snapshot');
+        // Caso 1: Éxito - crear snapshot + pagar
+        if (responseData.ok === true) {
+          const { snapshot, payment } = responseData.data || {};
+          
+          if (!snapshot || !snapshot.id) {
+            throw new Error('No se pudo crear snapshot');
+          }
+
+          console.log(`\n✅ === PAGO DIRECTO COMPLETADO ===`);
+          console.log(`📌 Snapshot ID: ${snapshot.id}`);
+          console.log(`💰 Total: $${snapshot.total_amount}`);
+          console.log(`📦 Servicios pagados: ${serviceIds.length}`);
+
+          return {
+            snapshot,
+            payment,
+            success: true
+          };
         }
-
-        console.log(`\n✅ === PAGO DIRECTO COMPLETADO ===`);
-        console.log(`📌 Snapshot ID: ${snapshot.id}`);
-        console.log(`💰 Total: $${snapshot.total_amount}`);
-        console.log(`📦 Servicios pagados: ${serviceIds.length}`);
-
-        return {
-          snapshot,
-          payment,
-          success: true
-        };
+        
+        // Caso 2: Error de negocio (duplicados, etc) - retornar la información del error
+        if (responseData.ok === false && responseData.allowed === false) {
+          console.warn(`⚠️ [COORDINATOR] Conflicto detectado: ${responseData.reason}`);
+          console.warn(`   Razón: ${responseData.message}`);
+          console.warn(`   Duplicados: ${JSON.stringify(responseData.duplicateServiceIds)}`);
+          
+          // Retornar la respuesta completa para que el front maneje los duplicados
+          return responseData;
+        }
+        
+        throw new Error('Respuesta inesperada del servidor');
       } catch (err: any) {
-        const message = err.response?.data?.error || "Error procesando pago directo";
+        // Manejar errores HTTP (409, 500, etc)
+        if (err.response?.status === 409) {
+          // 409 Conflict - error de negocio (duplicados, etc)
+          const conflictData = err.response?.data;
+          console.warn(`⚠️ [COORDINATOR] Conflicto (409): ${conflictData?.reason}`);
+          console.warn(`   Razón: ${conflictData?.message}`);
+          
+          // Retornar la información del conflicto para que el front maneje los duplicados
+          return conflictData;
+        }
+        
+        // Otros errores HTTP
+        const message = err.response?.data?.error || err.message || "Error procesando pago directo";
         setError(message);
         console.error("❌ Error en pago directo:", message);
         return null;
@@ -873,7 +903,7 @@ export function usePayments(token: string | null) {
         console.log(`   Service IDs: ${serviceIds}`);
         console.log(`   Total Amount: ${totalAmount}`);
 
-        const response = await api.post<{ ok: boolean; data: any }>(
+        const response = await api.post<any>(
           '/payments/snapshots/store/create',
           {
             store_id: storeId,
@@ -883,10 +913,40 @@ export function usePayments(token: string | null) {
           { headers }
         );
 
-        console.log(`✅ [HOOK] Snapshot creado:`, response.data.data);
-        return response.data.data || null;
+        // 🔍 Verificar si la respuesta es exitosa (ok: true) o error de negocio (ok: false, allowed: false)
+        const responseData = response.data;
+        
+        // Caso 1: Éxito - crear snapshot
+        if (responseData.ok === true) {
+          console.log(`✅ [HOOK] Snapshot creado:`, responseData.data);
+          return responseData.data || null;
+        }
+        
+        // Caso 2: Error de negocio (duplicados, etc) - retornar la información del error
+        if (responseData.ok === false && responseData.allowed === false) {
+          console.warn(`⚠️ [HOOK] Conflicto detectado: ${responseData.reason}`);
+          console.warn(`   Razón: ${responseData.message}`);
+          console.warn(`   Duplicados: ${JSON.stringify(responseData.duplicateServiceIds)}`);
+          
+          // Retornar la respuesta completa para que el front maneje los duplicados
+          return responseData;
+        }
+        
+        throw new Error('Respuesta inesperada del servidor');
       } catch (err: any) {
-        const message = err.response?.data?.message || "Error creando snapshot";
+        // Manejar errores HTTP (409, 500, etc)
+        if (err.response?.status === 409) {
+          // 409 Conflict - error de negocio (duplicados, etc)
+          const conflictData = err.response?.data;
+          console.warn(`⚠️ [HOOK] Conflicto (409): ${conflictData?.reason}`);
+          console.warn(`   Razón: ${conflictData?.message}`);
+          
+          // Retornar la información del conflicto para que el front maneje los duplicados
+          return conflictData;
+        }
+        
+        // Otros errores HTTP
+        const message = err.response?.data?.error || err.message || "Error creando snapshot";
         setError(message);
         console.error("❌ [HOOK] Error en createStoreSnapshot:", message);
         return null;

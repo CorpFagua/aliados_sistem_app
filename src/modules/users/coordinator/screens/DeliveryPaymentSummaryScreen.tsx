@@ -27,6 +27,23 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
   const [showCalendar, setShowCalendar] = useState<null | { field: "start" | "end" }>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [processing, setProcessing] = useState(false);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateServicesInfo, setDuplicateServicesInfo] = useState<{
+    duplicateServiceIds: string[];
+    duplicateServiceNames: string[];
+    duplicateDetails?: any[];
+    isPending?: boolean;
+    isPaid?: boolean;
+    snapshotStatus?: string;
+  } | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successData, setSuccessData] = useState<{
+    snapshotId: string;
+    servicesCount: number;
+    totalAmount: number;
+  } | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     loadData();
@@ -89,20 +106,30 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
   );
 
   const renderSnapshot = ({ item }) => (
-    <View style={styles.serviceCardRow}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.serviceTitle}>Factura #{item.id.slice(-8)}</Text>
-        <Text style={styles.serviceDetail}>Período: {item.period_start} a {item.period_end}</Text>
-        <Text style={styles.serviceDetail}>Total: {formatCurrency(item.total_amount || 0)}</Text>
-        <Text style={styles.serviceDetail}>Viajes: {item.services_count || 0}</Text>
-        {item.paid_at && <Text style={styles.serviceDetail}>Pagado: {new Date(item.paid_at).toLocaleDateString()}</Text>}
+    <View style={[styles.snapshotCard, styles.snapshotCardPaid]}>
+      <View style={styles.snapshotHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.snapshotId}>Factura #{item.id.slice(-8)}</Text>
+          <Text style={styles.snapshotPeriod}>
+            {new Date(item.period_start).toLocaleDateString()} - {new Date(item.period_end).toLocaleDateString()}
+          </Text>
+        </View>
+        <View style={[styles.statusBadge, styles.statusBadgePaid]}>
+          <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+          <Text style={[styles.statusBadgeText, { color: '#4CAF50', marginLeft: 4 }]}>Pagado</Text>
+        </View>
       </View>
-      <View style={{ paddingLeft: 12, justifyContent: 'center' }}>
-        <Ionicons
-          name="checkmark-circle"
-          size={22}
-          color={Colors.activeMenuText}
-        />
+
+      <View style={styles.snapshotDetails}>
+        <Text style={styles.snapshotAmount}>${item.total_amount?.toFixed(2)}</Text>
+        <Text style={styles.snapshotServices}>
+          {item.services_count || 0} viaje{item.services_count !== 1 ? 's' : ''}
+        </Text>
+        {item.paid_at && (
+          <Text style={styles.snapshotPeriod}>
+            Pagado: {new Date(item.paid_at).toLocaleDateString()} {new Date(item.paid_at).toLocaleTimeString()}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -181,25 +208,62 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
       // Usar la nueva función de pago directo que hace TODO en una sola operación
       const result = await coordinatorPayServices(selectedIds, delivery.id, paymentMethod, reference);
 
+      // 🔍 Verificar si la respuesta es un error de duplicados
+      if (result && result.ok === false && result.reason === 'SERVICES_ALREADY_IN_DELIVERY_SNAPSHOT') {
+        console.warn(`⚠️ [COORDINATOR] Servicios ya en otro snapshot DELIVERY:`, result.duplicateServiceIds);
+        
+        // Obtener información detallada de servicios duplicados
+        const duplicateDetails = result.duplicateServiceIds
+          .map((id: string) => {
+            const service = unpaid.find(s => s.id === id);
+            return {
+              id: id,
+              name: `Viaje #${id.slice(-4)}`,
+              status: service?.status || 'N/A',
+              amount: service?.priceDeliverySrv || 0,
+            };
+          });
+        
+        setDuplicateServicesInfo({
+          duplicateServiceIds: result.duplicateServiceIds || [],
+          duplicateServiceNames: duplicateDetails.map(d => d.name),
+          duplicateDetails: duplicateDetails,
+          isPending: result.isPending || false,
+          isPaid: result.isPaid || false,
+          snapshotStatus: result.duplicateSnapshotStatus || 'unknown',
+        });
+        setShowDuplicateModal(true);
+        setProcessing(false);
+        return;
+      }
+
       if (!result || !result.snapshot) {
         throw new Error('No se pudo procesar el pago');
       }
 
       console.log(`✅ Pago directo procesado exitosamente`);
       
-      Alert.alert(
-        "✅ Éxito", 
-        `Se generó la factura #${result.snapshot.id.slice(-8)} y se marcaron ${selectedIds.length} viaje${selectedIds.length !== 1 ? 's' : ''} como pagados.\n\nTotal: ${formatCurrency(result.snapshot.total_amount)}`
-      );
+      // Mostrar modal de éxito en lugar de Alert
+      setSuccessData({
+        snapshotId: result.snapshot.id,
+        servicesCount: selectedIds.length,
+        totalAmount: result.snapshot.total_amount,
+      });
+      setShowSuccessModal(true);
       
       setShowPayModal(false);
       setSelectedIds([]);
       setSelectAll(false);
       setReference("");
-      loadData();
+      
+      // Recargar datos después de 1.5 segundos
+      setTimeout(() => {
+        loadData();
+      }, 1500);
     } catch (err: any) {
       console.error('❌ Error:', err);
-      Alert.alert("Error", err.message || "No se pudo procesar el pago directo");
+      setErrorMessage(err.message || "No se pudo procesar el pago directo");
+      setShowErrorModal(true);
     } finally {
       setProcessing(false);
     }
@@ -364,6 +428,182 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
                 <Text style={styles.confirmButtonText}>Limpiar</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de duplicados - MEJORADO */}
+      <Modal visible={showDuplicateModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, { maxWidth: 420 }]}>
+            {/* Header */}
+            <View style={styles.duplicateModalHeader}>
+              <View style={styles.duplicateIconContainer}>
+                <Ionicons name="warning" size={32} color="#FF9800" />
+              </View>
+              <Text style={styles.duplicateModalTitle}>Viajes Duplicados</Text>
+            </View>
+
+            {/* Info Box */}
+            <View style={styles.duplicateInfoBox}>
+              {duplicateServicesInfo?.isPending && (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={styles.duplicateModalSubtitle}>
+                    ⏳ {duplicateServicesInfo?.duplicateServiceIds.length || 0} viaje(s) está(n) en una solicitud de pago pendiente de aprobación
+                  </Text>
+                </View>
+              )}
+              {duplicateServicesInfo?.isPaid && (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={styles.duplicateModalSubtitle}>
+                    ✓ {duplicateServicesInfo?.duplicateServiceIds.length || 0} viaje(s) ya ha(n) sido pagado(s)
+                  </Text>
+                </View>
+              )}
+              {!duplicateServicesInfo?.isPending && !duplicateServicesInfo?.isPaid && (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={styles.duplicateModalSubtitle}>
+                    {duplicateServicesInfo?.duplicateServiceIds.length || 0} viaje(s) ya está(n) en otra factura de domiciliario
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Lista de servicios duplicados */}
+            {duplicateServicesInfo && duplicateServicesInfo.duplicateDetails && duplicateServicesInfo.duplicateDetails.length > 0 && (
+              <View style={styles.duplicateServicesList}>
+                {duplicateServicesInfo.duplicateDetails.map((detail: any, idx: number) => (
+                  <View key={idx} style={styles.duplicateServiceItemContainer}>
+                    <View style={styles.duplicateServiceItemLeft}>
+                      <Ionicons name="alert-circle" size={18} color="#FF9800" />
+                      <View style={{ marginLeft: 12, flex: 1 }}>
+                        <Text style={styles.duplicateServiceName}>{detail.name}</Text>
+                        <Text style={styles.duplicateServiceDetail}>
+                          Estado: {detail.status}
+                        </Text>
+                        <Text style={styles.duplicateServiceAmount}>
+                          {formatCurrency(detail.amount)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Explicación */}
+            <View style={styles.duplicateWarningBox}>
+              <Ionicons name="information-circle" size={20} color={Colors.activeMenuText} />
+              <Text style={styles.duplicateWarningText}>
+                {duplicateServicesInfo?.isPending
+                  ? 'Deselecciona estos viajes para continuar. O espera a que se apruebe la solicitud pendiente.'
+                  : duplicateServicesInfo?.isPaid
+                  ? 'Estos viajes ya fueron pagados y no se pueden cobrar nuevamente.'
+                  : 'Deselecciona estos viajes para continuar con el pago.'}
+              </Text>
+            </View>
+
+            {/* Botones */}
+            <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => setShowDuplicateModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Descartar</Text>
+              </TouchableOpacity>
+              {duplicateServicesInfo?.isPending && (
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.confirmButton]} 
+                  onPress={() => {
+                    // Deseleccionar los duplicados
+                    const newSelection = selectedIds.filter(
+                      id => !duplicateServicesInfo.duplicateServiceIds.includes(id)
+                    );
+                    setSelectedIds(newSelection);
+                    setSelectAll(false);
+                    setShowDuplicateModal(false);
+                  }}
+                >
+                  <Text style={styles.confirmButtonText}>Deseleccionar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Éxito - NUEVO */}
+      <Modal visible={showSuccessModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, styles.successModal]}>
+            {/* Ícono de éxito con animación */}
+            <View style={styles.successIconContainer}>
+              <View style={styles.successCheckmark}>
+                <Ionicons name="checkmark" size={48} color="#4CAF50" />
+              </View>
+            </View>
+
+            {/* Título */}
+            <Text style={styles.successTitle}>¡Pago Realizado!</Text>
+
+            {/* Información del pago */}
+            {successData && (
+              <View style={styles.successDetailsBox}>
+                <View style={styles.successDetailRow}>
+                  <Text style={styles.successDetailLabel}>Factura #</Text>
+                  <Text style={styles.successDetailValue}>{successData.snapshotId.slice(-8)}</Text>
+                </View>
+                <View style={[styles.successDetailRow, { marginTop: 12 }]}>
+                  <Text style={styles.successDetailLabel}>Viajes pagados</Text>
+                  <Text style={styles.successDetailValue}>{successData.servicesCount}</Text>
+                </View>
+                <View style={[styles.successDetailRow, { marginTop: 12 }]}>
+                  <Text style={styles.successDetailLabel}>Monto total</Text>
+                  <Text style={styles.successDetailValueAmount}>{formatCurrency(successData.totalAmount)}</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Mensaje */}
+            <Text style={styles.successMessage}>
+              El pago ha sido procesado correctamente. Los viajes están marcados como pagados.
+            </Text>
+
+            {/* Botón de cierre */}
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.confirmButton, { width: '100%', marginTop: 20 }]} 
+              onPress={() => setShowSuccessModal(false)}
+            >
+              <Text style={styles.confirmButtonText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Error - MEJORADO */}
+      <Modal visible={showErrorModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, styles.errorModal]}>
+            {/* Header */}
+            <View style={styles.errorModalHeader}>
+              <View style={styles.errorIconContainer}>
+                <Ionicons name="close-circle" size={32} color="#D32F2F" />
+              </View>
+              <Text style={styles.errorModalTitle}>Error en el Pago</Text>
+            </View>
+
+            {/* Mensaje de error */}
+            <View style={styles.errorMessageBox}>
+              <Text style={styles.errorMessageText}>{errorMessage}</Text>
+            </View>
+
+            {/* Botón */}
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.cancelButton, { width: '100%' }]} 
+              onPress={() => setShowErrorModal(false)}
+            >
+              <Text style={styles.confirmButtonText}>Entendido</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -569,5 +809,266 @@ const styles = StyleSheet.create({
     color: Colors.menuText,
     marginBottom: 6,
     fontSize: 13,
+  },
+  snapshotCard: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  snapshotCardPaid: {
+    borderLeftColor: '#4CAF50',
+    backgroundColor: 'rgba(76, 175, 80, 0.04)',
+  },
+  snapshotHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  snapshotId: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.normalText,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statusBadgePaid: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+  },
+  snapshotDetails: {
+    marginBottom: 12,
+  },
+  snapshotAmount: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.activeMenuText,
+  },
+  snapshotPeriod: {
+    fontSize: 11,
+    color: Colors.menuText,
+    marginTop: 2,
+  },
+  snapshotServices: {
+    fontSize: 11,
+    color: Colors.normalText,
+    fontWeight: '500',
+  },
+  duplicateModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    justifyContent: 'center',
+  },
+  duplicateModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FF9800',
+    marginLeft: 8,
+  },
+  duplicateModalSubtitle: {
+    fontSize: 14,
+    color: Colors.normalText,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  duplicateServicesList: {
+    backgroundColor: 'rgba(255, 152, 0, 0.08)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+  },
+  duplicateServiceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  duplicateServiceName: {
+    color: Colors.normalText,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  duplicateModalText: {
+    color: Colors.menuText,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  // ========== ESTILOS NUEVOS PARA MODALES MEJORADOS ==========
+  duplicateIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 152, 0, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  duplicateInfoBox: {
+    backgroundColor: 'rgba(255, 152, 0, 0.08)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+  },
+  duplicateServiceItemContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 152, 0, 0.1)',
+  },
+  duplicateServiceItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+  },
+  duplicateServiceDetail: {
+    fontSize: 12,
+    color: Colors.menuText,
+    marginTop: 2,
+  },
+  duplicateServiceAmount: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FF9800',
+    marginTop: 4,
+  },
+  duplicateWarningBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.activeMenuText,
+  },
+  duplicateWarningText: {
+    color: Colors.normalText,
+    fontSize: 12,
+    lineHeight: 16,
+    marginLeft: 10,
+    flex: 1,
+  },
+  // Modal de éxito
+  successModal: {
+    backgroundColor: 'rgba(24, 24, 26, 0.95)',
+    maxWidth: 380,
+  },
+  successIconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  successCheckmark: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#4CAF50',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  successDetailsBox: {
+    backgroundColor: Colors.Border,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  successDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  successDetailLabel: {
+    fontSize: 12,
+    color: Colors.menuText,
+    fontWeight: '500',
+  },
+  successDetailValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.normalText,
+  },
+  successDetailValueAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4CAF50',
+  },
+  successMessage: {
+    fontSize: 13,
+    color: Colors.menuText,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  // Modal de error
+  errorModal: {
+    maxWidth: 380,
+  },
+  errorModalHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  errorIconContainer: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(211, 47, 47, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#D32F2F',
+  },
+  errorModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#D32F2F',
+  },
+  errorMessageBox: {
+    backgroundColor: 'rgba(211, 47, 47, 0.08)',
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#D32F2F',
+  },
+  errorMessageText: {
+    fontSize: 13,
+    color: Colors.normalText,
+    lineHeight: 18,
   },
 });
