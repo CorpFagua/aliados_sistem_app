@@ -124,6 +124,26 @@ const checkTodaysCutRequest = async (todayKey: string): Promise<boolean> => {
   }
 };
 
+/**
+ * Calcular ganancias del día de hoy
+ */
+const calculateTodayEarnings = (services: any[]): number => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  return services
+    .filter((s) => {
+      if (!s.completedAt) return false;
+      const completedDate = new Date(s.completedAt);
+      completedDate.setHours(0, 0, 0, 0);
+      return completedDate.getTime() === today.getTime();
+    })
+    .reduce((sum, s) => 
+      sum + (parseFloat(s.priceDeliverySrv || s.price_delivery_srv || s.earnedByDelivery || s.amount || 0)), 
+      0
+    );
+};
+
 // ================================================================
 //  COMPONENTE PRINCIPAL
 // ================================================================
@@ -164,6 +184,7 @@ export default function DeliveryEarningsScreen() {
   const [showCutModal, setShowCutModal] = useState(false);
   const [cutoffInfo, setCutoffInfo] = useState<any>(getCutoffStatus());
   const [alreadyRequestedToday, setAlreadyRequestedToday] = useState(false);
+  const [todayEarnings, setTodayEarnings] = useState(0);
 
   useEffect(() => {
     if (session?.access_token) {
@@ -261,9 +282,13 @@ export default function DeliveryEarningsScreen() {
       });
 
       setPendingServices(unpaid);
+      // Calcular ganancias de hoy
+      const today = calculateTodayEarnings(unpaid);
+      setTodayEarnings(today);
     } catch (err: any) {
       console.error("\n❌ [EARNINGS] Error cargando servicios:", err);
       setPendingServices([]);
+      setTodayEarnings(0);
     }
   };
 
@@ -402,23 +427,87 @@ export default function DeliveryEarningsScreen() {
           </View>
         </View>
 
-        {/* SECCIÓN: GANANCIAS DEL PERÍODO ACTUAL */}
+        {/* ⭐ SECCIÓN: DASHBOARD PRINCIPAL - 3 MÉTRICAS CLAVE */}
+        <View style={styles.dashboardSection}>
+          {/* TARJETA 1: HOY (ANCHO COMPLETO) */}
+          <View style={[styles.dashboardCard, styles.dashboardCardLarge, styles.dashboardCardToday, styles.dashboardTopRow]}>
+            <View>
+              <View style={styles.dashboardCardHeader}>
+                <View style={[styles.dashboardCardIcon, styles.dashboardCardIconToday]}>
+                  <MaterialCommunityIcons name="calendar-today" size={20} color="#4A90E2" />
+                </View>
+                <View style={styles.dashboardCardHeaderText}>
+                  <Text style={styles.dashboardCardLabel}>Hoy</Text>
+                  <Text style={styles.dashboardCardSubLabel}>Ganancias de hoy</Text>
+                </View>
+              </View>
+              <Text style={styles.dashboardCardValue}>
+                {formatCurrency(todayEarnings)}
+              </Text>
+            </View>
+            <Text style={styles.dashboardCardSubtext}>
+              {pendingServices.filter(s => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const completed = s.completedAt ? new Date(s.completedAt) : null;
+                if (!completed) return false;
+                completed.setHours(0, 0, 0, 0);
+                return completed.getTime() === today.getTime();
+              }).length} servicio(s) completado(s)
+            </Text>
+          </View>
+
+          {/* FILA CON DOS TARJETAS */}
+          <View style={styles.dashboardBottomRow}>
+            {/* TARJETA 2: SIN COBRAR (50% ANCHO) */}
+            <View style={[styles.dashboardCard, styles.dashboardCardSmall, styles.dashboardCardPending]}>
+              <View>
+                <View style={styles.dashboardCardHeader}>
+                  <View style={[styles.dashboardCardIcon, styles.dashboardCardIconPending]}>
+                    <MaterialCommunityIcons name="cash-multiple" size={20} color="#F5A623" />
+                  </View>
+                  <View style={styles.dashboardCardHeaderText}>
+                    <Text style={styles.dashboardCardLabel}>Sin Cobrar</Text>
+                    <Text style={styles.dashboardCardSubLabel}>Adeudado</Text>
+                  </View>
+                </View>
+                <Text style={styles.dashboardCardValue}>
+                  {formatCurrency(totalMonthAmount)}
+                </Text>
+              </View>
+              <Text style={styles.dashboardCardSubtext}>
+                {totalMonthServices} servicio(s)
+              </Text>
+            </View>
+
+            {/* TARJETA 3: YA COBRADO (50% ANCHO) */}
+            <View style={[styles.dashboardCard, styles.dashboardCardSmall, styles.dashboardCardPaid]}>
+              <View>
+                <View style={styles.dashboardCardHeader}>
+                  <View style={[styles.dashboardCardIcon, styles.dashboardCardIconPaid]}>
+                    <MaterialCommunityIcons name="check-circle" size={20} color="#7ED321" />
+                  </View>
+                  <View style={styles.dashboardCardHeaderText}>
+                    <Text style={styles.dashboardCardLabel}>Pagado</Text>
+                    <Text style={styles.dashboardCardSubLabel}>Total cobrado</Text>
+                  </View>
+                </View>
+                <Text style={styles.dashboardCardValue}>
+                  {formatCurrency(earnings.total_paid)}
+                </Text>
+              </View>
+              <Text style={styles.dashboardCardSubtext}>
+                Acumulado
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* SECCIÓN: DETALLES ADICIONALES */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
             <MaterialCommunityIcons name="chart-line" size={20} color={Colors.activeMenuText} />
-            <Text style={styles.sectionTitle}>Ganancias del Período Actual</Text>
-          </View>
-
-          <View style={styles.mainCard}>
-            <View style={styles.cardContent}>
-              <Text style={styles.cardLabel}>Sin Pagar Este Período</Text>
-              <Text style={styles.cardMainValue}>
-                {formatCurrency(earnings.current_period_earnings)}
-              </Text>
-              <Text style={styles.cardDescription}>
-                {totalMonthServices} servicio{totalMonthServices !== 1 ? 's' : ''} entregado{totalMonthServices !== 1 ? 's' : ''}
-              </Text>
-            </View>
+            <Text style={styles.sectionTitle}>Resumen del Período</Text>
           </View>
 
           {/* GRID: Información Acumulada */}
@@ -431,14 +520,6 @@ export default function DeliveryEarningsScreen() {
               <Text style={styles.statValue}>
                 {formatCurrency(earnings.total_unpaid_earnings + earnings.total_paid)}
               </Text>
-            </View>
-
-            <View style={[styles.statCard, { borderLeftColor: Colors.success }]}>
-              <View style={styles.statLabelRow}>
-                <MaterialCommunityIcons name="check-circle" size={16} color={Colors.success} />
-                <Text style={styles.statLabel}>Ya Pagado</Text>
-              </View>
-              <Text style={styles.statValue}>{formatCurrency(earnings.total_paid)}</Text>
             </View>
 
             <View style={[styles.statCard, { borderLeftColor: Colors.warning }]}>
@@ -1222,5 +1303,101 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: Colors.Background,
+  },
+  // ============ NUEVOS ESTILOS PARA DASHBOARD ============
+  dashboardSection: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    gap: 12,
+  },
+  dashboardTopRow: {
+    width: "100%",
+  },
+  dashboardBottomRow: {
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  dashboardCard: {
+    backgroundColor: Colors.activeMenuBackground,
+    borderRadius: 16,
+    padding: 16,
+    borderBottomWidth: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+    justifyContent: "space-between",
+    minHeight: 100,
+  },
+  dashboardCardLarge: {
+    minHeight: 140,
+    borderBottomWidth: 5,
+  },
+  dashboardCardSmall: {
+    flex: 1,
+    minHeight: 140,
+    borderBottomWidth: 5,
+  },
+  dashboardCardToday: {
+    borderBottomColor: "#4A90E2",
+  },
+  dashboardCardPending: {
+    borderBottomColor: "#F5A623",
+  },
+  dashboardCardPaid: {
+    borderBottomColor: "#7ED321",
+  },
+  dashboardCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  dashboardCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  dashboardCardIconToday: {
+    backgroundColor: "rgba(74, 144, 226, 0.15)",
+  },
+  dashboardCardIconPending: {
+    backgroundColor: "rgba(245, 166, 35, 0.15)",
+  },
+  dashboardCardIconPaid: {
+    backgroundColor: "rgba(126, 211, 33, 0.15)",
+  },
+  dashboardCardHeaderText: {
+    flex: 1,
+  },
+  dashboardCardLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.menuText,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  dashboardCardSubLabel: {
+    fontSize: 10,
+    color: Colors.menuText,
+    opacity: 0.7,
+  },
+  dashboardCardValue: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: Colors.normalText,
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  dashboardCardSubtext: {
+    fontSize: 11,
+    color: Colors.menuText,
+    fontWeight: "500",
   },
 });
