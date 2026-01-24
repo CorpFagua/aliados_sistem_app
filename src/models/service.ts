@@ -218,7 +218,8 @@ export function toService(dto: ServiceResponse): Service {
     typeId: (dto.type_id as ServiceTypeId) ?? null,
 
     assignedDelivery: dto.assigned_delivery ?? null,
-    assignedDeliveryName: dto.profiles?.name ?? null,
+    // Obtener nombre del domiciliario - asegurar que es un objeto y tiene name
+    assignedDeliveryName: (typeof dto.profiles === 'object' && dto.profiles?.name) ? dto.profiles.name : null,
 
     storeId: dto.store_id ?? null,
     storeName: dto.store?.name ?? null,
