@@ -260,8 +260,8 @@ export default function OrderRow({
           <View style={styles.contentRow}>
             {/* Columna izquierda: información principal */}
             <View style={styles.left}>
-              {pedido.storeName && (
-                <Text style={styles.store}>{pedido.storeName}</Text>
+              {pedido.profileStoreName && (
+                <Text style={styles.store}>{pedido.profileStoreName}</Text>
               )}
 
               <Text style={styles.destination}>

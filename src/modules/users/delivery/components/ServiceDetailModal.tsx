@@ -216,7 +216,7 @@ export default function OrderDetailModal({
               />
               <View>
                 <Text style={styles.modalTitle}>
-                  {pedido.storeName || "Sin tienda"}
+                  {pedido.profileStoreName || "Sin tienda"}
                 </Text>
                 <Text style={styles.serviceId}>#{pedido.id.slice(-4)}</Text>
               </View>
