@@ -4,6 +4,7 @@ import { Stack } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { useColorScheme, Platform, KeyboardAvoidingView } from "react-native"
 import AuthProvider from "@/providers/AuthProvider"
+import { ServicesProvider } from "@/providers/ServicesProvider" // 👈 NUEVO
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import Toast from "react-native-toast-message"
 
@@ -38,7 +39,9 @@ function AppContent() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <AppContent /> 
+      <ServicesProvider> 
+        <AppContent />
+      </ServicesProvider>
     </AuthProvider>
   );
 }

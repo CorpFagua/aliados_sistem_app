@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import ServiceFormModal from "../components/ServiceFormModalCoordinator";
 import CoordinatorOrderCard from "../components/CoordiatorOrderCard";
 import OrderDetailModal from "../components/OrderDetailModal";
 import { useAuth } from "@/providers/AuthProvider";
-import { fetchServices } from "@/services/services";
+import { useServices } from "@/providers/ServicesProvider";
 import { Service } from "@/models/service";
 import { filterServicesByType } from "@/utils/serviceTypeUtils";
 
@@ -29,45 +29,32 @@ export default function HomeScreen() {
   const isMobile = width < 768;
 
   const { session } = useAuth();
+  const { services, loading, refetch } = useServices();
 
   const [activeTab, setActiveTab] = useState("Disponibles");
   const [activeServiceTypeFilter, setActiveServiceTypeFilter] = useState("Todos");
   const [selectedOrder, setSelectedOrder] = useState<Service | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // 👇 Estado de pedidos tipado
-  const [pedidos, setPedidos] = useState<Record<string, Service[]>>({
-    Disponibles: [],
-    Tomados: [],
-    "En ruta": [],
-  });
-  const [loading, setLoading] = useState(true);
-
-  // ⚡ Traer servicios del backend
-  useEffect(() => {
-    if (!session) return;
-
-    const loadServices = async () => {
-      setLoading(true);
-      try {
-        const data = await fetchServices(session.access_token);
-
-        const grouped: Record<string, Service[]> = {
-          Disponibles: data.filter((s) => s.status === "disponible"),
-          Tomados: data.filter((s) => s.status === "asignado"),
-          "En ruta": data.filter((s) => s.status === "en_ruta"),
-        };
-
-        setPedidos(grouped);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+  // 🎯 Agrupar servicios por estado
+  const pedidos = useMemo(() => {
+    return {
+      Disponibles: services.filter((s) => s.status === "disponible"),
+      Tomados: services.filter((s) => s.status === "asignado"),
+      "En ruta": services.filter((s) => s.status === "en_ruta"),
     };
+  }, [services]);
 
-    loadServices();
-  }, [session]);
+  // 🔄 Pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // 🔄 Aplicar filtro de tipo de servicio
   const getFilteredPedidos = (tab: string): Service[] => {
@@ -111,33 +98,48 @@ export default function HomeScreen() {
 
       {/* Tabs de tipo de servicio (Todos, Domicilios, Paquetería) */}
       <View style={styles.serviceTypeFiltersWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.serviceTypeFilters}
-        >
-          {SERVICE_TYPE_FILTERS.map((filter) => (
-            <TouchableOpacity
-              key={filter}
-              style={[
-                styles.serviceTypeFilterButton,
-                activeServiceTypeFilter === filter &&
-                  styles.activeServiceTypeFilterButton,
-              ]}
-              onPress={() => setActiveServiceTypeFilter(filter)}
-            >
-              <Text
+        <View style={styles.filterHeaderRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.serviceTypeFilters}
+          >
+            {SERVICE_TYPE_FILTERS.map((filter) => (
+              <TouchableOpacity
+                key={filter}
                 style={[
-                  styles.serviceTypeFilterText,
+                  styles.serviceTypeFilterButton,
                   activeServiceTypeFilter === filter &&
-                    styles.activeServiceTypeFilterText,
+                    styles.activeServiceTypeFilterButton,
                 ]}
+                onPress={() => setActiveServiceTypeFilter(filter)}
               >
-                {filter}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+                <Text
+                  style={[
+                    styles.serviceTypeFilterText,
+                    activeServiceTypeFilter === filter &&
+                      styles.activeServiceTypeFilterText,
+                  ]}
+                >
+                  {filter}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          
+          {/* Botón Reload */}
+          <TouchableOpacity 
+            style={styles.reloadButton}
+            onPress={onRefresh}
+            disabled={refreshing}
+          >
+            <Ionicons 
+              name="refresh" 
+              size={20} 
+              color={Colors.activeMenuText}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Listado */}
@@ -254,18 +256,7 @@ export default function HomeScreen() {
         visible={!!selectedOrder}
         pedido={selectedOrder}
         onClose={() => setSelectedOrder(null)}
-        onRefresh={() => {
-          if (session) {
-            fetchServices(session.access_token).then((data) => {
-              const grouped = {
-                Disponibles: data.filter((s) => s.status === "disponible"),
-                Tomados: data.filter((s) => s.status === "asignado"),
-                "En ruta": data.filter((s) => s.status === "en_ruta"),
-              };
-              setPedidos(grouped);
-            });
-          }
-        }}
+        onRefresh={refetch}
       />
 
       {/* Botón FAB */}
@@ -284,16 +275,7 @@ export default function HomeScreen() {
         onClose={() => setShowForm(false)}
         onSuccess={() => {
           setShowForm(false);
-          if (session) {
-            fetchServices(session.access_token).then((data) => {
-              const grouped: Record<string, Service[]> = {
-                Disponibles: data.filter((s) => s.status === "disponible"),
-                Tomados: data.filter((s) => s.status === "asignado"),
-                "En ruta": data.filter((s) => s.status === "en_ruta"),
-              };
-              setPedidos(grouped);
-            });
-          }
+          refetch();
         }}
       />
     </View>
@@ -321,9 +303,26 @@ const styles = StyleSheet.create({
   tabText: { color: Colors.menuText, fontSize: 14, fontWeight: "500" },
   activeTabText: { color: "#000", fontWeight: "700" },
   serviceTypeFiltersWrapper: { paddingHorizontal: 12, paddingVertical: 8 },
+  filterHeaderRow: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    justifyContent: "space-between",
+    gap: 8,
+  },
   serviceTypeFilters: {
     gap: 8,
     paddingHorizontal: 4,
+    flex: 1,
+  },
+  reloadButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderWidth: 1,
+    borderColor: Colors.activeMenuText,
+    justifyContent: "center",
+    alignItems: "center",
   },
   serviceTypeFilterButton: {
     paddingHorizontal: 14,

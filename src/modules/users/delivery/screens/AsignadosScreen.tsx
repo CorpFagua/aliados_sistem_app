@@ -1,10 +1,11 @@
 // src/modules/users/delivery/screens/AsignadosScreen.tsx
-import React, { useEffect, useState, useCallback } from "react";
-import { StyleSheet, View, FlatList, Text, ActivityIndicator } from "react-native";
+import React, { useMemo, useState } from "react";
+import { StyleSheet, View, FlatList, Text, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { fetchServices, updateServiceStatus } from "@/services/services";
+import { updateServiceStatus } from "@/services/services";
+import { useServices } from "@/providers/ServicesProvider";
 import { Service } from "@/models/service";
 import OrderRow from "../components/OrderRow";
 import OrderDetailModal from "../components/ServiceDetailModal";
@@ -12,30 +13,26 @@ import AssignZoneModal from "../components/AssignZoneModal";
 
 export default function AsignadosScreen() {
   const { session } = useAuth();
-  const [pedidos, setPedidos] = useState<Service[]>([]);
+  const { services, loading, refetch } = useServices();
   const [selectedPedido, setSelectedPedido] = useState<Service | null>(null);
   const [assigning, setAssigning] = useState<Service | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // 🔄 función para cargar servicios asignados
-  const loadPedidos = useCallback(async () => {
-    if (!session) return;
-    setLoading(true);
+  // 🎯 Filtrar servicios asignados
+  const pedidos = useMemo(
+    () => services.filter((s) => s.status === "asignado"),
+    [services]
+  );
+
+  // 🔄 Pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
     try {
-      const data = await fetchServices(session.access_token);
-      const asignados = data.filter((s) => s.status === "asignado");
-      setPedidos(asignados);
-    } catch (err) {
-      console.error("❌ Error cargando servicios asignados:", err);
+      await refetch();
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
-  }, [session]);
-
-  // cargar al montar
-  useEffect(() => {
-    loadPedidos();
-  }, [loadPedidos]);
+  };
 
   return (
     <View style={styles.container}>
@@ -71,6 +68,14 @@ export default function AsignadosScreen() {
           )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[Colors.activeMenuText, Colors.gradientEnd]}
+              progressBackgroundColor={Colors.activeMenuBackground}
+            />
+          }
         />
       )}
 
@@ -100,7 +105,6 @@ export default function AsignadosScreen() {
             session?.access_token || ""
           );
 
-          await loadPedidos();
           setAssigning(null);
         }}
       />

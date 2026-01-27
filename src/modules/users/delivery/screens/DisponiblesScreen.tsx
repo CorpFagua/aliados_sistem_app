@@ -1,37 +1,33 @@
 // src/modules/users/delivery/screens/DisponiblesScreen.tsx
-import React, { useEffect, useState, useCallback } from "react";
-import { StyleSheet, FlatList, View, Text, ActivityIndicator } from "react-native";
+import React, { useMemo, useState } from "react";
+import { StyleSheet, FlatList, View, Text, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { fetchServices, updateServiceStatus } from "@/services/services";
-import { Service } from "@/models/service";
+import { updateServiceStatus } from "@/services/services";
+import { useServices } from "@/providers/ServicesProvider";
 import OrderRow from "../components/OrderRow";
 
 export default function DisponiblesScreen() {
   const { session } = useAuth();
-  const [pedidos, setPedidos] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { services, loading, refetch } = useServices();
+  const [refreshing, setRefreshing] = useState(false);
 
-  // 🔄 función de carga reutilizable
-  const loadPedidos = useCallback(async () => {
-    if (!session) return;
-    setLoading(true);
+  // 🎯 Filtrar servicios disponibles
+  const pedidos = useMemo(
+    () => services.filter((s) => s.status === "disponible"),
+    [services]
+  );
+
+  // 🔄 Pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
     try {
-      const data = await fetchServices(session.access_token);
-      const disponibles = data.filter((s) => s.status === "disponible");
-      console.log("Servicios disponibles:", disponibles);
-      setPedidos(disponibles);
-    } catch (err) {
-      console.error("❌ Error cargando servicios disponibles:", err);
+      await refetch();
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
-  }, [session]);
-
-  useEffect(() => {
-    loadPedidos();
-  }, [loadPedidos]);
+  };
 
   return (
     <View style={styles.container}>
@@ -67,26 +63,21 @@ export default function DisponiblesScreen() {
                   session.access_token,
                   session.user.id
                 );
-                await loadPedidos(); // 🔄 refresca después de asignar
                 return true;
               }}
-              rightEnabled
-              rightLabel="Cancelar"
-              rightColor="#FF3B30"
-              onRightAction={async (p) => {
-                console.log("❌ Pedido cancelado:", p.id);
-                await updateServiceStatus(
-                  p.id,
-                  "cancelado",
-                  session.access_token
-                );
-                await loadPedidos(); // 🔄 refresca después de cancelar
-                return true;
-              }}
+              rightEnabled={false}
             />
           )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[Colors.activeMenuText, Colors.gradientEnd]}
+              progressBackgroundColor={Colors.activeMenuBackground}
+            />
+          }
         />
       )}
     </View>

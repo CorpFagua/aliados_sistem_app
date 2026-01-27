@@ -1,39 +1,35 @@
 // src/modules/users/delivery/screens/EnRutaScreen.tsx
-import React, { useEffect, useState, useCallback } from "react";
-import { StyleSheet, View, FlatList, Text, ActivityIndicator } from "react-native";
+import React, { useMemo, useState } from "react";
+import { StyleSheet, View, FlatList, Text, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { fetchServices, updateServiceStatus } from "@/services/services";
-import { Service } from "@/models/service";
+import { updateServiceStatus } from "@/services/services";
+import { useServices } from "@/providers/ServicesProvider";
 import OrderRow from "../components/OrderRow";
 import OrderDetailModal from "../components/ServiceDetailModal";
 
 export default function EnRutaScreen() {
   const { session } = useAuth();
-  const [pedidos, setPedidos] = useState<Service[]>([]);
+  const { services, loading, refetch } = useServices();
   const [selectedPedido, setSelectedPedido] = useState<Service | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // 🔄 función para cargar pedidos (memoizada con useCallback)
-  const loadPedidos = useCallback(async () => {
-    if (!session) return;
-    setLoading(true);
+  // 🎯 Filtrar servicios en ruta
+  const pedidos = useMemo(
+    () => services.filter((s) => s.status === "en_ruta"),
+    [services]
+  );
+
+  // 🔄 Pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
     try {
-      const data = await fetchServices(session.access_token);
-      const enRuta = data.filter((s) => s.status === "en_ruta");
-      setPedidos(enRuta);
-    } catch (err) {
-      console.error("❌ Error cargando servicios en ruta:", err);
+      await refetch();
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
-  }, [session]);
-
-  // cargar al montar
-  useEffect(() => {
-    loadPedidos();
-  }, [loadPedidos]);
+  };
 
   return (
     <View style={styles.container}>
@@ -64,16 +60,20 @@ export default function EnRutaScreen() {
               onLeftAction={async (p) => {
                 console.log("✔️ Pedido entregado:", p.id);
                 await updateServiceStatus(p.id, "entregado", session.access_token);
-
-                // 🔄 recargar lista después de actualizar
-                await loadPedidos();
-
                 return true;
               }}
             />
           )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[Colors.activeMenuText, Colors.gradientEnd]}
+              progressBackgroundColor={Colors.activeMenuBackground}
+            />
+          }
         />
       )}
 

@@ -3,6 +3,9 @@ import { clearChatMessages } from "@/lib/chatStorage";
 import { api, authHeaders } from "../lib/api";
 import { Service, ServicePayload, ServiceResponse, toService ,toServicePayload} from "@/models/service";
 
+// ✅ Exportar Service para que otras importaciones funcionen
+export type { Service, ServicePayload, ServiceResponse };
+
 // Crear un servicio (envía DTO y devuelve modelo del front)
 export async function createService(
   payload: ServicePayload,

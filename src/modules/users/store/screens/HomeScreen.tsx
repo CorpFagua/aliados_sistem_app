@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -15,8 +15,8 @@ import ServiceFormModal from "../components/ServiceFormModal";
 import StoreOrderCard from "../components/StoreOrderCard";
 import OrderDetailModal from "../components/OrderDetailModal";
 import { useAuth } from "@/providers/AuthProvider";
-import { fetchServices } from "@/services/services";
-import { Service } from "@/models/service"; // 👈 usamos nuestro modelo tipado
+import { useServices } from "@/providers/ServicesProvider";
+import { Service } from "@/models/service";
 
 const TABS = ["Disponibles", "Tomados", "En ruta"];
 
@@ -27,44 +27,31 @@ export default function HomeScreen() {
   const isMobile = width < 768;
 
   const { session } = useAuth();
+  const { services, loading, refetch } = useServices();
 
   const [activeTab, setActiveTab] = useState("Disponibles");
   const [selectedOrder, setSelectedOrder] = useState<Service | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // 👇 Estado de pedidos tipado
-  const [pedidos, setPedidos] = useState<Record<string, Service[]>>({
-    Disponibles: [],
-    Tomados: [],
-    "En ruta": [],
-  });
-
-  // ⚡ Traer servicios del backend
-  useEffect(() => {
-    if (!session) return;
-
-    const loadServices = async () => {
-      try {
-        setLoading(true);
-        const data = await fetchServices(session.access_token);
-
-        const grouped: Record<string, Service[]> = {
-          Disponibles: data.filter((s) => s.status === "disponible"),
-          Tomados: data.filter((s) => s.status === "asignado"),
-          "En ruta": data.filter((s) => s.status === "en_ruta"),
-        };
-
-        setPedidos(grouped);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+  // 🎯 Agrupar servicios por estado
+  const pedidos = useMemo(() => {
+    return {
+      Disponibles: services.filter((s) => s.status === "disponible"),
+      Tomados: services.filter((s) => s.status === "asignado"),
+      "En ruta": services.filter((s) => s.status === "en_ruta"),
     };
+  }, [services]);
 
-    loadServices();
-  }, [session]);
+  // 🔄 Recargar servicios
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const EmptyState = ({ tabName }: { tabName: string }) => {
     const getEmptyIcon = () => {
@@ -118,23 +105,54 @@ export default function HomeScreen() {
           {/* Tabs móviles */}
           {isMobile && (
             <View style={styles.tabsWrapper}>
-              <View style={styles.tabs}>
-                {TABS.map((tab) => (
-                  <TouchableOpacity
-                    key={tab}
-                    style={[styles.tabButton, activeTab === tab && styles.activeTabButton]}
-                    onPress={() => setActiveTab(tab)}
-                  >
-                    <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-                      {tab}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={styles.tabsContainer}>
+                <View style={styles.tabs}>
+                  {TABS.map((tab) => (
+                    <TouchableOpacity
+                      key={tab}
+                      style={[styles.tabButton, activeTab === tab && styles.activeTabButton]}
+                      onPress={() => setActiveTab(tab)}
+                    >
+                      <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                        {tab}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                
+                {/* Botón Reload */}
+                <TouchableOpacity 
+                  style={styles.reloadButton}
+                  onPress={handleRefresh}
+                  disabled={refreshing}
+                >
+                  <Ionicons 
+                    name="refresh" 
+                    size={20} 
+                    color={Colors.activeMenuText}
+                  />
+                </TouchableOpacity>
               </View>
             </View>
           )}
 
           {/* Listado */}
+          <View style={styles.headerRow}>
+            <View style={{ flex: 1 }} />
+            {(isTablet || isLargeScreen) && (
+              <TouchableOpacity 
+                style={styles.reloadButton}
+                onPress={handleRefresh}
+                disabled={refreshing}
+              >
+                <Ionicons 
+                  name="refresh" 
+                  size={20} 
+                  color={Colors.activeMenuText}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
           <ScrollView
             contentContainerStyle={[
               styles.scrollContent,
@@ -194,18 +212,7 @@ export default function HomeScreen() {
         visible={!!selectedOrder}
         pedido={selectedOrder}
         onClose={() => setSelectedOrder(null)}
-        onRefresh={() => {
-          if (session) {
-            fetchServices(session.access_token).then((data) => {
-              const grouped: Record<string, Service[]> = {
-                Disponibles: data.filter((s) => s.status === "disponible"),
-                Tomados: data.filter((s) => s.status === "asignado"),
-                "En ruta": data.filter((s) => s.status === "en_ruta"),
-              };
-              setPedidos(grouped);
-            });
-          }
-        }}
+        onRefresh={refetch}
       />
 
       {/* Botón FAB */}
@@ -224,16 +231,7 @@ export default function HomeScreen() {
         onClose={() => setShowForm(false)}
         onSuccess={() => {
           setShowForm(false);
-          if (session) {
-            fetchServices(session.access_token).then((data) => {
-              const grouped: Record<string, Service[]> = {
-                Disponibles: data.filter((s) => s.status === "disponible"),
-                Tomados: data.filter((s) => s.status === "asignado"),
-                "En ruta": data.filter((s) => s.status === "en_ruta"),
-              };
-              setPedidos(grouped);
-            });
-          }
+          refetch();
         }}
       />
     </View>
@@ -259,12 +257,18 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   tabsWrapper: { paddingTop: 10, paddingBottom: 12 },
+  tabsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    gap: 8,
+  },
   tabs: {
+    flex: 1,
     flexDirection: "row",
     backgroundColor: Colors.activeMenuBackground,
     borderRadius: 30,
     padding: 4,
-    marginHorizontal: 12,
   },
   tabButton: {
     flex: 1,
@@ -276,6 +280,22 @@ const styles = StyleSheet.create({
   activeTabButton: { backgroundColor: Colors.iconActive },
   tabText: { color: Colors.menuText, fontSize: 14, fontWeight: "500" },
   activeTabText: { color: "#000", fontWeight: "700" },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  reloadButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderWidth: 1,
+    borderColor: Colors.activeMenuText,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   scrollContent: { paddingBottom: 120, paddingHorizontal: 12 },
   scrollContentDesktop: { paddingBottom: 40, paddingHorizontal: 20 },
   columnsWrapper: {
