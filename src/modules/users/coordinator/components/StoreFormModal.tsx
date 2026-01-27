@@ -31,6 +31,7 @@ export default function StoreFormModal({
   const isEditing = !!store;
 
   const [name, setName] = useState(store?.name || "");
+  const [email, setEmail] = useState(store?.adminEmail || "");
   const [type, setType] = useState<"credito" | "efectivo">(
     store?.type || "efectivo"
   );
@@ -42,9 +43,11 @@ export default function StoreFormModal({
   useEffect(() => {
     if (store) {
       setName(store.name);
+      setEmail(store.adminEmail || "");
       setType(store.type);
     } else {
       setName("");
+      setEmail("");
       setType("efectivo");
     }
   }, [store, visible]);
@@ -59,11 +62,21 @@ export default function StoreFormModal({
       return;
     }
 
+    if (!email.trim()) {
+      Toast.show({
+        type: "error",
+        text1: "Campo requerido",
+        text2: "El email del administrador es obligatorio.",
+      });
+      return;
+    }
+
     try {
       setLoading(true);
 
       const payload = {
         name: name.trim(),
+        admin_email: email.trim(),
         type,
       };
 
@@ -115,6 +128,17 @@ export default function StoreFormModal({
                 placeholderTextColor={Colors.menuText}
                 value={name}
                 onChangeText={setName}
+              />
+
+              <Text style={styles.label}>Email Administrador</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="correo@ejemplo.com"
+                placeholderTextColor={Colors.menuText}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
               />
 
               <Text style={styles.label}>Tipo</Text>

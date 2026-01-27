@@ -6,6 +6,7 @@ export interface Store {
   adminId: string;
   branchId: string;
   type: "credito" | "efectivo";
+  adminEmail?: string;
   createdAt: string;
   branch?: {
     id: string;
@@ -26,6 +27,7 @@ export interface StoreResponse {
   admin_id: string;
   branch_id: string;
   type: "credito" | "efectivo";
+  admin_email?: string;
   created_at: string;
   branches?: {
     id: string;
@@ -43,6 +45,7 @@ export interface StoreResponse {
 export interface StorePayload {
   name: string;
   admin_id?: string;
+  admin_email?: string;
   branch_id?: string;
   type: "credito" | "efectivo";
 }
@@ -55,6 +58,7 @@ export function toStore(r: StoreResponse): Store {
     adminId: r.admin_id,
     branchId: r.branch_id,
     type: r.type,
+    adminEmail: r.admin_email,
     createdAt: r.created_at,
     branch: r.branches
       ? {

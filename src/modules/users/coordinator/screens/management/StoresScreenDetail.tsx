@@ -129,16 +129,10 @@ export default function StoreDetailScreen({
             {store.type === "credito" ? "Crédito" : "Efectivo"}
           </Text>
 
-          <Text style={styles.label}>Administrador:</Text>
+          <Text style={styles.label}>Email Administrador:</Text>
           <Text style={styles.value}>
-            {store.profiles?.[0]?.name || "No asignado"}
+            {store.adminEmail || "No asignado"}
           </Text>
-
-          <Text style={styles.label}>Sucursal:</Text>
-          <Text style={styles.value}>{store.branch?.name || "N/A"}</Text>
-
-          <Text style={styles.label}>Dirección:</Text>
-          <Text style={styles.value}>{store.branch?.address || "N/A"}</Text>
 
           <Text style={styles.label}>Fecha creación:</Text>
           <Text style={styles.value}>
