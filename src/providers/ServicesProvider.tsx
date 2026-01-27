@@ -1,7 +1,7 @@
 // src/providers/ServicesProvider.tsx
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useAuth } from './AuthProvider';
-import { fetchServices, Service } from '@/services/services';
+import { fetchServices, Service, getServiceById } from '@/services/services';
 import { useRealtimeListener } from '@/hooks/useRealtimeListener';
 import { toService, ServiceResponse } from '@/models/service';
 
@@ -67,36 +67,23 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
         // 🔄 GET el servicio completo con todas las relaciones
         if (session?.access_token) {
           try {
-            const res = await fetch(
-              `${process.env.EXPO_PUBLIC_API_URL_LOCAL}/services/${serviceId}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${session.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-              }
-            );
-
-            if (!res.ok) {
-              console.error('[ServicesProvider] Error fetching service:', res.status);
-              return;
-            }
-
-            const fullData = (await res.json()) as ServiceResponse;
-            const updatedService = toService(fullData);
+            console.log(`\n📡 [REALTIME] Evento: ${eventType} - ID: ${serviceId}`);
+            const updatedService = await getServiceById(serviceId, session.access_token);
 
             setServices((prev) => {
               const exists = prev.find((s) => s.id === serviceId);
               if (exists) {
                 // Actualizar existente
+                console.log(`🔄 [STATE] Actualizando servicio existente`);
                 return prev.map((s) => (s.id === serviceId ? updatedService : s));
               } else {
                 // Agregar nuevo (INSERT)
+                console.log(`➕ [STATE] Agregando nuevo servicio`);
                 return [updatedService, ...prev];
               }
             });
 
-            console.log('[ServicesProvider] ✅ Actualizado con datos completos:', serviceId);
+            console.log(`✅ [PROVIDER] Actualizado: ${serviceId}`);
           } catch (err) {
             console.error('[ServicesProvider] Error al obtener servicio completo:', err);
           }

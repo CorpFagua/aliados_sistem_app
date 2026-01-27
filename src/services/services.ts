@@ -40,6 +40,30 @@ export async function fetchServices(token: string): Promise<Service[]> {
   }
 }
 
+// 📦 Obtener un servicio por ID
+export async function getServiceById(
+  serviceId: string,
+  token: string
+): Promise<Service> {
+  try {
+    console.log(`📦 [GET_SERVICE] Obteniendo: ${serviceId}`);
+    const res = await api.get<{ ok: boolean; data: ServiceResponse }>(
+      `/services/${serviceId}`,
+      {
+        headers: authHeaders(token),
+      }
+    );
+
+    if (!res.data.ok) throw res.data;
+    const service = toService(res.data.data);
+    console.log(`✅ [GET_SERVICE] Obtenido: ${service.id}`);
+    return service;
+  } catch (err: any) {
+    console.error("❌ Error fetching service:", err.response?.data || err.message);
+    throw err;
+  }
+}
+
 /**
  * 📦 Obtener servicios optimizados para DELIVERY
  * Solo trae: servicios disponibles + servicios asignados al delivery
