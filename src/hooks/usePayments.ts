@@ -1082,6 +1082,54 @@ export function usePayments(token: string | null) {
     [token, headers]
   );
 
+  /**
+   * 📧 Enviar prefactura por email
+   */
+  const sendStoreSnapshotEmail = useCallback(
+    async (snapshotId: string): Promise<any | null> => {
+      if (!token) {
+        setError("No hay sesión activa");
+        return null;
+      }
+
+      if (!snapshotId) {
+        setError("Snapshot ID requerido");
+        return null;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        console.log(`\n📧 [HOOK] === Enviando Snapshot por Email ===`);
+        console.log(`📌 Snapshot ID: ${snapshotId}`);
+
+        const response = await api.post<{ ok: boolean; data: any }>(
+          `/payments/snapshots/store/${snapshotId}/send-email`,
+          {},
+          { headers }
+        );
+
+        console.log(`✅ [HOOK] Respuesta del servidor:`, response.data);
+        
+        // Devolver los datos del email enviado
+        const emailData = response.data.data || response.data;
+        console.log(`📧 [HOOK] Datos de email:`, emailData);
+        
+        return emailData;
+      } catch (err: any) {
+        const message = err.response?.data?.error || err.message || "Error enviando email";
+        setError(message);
+        console.error("❌ [HOOK] Error en sendStoreSnapshotEmail:", message);
+        console.error("❌ [HOOK] Error completo:", err);
+        throw err; // Relanzar para que el componente lo maneje
+      } finally {
+        setLoading(false);
+      }
+    },
+    [token, headers]
+  );
+
   return {
     // Estado
     loading,
@@ -1120,6 +1168,9 @@ export function usePayments(token: string | null) {
 
     // Eliminar snapshots
     deleteSnapshot,
+
+    // Email
+    sendStoreSnapshotEmail,
   };
 }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, FlatList, TouchableOpacity, RefreshControl, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, FlatList, TouchableOpacity, RefreshControl, Modal, TextInput, Alert, Animated } from 'react-native';
 import { useAuth } from '../../../../providers/AuthProvider';
 import { fetchServices, updateServiceData } from '../../../../services/services';
 import { formatCurrency } from '../../../../services/payments';
@@ -34,7 +34,7 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   const route = useRoute<RouteProp<Params,'StorePaymentSummary'>>();
   const navigation = useNavigation();
   const { session } = useAuth();
-  const { getStorePaymentSnapshots, createStoreSnapshot, chargeStoreSnapshot, deleteSnapshot } = usePayments(session?.access_token || null);
+  const { getStorePaymentSnapshots, createStoreSnapshot, chargeStoreSnapshot, deleteSnapshot, sendStoreSnapshotEmail } = usePayments(session?.access_token || null);
   const { getServicesDetail, downloadServicesExcel, loading: loadingServicesDetail } = useServicesDetail(session?.access_token || null);
   
   const routeParams = (route && (route.params as any)) || {};
@@ -80,6 +80,54 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   // Estados para servicios detallados
   const [servicesDetail, setServicesDetail] = useState<any[]>([]);
   const [showServicesDetailModal, setShowServicesDetailModal] = useState(false);
+
+  // Estados para envío de email
+  const [sendingEmailSnapshotId, setSendingEmailSnapshotId] = useState<string | null>(null);
+  const [showSendEmailModal, setShowSendEmailModal] = useState(false);
+  const [emailModalSnapshot, setEmailModalSnapshot] = useState<Snapshot | null>(null);
+
+  // Estados para notificaciones
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const notificationOpacity = React.useRef(new Animated.Value(0)).current;
+  const notificationTranslate = React.useRef(new Animated.Value(-100)).current;
+  
+  // Función para mostrar notificación
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    // Animar entrada
+    Animated.parallel([
+      Animated.timing(notificationOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.spring(notificationTranslate, {
+        toValue: 0,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setNotification({ type, message });
+    
+    // Animar salida después de 4 segundos
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(notificationOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(notificationTranslate, {
+          toValue: -100,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setNotification(null);
+      });
+    }, 4000);
+  };
 
   // Cargar datos cuando cambia el tab activo
   useEffect(() => {
@@ -270,15 +318,15 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       }
 
       console.log(`✅ [SCREEN] Snapshot creado exitosamente`);
-      Alert.alert('Éxito', `Prefactura #${newSnapshot.id.slice(-8)} creada exitosamente`);
       setShowPayModal(false);
+      showNotification('success', `Prefactura #${newSnapshot.id.slice(-8)} creada\nTotal: ${formatCurrency(totalSelectedAmount())} • ${selectedIds.length} servicio${selectedIds.length !== 1 ? 's' : ''}`);
       setSelectedIds([]);
       setSelectAll(false);
       await load();
     }catch(e: any){
       console.error('❌ [SCREEN] Error:', e);
       const errorMsg = e?.response?.data?.message || e.message || 'No se pudo crear la prefactura';
-      Alert.alert('Error', errorMsg);
+      showNotification('error', `No se pudo crear la prefactura\n${errorMsg}`);
     }finally{ 
       setProcessingPayment(false); 
     }
@@ -394,13 +442,7 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       setChargeNotes('');
       
       // Mostrar éxito - NO recargar automáticamente
-      Alert.alert(
-        '✓ Prefactura Cobrada',
-        `Prefactura #${snapshot.id.slice(-8)} cobrada exitosamente.\n\n💰 Monto: $${snapshot.total_amount.toFixed(2)}\n📦 Servicios: ${snapshot.services_count}`,
-        [{ 
-          text: 'OK'
-        }]
-      );
+      showNotification('success', `Prefactura #${snapshot.id.slice(-8)} cobrada exitosamente\n${formatCurrency(snapshot.total_amount)} • ${snapshot.services_count} servicio${snapshot.services_count !== 1 ? 's' : ''}`);
     } catch (error: any) {
       console.error(`\n❌ [SCREEN] === ERROR EN COBRO ===`);
       console.error(`Error completo:`, error);
@@ -413,12 +455,7 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
         || 'Error desconocido al cobrar prefactura';
       
       console.error(`📝 Mensaje de error: ${errorMsg}`);
-      
-      Alert.alert(
-        '❌ Error al Cobrar',
-        `No se pudo cobrar la prefactura #${snapshot.id.slice(-8)}:\n\n${errorMsg}`,
-        [{ text: 'OK' }]
-      );
+      showNotification('error', `No se pudo cobrar la prefactura\n${errorMsg}`);
     }
   }
 
@@ -489,20 +526,11 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       }
 
       // Mostrar mensaje de éxito - NO recargar automáticamente
-      let successMsg = `Prefactura #${snapshot.id.slice(-8)} eliminada exitosamente.`;
+      let successMsg = `Prefactura #${snapshot.id.slice(-8)} eliminada exitosamente`;
       if (snapshot.status === 'paid') {
-        successMsg += `\n\n${result.services_reverted} servicios revertidos a "entregado".`;
+        successMsg += `\n${result.services_reverted} servicio${result.services_reverted !== 1 ? 's' : ''} revertido${result.services_reverted !== 1 ? 's' : ''}`;
       }
-
-      Alert.alert(
-        '✓ Prefactura Eliminada',
-        successMsg,
-        [
-          {
-            text: 'OK'
-          }
-        ]
-      );
+      showNotification('success', successMsg);
     } catch (error: any) {
       console.error(`\n❌ [SCREEN] === ERROR EN ELIMINACIÓN ===`);
       console.error(`Error completo:`, error);
@@ -515,13 +543,84 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
         || 'Error desconocido al eliminar prefactura';
 
       console.error(`📝 Mensaje de error: ${errorMsg}`);
-
-      Alert.alert(
-        '❌ Error al Eliminar',
-        `No se pudo eliminar la prefactura #${snapshot.id.slice(-8)}:\n\n${errorMsg}`,
-        [{ text: 'OK' }]
-      );
+      showNotification('error', `No se pudo eliminar la prefactura\n${errorMsg}`);
     }
+  }
+
+  // ====================================
+  // EMAIL FUNCTIONS
+  // ====================================
+  function openSendEmailModal(snapshot: Snapshot) {
+    console.log(`📧 [SCREEN] Abriendo modal para enviar snapshot por email: ${snapshot.id}`);
+    setEmailModalSnapshot(snapshot);
+    setShowSendEmailModal(true);
+  }
+
+  async function executeSendEmail() {
+    if (!emailModalSnapshot || !session?.access_token) {
+      Alert.alert('Error', 'No hay información del snapshot o sesión expirada');
+      return;
+    }
+
+    const snapshot = emailModalSnapshot;
+    setSendingEmailSnapshotId(snapshot.id);
+
+    try {
+      console.log(`\n📧 [SCREEN] === ENVIANDO SNAPSHOT POR EMAIL ===`);
+      console.log(`📌 Snapshot ID: ${snapshot.id}`);
+      console.log(`💰 Monto total: $${snapshot.total_amount.toFixed(2)}`);
+      console.log(`📦 Cantidad de servicios: ${snapshot.services_count}`);
+
+      const result = await sendStoreSnapshotEmail(snapshot.id);
+
+      console.log(`📊 [SCREEN] Respuesta del servidor:`, JSON.stringify(result, null, 2));
+      console.log(`📊 [SCREEN] Tipo de resultado:`, typeof result);
+      console.log(`📊 [SCREEN] Propiedades:`, Object.keys(result || {}));
+
+      // El resultado debería tener propiedades como email, snapshotId, etc.
+      if (!result) {
+        throw new Error('No se recibió respuesta del servidor');
+      }
+
+      console.log(`✅ [SCREEN] === EMAIL ENVIADO EXITOSAMENTE ===`);
+
+      // Cerrar modal
+      setShowSendEmailModal(false);
+      setEmailModalSnapshot(null);
+      setSendingEmailSnapshotId(null);
+
+      // Mostrar éxito con email - busca el email en varias posiciones posibles
+      const emailDestino = result.email 
+        || result.data?.email 
+        || result.destinatario 
+        || result.admin_email
+        || 'administrador';
+      
+      console.log(`📧 [SCREEN] Email destino encontrado: ${emailDestino}`);
+      showNotification('success', `Email enviado exitosamente a\n${emailDestino}`);
+    } catch (error: any) {
+      console.error(`\n❌ [SCREEN] === ERROR AL ENVIAR EMAIL ===`);
+      console.error(`Error completo:`, error);
+      console.error(`Error type:`, typeof error);
+      console.error(`Error message:`, error?.message);
+      console.error(`Error response:`, error?.response);
+
+      setSendingEmailSnapshotId(null);
+
+      const errorMsg = error?.response?.data?.error
+        || error?.response?.data?.message
+        || error?.message
+        || 'Error desconocido al enviar email';
+
+      console.error(`📝 Mensaje de error a mostrar: ${errorMsg}`);
+      showNotification('error', `No se pudo enviar el email\n${errorMsg}`);
+    }
+  }
+
+  function handleSendEmailCancel() {
+    setShowSendEmailModal(false);
+    setEmailModalSnapshot(null);
+    setSendingEmailSnapshotId(null);
   }
 
   // Calendar helpers
@@ -671,6 +770,21 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
         )}
         
         <TouchableOpacity
+          style={[styles.chargeButton, styles.chargeButtonSecondary, sendingEmailSnapshotId === item.id && styles.chargeButtonLoading]}
+          onPress={() => openSendEmailModal(item)}
+          disabled={sendingEmailSnapshotId === item.id}
+        >
+          {sendingEmailSnapshotId === item.id ? (
+            <ActivityIndicator color={Colors.activeMenuText} size="small" />
+          ) : (
+            <>
+              <Ionicons name="mail" size={14} color={Colors.activeMenuText} style={{ marginRight: 6 }} />
+              <Text style={[styles.chargeButtonText, { color: Colors.activeMenuText }]}>Enviar Email</Text>
+            </>
+          )}
+        </TouchableOpacity>
+        
+        <TouchableOpacity
           style={[styles.deleteButton, deletingSnapshotId === item.id && styles.deleteButtonLoading]}
           onPress={() => openDeleteModal(item)}
           disabled={deletingSnapshotId === item.id}
@@ -695,6 +809,60 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
 
   return (
     <View style={styles.container}>
+      {/* NOTIFICACIÓN VISUAL */}
+      {notification && (
+        <Animated.View
+          style={[
+            styles.notificationContainer,
+            notification.type === 'success' ? styles.notificationSuccess : styles.notificationError,
+            {
+              opacity: notificationOpacity,
+              transform: [{ translateY: notificationTranslate }],
+            },
+          ]}
+        >
+          <View style={styles.notificationContent}>
+            <View style={styles.notificationIconWrapper}>
+              <Ionicons
+                name={notification.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                size={24}
+                color="#fff"
+              />
+            </View>
+            <View style={styles.notificationTextWrapper}>
+              <Text
+                style={styles.notificationText}
+                numberOfLines={3}
+              >
+                {notification.message}
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.notificationCloseBtn}
+              onPress={() => {
+                Animated.parallel([
+                  Animated.timing(notificationOpacity, {
+                    toValue: 0,
+                    duration: 200,
+                    useNativeDriver: true,
+                  }),
+                  Animated.timing(notificationTranslate, {
+                    toValue: -100,
+                    duration: 200,
+                    useNativeDriver: true,
+                  }),
+                ]).start(() => {
+                  setNotification(null);
+                });
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      )}
+
       <View style={{flexDirection:'row', alignItems:'center', marginBottom:8}}>
         <TouchableOpacity onPress={() => { if (onClose) onClose(); else navigation.goBack(); }} style={{flexDirection:'row', alignItems:'center'}}>
           <Ionicons name="chevron-back" size={20} color={Colors.activeMenuText} />
@@ -1254,6 +1422,75 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
                   <ActivityIndicator color={Colors.Background} size="small" />
                 ) : (
                   <Text style={styles.deleteConfirmButtonText}>Eliminar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Envío de Email */}
+      <Modal visible={showSendEmailModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>📧 Enviar Prefactura por Email</Text>
+            
+            {emailModalSnapshot && (
+              <>
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={styles.label}>ID Prefactura:</Text>
+                  <Text style={styles.modalText}>#{emailModalSnapshot.id.slice(-8)}</Text>
+                </View>
+
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={styles.label}>Período:</Text>
+                  <Text style={styles.modalText}>{emailModalSnapshot.period_start} a {emailModalSnapshot.period_end}</Text>
+                </View>
+
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={styles.label}>Monto Total:</Text>
+                  <Text style={[styles.modalText, { fontSize: 18, fontWeight: '700', color: Colors.activeMenuText }]}>
+                    ${emailModalSnapshot.total_amount.toFixed(2)}
+                  </Text>
+                </View>
+
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={styles.label}>Cantidad de Servicios:</Text>
+                  <Text style={styles.modalText}>{emailModalSnapshot.services_count}</Text>
+                </View>
+
+                <View style={{
+                  backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                  borderRadius: 8,
+                  padding: 12,
+                  marginBottom: 16,
+                  borderLeftWidth: 4,
+                  borderLeftColor: Colors.activeMenuText,
+                }}>
+                  <Text style={{ color: Colors.normalText, fontSize: 13, lineHeight: 18 }}>
+                    📎 Se enviará un email profesional al administrador de la tienda con el Excel adjunto con todos los detalles de los servicios.
+                  </Text>
+                </View>
+              </>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={handleSendEmailCancel}
+                disabled={sendingEmailSnapshotId !== null}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={executeSendEmail}
+                disabled={sendingEmailSnapshotId !== null}
+              >
+                {sendingEmailSnapshotId ? (
+                  <ActivityIndicator color={Colors.Background} size="small" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>Enviar Email</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1829,4 +2066,63 @@ const styles = StyleSheet.create({
     color: Colors.Background,
     fontWeight: '700',
     fontSize: 14,
-  },});
+  },
+  notificationContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 16,
+    right: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 12,
+    zIndex: 1000,
+  },
+  notificationSuccess: {
+    backgroundColor: '#10B981',
+    borderLeftWidth: 6,
+    borderLeftColor: '#059669',
+  },
+  notificationError: {
+    backgroundColor: '#EF4444',
+    borderLeftWidth: 6,
+    borderLeftColor: '#DC2626',
+  },
+  notificationContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  notificationIconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  notificationTextWrapper: {
+    flex: 1,
+    marginRight: 10,
+  },
+  notificationText: {
+    color: '#fff',
+    fontSize: 13.5,
+    fontWeight: '600',
+    lineHeight: 19,
+    letterSpacing: 0.35,
+  },
+  notificationCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
