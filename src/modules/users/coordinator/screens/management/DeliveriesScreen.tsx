@@ -125,7 +125,7 @@ export default function DeliveriesScreen() {
           {
             ...values,
             role: "delivery",
-            branch_id: profile?.branch_id,
+            branch_id: profile?.branchId,
             isActive: true,
           },
           token
@@ -165,25 +165,66 @@ export default function DeliveriesScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingVertical: 12 }}
           renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>{item.name}</Text>
-                <Text style={styles.cardSubtitle}>Tel: {item.phone || "—"}</Text>
-                <Text style={styles.cardSubtitle}>
-                  Estado: {item.isActive ? "🟢 Activo" : "🔴 Inactivo"}
-                </Text>
+            <View style={[styles.card, item.isVIP && styles.cardVIP]}>
+              {/* VIP Bar Left */}
+              {item.isVIP && <View style={styles.vipBar} />}
+
+              {/* VIP Badge Top Right */}
+              {item.isVIP && (
+                <View style={styles.vipBadge}>
+                  <Ionicons name="star" size={12} color="#fff" />
+                  <Text style={styles.vipBadgeText}>VIP</Text>
+                </View>
+              )}
+
+              {/* Header: Avatar + Name */}
+              <View style={styles.cardHeader}>
+                <View style={[styles.avatar, item.isVIP && styles.avatarVIP]}>
+                  <Ionicons 
+                    name="person-circle" 
+                    size={40} 
+                    color={item.isVIP ? "#ffc107" : Colors.normalText} 
+                  />
+                </View>
+                
+                <View style={styles.nameContainer}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.name}>{item.name}</Text>
+                    {item.isVIP && (
+                      <View style={styles.vipStarBadge}>
+                        <Ionicons name="star-sharp" size={10} color="#ffc107" />
+                      </View>
+                    )}
+                  </View>
+                </View>
               </View>
 
+              {/* Status + Phone */}
+              <View style={styles.statusLine}>
+                <View style={styles.status}>
+                  <Ionicons 
+                    name={item.isActive ? "checkmark-circle" : "close-circle"} 
+                    size={13} 
+                    color={item.isActive ? "#4caf50" : "#f44336"} 
+                  />
+                  <Text style={[styles.statusText, { color: item.isActive ? "#4caf50" : "#f44336" }]}>
+                    {item.isActive ? "Activo" : "Inactivo"}
+                  </Text>
+                </View>
+
+                <View style={styles.phone}>
+                  <Ionicons name="call" size={11} color={Colors.menuText} />
+                  <Text style={styles.phoneText}>{item.phone || "Sin tel"}</Text>
+                </View>
+              </View>
+
+              {/* Actions Row */}
               <View style={styles.actions}>
                 <TouchableOpacity
                   onPress={() => handleToggleActive(item)}
-                  style={{ padding: 6 }}
+                  style={[styles.actionBtn, { backgroundColor: "#ff9800" }]}
                 >
-                  <Ionicons
-                    name={item.isActive ? "pause-outline" : "play-outline"}
-                    size={22}
-                    color={item.isActive ? "orange" : "green"}
-                  />
+                  <Ionicons name={item.isActive ? "pause" : "play"} size={14} color="#fff" />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -191,16 +232,16 @@ export default function DeliveriesScreen() {
                     setEditingUser(item);
                     setShowForm(true);
                   }}
-                  style={{ padding: 6 }}
+                  style={[styles.actionBtn, { backgroundColor: "#2196f3" }]}
                 >
-                  <Ionicons name="pencil-outline" size={22} color="#007bff" />
+                  <Ionicons name="pencil" size={14} color="#fff" />
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => handleDelete(item)}
-                  style={{ padding: 6 }}
+                  style={[styles.actionBtn, { backgroundColor: "#f44336" }]}
                 >
-                  <Ionicons name="trash-outline" size={22} color="red" />
+                  <Ionicons name="trash" size={14} color="#fff" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -235,36 +276,170 @@ export default function DeliveriesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.Background, padding: 16 },
-  title: { fontSize: 22, fontWeight: "700", color: Colors.normalText, marginBottom: 6 },
-  subtitle: { fontSize: 14, color: Colors.menuText, marginBottom: 12 },
+  container: { 
+    flex: 1, 
+    backgroundColor: Colors.Background, 
+    paddingHorizontal: 12,
+  },
+  title: { 
+    fontSize: 24, 
+    fontWeight: "800", 
+    color: Colors.normalText, 
+    marginBottom: 4,
+    marginTop: 12,
+  },
+  subtitle: { 
+    fontSize: 13, 
+    color: Colors.menuText, 
+    marginBottom: 12,
+  },
   card: {
+    marginVertical: 6,
+    marginHorizontal: 0,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
     backgroundColor: Colors.activeMenuBackground,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: Colors.Border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 2,
+    position: "relative",
+  },
+  cardVIP: {
+    borderColor: "#d4af37",
+    borderWidth: 2,
+    backgroundColor: "rgba(212, 175, 55, 0.08)",
+  },
+  vipBar: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: "#d4af37",
+    borderTopLeftRadius: 11,
+    borderBottomLeftRadius: 11,
+  },
+  vipBadge: {
+    position: "absolute",
+    top: 6,
+    right: 8,
+    backgroundColor: "#d4af37",
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    shadowColor: "#d4af37",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  vipBadgeText: {
+    fontSize: 8,
+    fontWeight: "700",
+    color: "#000",
+    letterSpacing: 0.2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 7,
+  },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+    backgroundColor: "transparent",
+  },
+  avatarVIP: {
+    backgroundColor: "rgba(212, 175, 55, 0.2)",
+    borderWidth: 2,
+    borderColor: "#d4af37",
+  },
+  nameContainer: {
+    flex: 1,
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  name: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.normalText,
+    flex: 1,
+  },
+  vipStarBadge: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#d4af37",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  statusLine: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.Border,
+    marginBottom: 7,
+    paddingLeft: 48,
   },
-  cardTitle: { fontSize: 16, color: Colors.normalText, fontWeight: "600" },
-  cardSubtitle: { fontSize: 13, color: Colors.menuText, marginTop: 2 },
-  actions: { flexDirection: "row", alignItems: "center" },
+  status: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  phone: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  phoneText: {
+    fontSize: 11,
+    color: Colors.menuText,
+    fontWeight: "500",
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 7,
+    justifyContent: "flex-end",
+    paddingLeft: 48,
+  },
+  actionBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 5,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   fab: {
     position: "absolute",
     right: 20,
     bottom: 20,
     backgroundColor: Colors.normalText,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });

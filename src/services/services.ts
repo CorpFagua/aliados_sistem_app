@@ -59,7 +59,14 @@ export async function getServiceById(
     console.log(`✅ [GET_SERVICE] Obtenido: ${service.id}`);
     return service;
   } catch (err: any) {
-    console.error("❌ Error fetching service:", err.response?.data || err.message);
+    const message = err.response?.data?.message || err.response?.statusText || err.message;
+    const status = err.response?.status;
+    
+    if (status === 401) {
+      console.warn(`⚠️  [GET_SERVICE] Token expirado para ${serviceId}`);
+    } else {
+      console.error(`❌ [GET_SERVICE] Error (${status}): ${message}`);
+    }
     throw err;
   }
 }
