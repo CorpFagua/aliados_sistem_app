@@ -119,7 +119,15 @@ export async function updateServiceStatus(
     return toService(res.data.data); // ✅ usar el `data` interno
   } catch (err: any) {
     console.error("❌ Error updating service status:", err.response?.data || err.message);
-    throw err;
+
+    // Normalizar el mensaje de error que viene del backend (Express)
+    const backendError = err?.response?.data?.error || err?.response?.data?.message;
+    const message =
+      backendError ||
+      err?.message ||
+      "Error al actualizar el estado del servicio";
+
+    throw new Error(message);
   }
 }
 

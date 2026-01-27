@@ -56,14 +56,22 @@ export default function DisponiblesScreen() {
               leftLabel="Tomar"
               leftColor="#2563EB"
               onLeftAction={async (p) => {
-                console.log("✔️ Pedido asignado:", p.id);
-                await updateServiceStatus(
-                  p.id,
-                  "asignado",
-                  session.access_token,
-                  session.user.id
-                );
-                return true;
+                try {
+                  console.log("✔️ Intentando asignar pedido:", p.id);
+                  await updateServiceStatus(
+                    p.id,
+                    "asignado",
+                    session.access_token,
+                    session.user.id
+                  );
+                  return true; // cierra la tarjeta al éxito
+                } catch (err: any) {
+                  console.error("❌ Error al tomar servicio:", err);
+                  const message = err?.message ||
+                    "No se pudo tomar el servicio. Intenta de nuevo.";
+                  alert(message);
+                  return false; // mantiene la tarjeta abierta
+                }
               }}
               rightEnabled={false}
             />
