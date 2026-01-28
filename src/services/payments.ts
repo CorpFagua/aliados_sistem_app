@@ -13,6 +13,7 @@ import { api, authHeaders } from "../lib/api";
 export interface DeliveryEarningsDTO {
   delivery_id: string;
   current_period_earnings: number;
+  total_unpaid_earnings: number;
   total_earnings: number;
   total_paid: number;
   total_pending: number;
@@ -80,11 +81,17 @@ export interface PaymentHistoryItemDTO {
  */
 export async function getDeliveryEarnings(token: string): Promise<DeliveryEarningsDTO> {
   try {
-    const response = await api.get<DeliveryEarningsDTO>(
+    const response = await api.get<{ ok: boolean; data: DeliveryEarningsDTO }>(
       "/payments/delivery-earnings",
       { headers: authHeaders(token) }
     );
-    return response.data;
+    console.log("📊 [PAYMENTS.TS] Respuesta raw:", JSON.stringify(response.data, null, 2));
+    
+    // Extraer data si viene envuelto en { ok: true, data: {...} }
+    const data = response.data?.data || response.data;
+    console.log("📊 [PAYMENTS.TS] Data extraída:", JSON.stringify(data, null, 2));
+    
+    return data as DeliveryEarningsDTO;
   } catch (error: any) {
     console.error("❌ Error getDeliveryEarnings:", error.response?.data || error.message);
     throw error;

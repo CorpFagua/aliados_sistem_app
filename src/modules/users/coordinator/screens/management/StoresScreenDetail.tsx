@@ -17,6 +17,7 @@ import { Store } from "@/models/store";
 import Toast from "react-native-toast-message";
 import StoreFormModal from "../../components/StoreFormModal";
 import UserFormModal from "../../components/UserFormModal";
+import UserProfileModal from "../../components/UserProfileModal";
 
 // 🟩 ahora recibe props desde StoresScreen
 export default function StoreDetailScreen({
@@ -33,6 +34,8 @@ export default function StoreDetailScreen({
   const [loading, setLoading] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
 
   useEffect(() => {
     if (token && id) loadStore();
@@ -126,16 +129,10 @@ export default function StoreDetailScreen({
             {store.type === "credito" ? "Crédito" : "Efectivo"}
           </Text>
 
-          <Text style={styles.label}>Administrador:</Text>
+          <Text style={styles.label}>Email Administrador:</Text>
           <Text style={styles.value}>
-            {store.profiles?.[0]?.name || "No asignado"}
+            {store.adminEmail || "No asignado"}
           </Text>
-
-          <Text style={styles.label}>Sucursal:</Text>
-          <Text style={styles.value}>{store.branch?.name || "N/A"}</Text>
-
-          <Text style={styles.label}>Dirección:</Text>
-          <Text style={styles.value}>{store.branch?.address || "N/A"}</Text>
 
           <Text style={styles.label}>Fecha creación:</Text>
           <Text style={styles.value}>
@@ -170,7 +167,13 @@ export default function StoreDetailScreen({
             data={store.profiles}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <View style={styles.userCard}>
+              <TouchableOpacity
+                style={styles.userCard}
+                onPress={() => {
+                  setSelectedUserId(item.id);
+                  setShowUserProfile(true);
+                }}
+              >
                 <Ionicons
                   name="person-circle-outline"
                   size={30}
@@ -182,7 +185,7 @@ export default function StoreDetailScreen({
                     {item.phone || "Sin teléfono"}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             )}
             scrollEnabled={false}
             contentContainerStyle={{ paddingBottom: 30 }}
@@ -208,6 +211,19 @@ export default function StoreDetailScreen({
         onClose={() => setShowUserForm(false)}
         onSave={() => {
           setShowUserForm(false);
+          loadStore(); // refrescar lista de usuarios
+        }}
+      />
+
+      {/* 🟪 Modal ver/editar perfil usuario */}
+      <UserProfileModal
+        visible={showUserProfile}
+        userId={selectedUserId}
+        onClose={() => {
+          setShowUserProfile(false);
+          setSelectedUserId("");
+        }}
+        onSave={() => {
           loadStore(); // refrescar lista de usuarios
         }}
       />

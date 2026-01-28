@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
 import { useRealtimeListener } from './useRealtimeListener';
 import { Service } from '@/models/service';
-import { fetchServices } from '@/services/services';
+import { fetchDeliveryServices } from '@/services/services';
 
 export function useDeliveryOrdersRealtime() {
   const { session, profile } = useAuth();
@@ -26,7 +26,8 @@ export function useDeliveryOrdersRealtime() {
     const loadInitial = async () => {
       try {
         setLoading(true);
-        const data = await fetchServices(session.access_token);
+        console.log("📦 [DELIVERY] Cargando servicios optimizados...");
+        const data = await fetchDeliveryServices(session.access_token);
 
         const grouped: Record<string, Service[]> = {
           Disponibles: data.filter((s) => s.status === 'disponible'),
@@ -40,6 +41,13 @@ export function useDeliveryOrdersRealtime() {
             (s) => s.status === 'entregado' && s.assignedDelivery === session.user.id
           ),
         };
+
+        console.log("✅ [DELIVERY] Servicios cargados:", {
+          disponibles: grouped.Disponibles.length,
+          asignados: grouped.Asignados.length,
+          en_ruta: grouped['En ruta'].length,
+          entregados: grouped.Entregados.length,
+        });
 
         setPedidos(grouped);
       } catch (err) {

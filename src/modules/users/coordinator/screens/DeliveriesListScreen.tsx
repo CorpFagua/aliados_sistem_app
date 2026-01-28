@@ -1,18 +1,17 @@
-
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../../../constans/colors";
 import { fetchDeliveries } from "../../../../services/users";
 import { useAuth } from "../../../../providers/AuthProvider";
-import { useNavigation } from "@react-navigation/native";
 import DeliveryPaymentSummaryScreen from "./DeliveryPaymentSummaryScreen";
 
-export default function CoordinatorPaymentRequestsScreen() {
+export default function DeliveriesListScreen() {
   const { session } = useAuth();
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedDelivery, setSelectedDelivery] = useState(null);
 
   useEffect(() => {
     loadDeliveries();
@@ -32,9 +31,7 @@ export default function CoordinatorPaymentRequestsScreen() {
     }
   };
 
-  const navigation = useNavigation();
-    const [selectedDelivery, setSelectedDelivery] = useState(null);
-  const renderDeliveryCard = ({ item }) => (
+  const renderDeliveryCard = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.9}
@@ -59,45 +56,43 @@ export default function CoordinatorPaymentRequestsScreen() {
     </TouchableOpacity>
   );
 
+  if (selectedDelivery) {
+    return (
+      <>
+        <TouchableOpacity onPress={() => setSelectedDelivery(null)} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={20} color={Colors.activeMenuText} />
+          <Text style={styles.backButtonText}>Volver a la lista</Text>
+        </TouchableOpacity>
+        <DeliveryPaymentSummaryScreen delivery={selectedDelivery} />
+      </>
+    );
+  }
+
+  if (loading && deliveries.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.activeMenuText} />
+        <Text style={styles.loadingText}>Cargando domiciliarios...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {selectedDelivery ? (
-        <>
-          <TouchableOpacity onPress={() => setSelectedDelivery(null)} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={20} color={Colors.activeMenuText} />
-            <Text style={styles.backButtonText}>Volver a la lista</Text>
-          </TouchableOpacity>
-          <DeliveryPaymentSummaryScreen delivery={selectedDelivery} />
-        </>
-      ) : (
-        <>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Domiciliarios</Text>
-            <Text style={styles.headerSubtitle}>Total: {deliveries.length}</Text>
+      <FlatList
+        data={deliveries}
+        renderItem={renderDeliveryCard}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadDeliveries(); }} />}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="checkmark-circle-outline" size={48} color={Colors.success} />
+            <Text style={styles.emptyStateTitle}>No hay domiciliarios</Text>
+            <Text style={styles.emptyStateText}>Aún no tienes domiciliarios registrados.</Text>
           </View>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.activeMenuText} />
-              <Text style={styles.loadingText}>Cargando domiciliarios...</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={deliveries}
-              renderItem={renderDeliveryCard}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContent}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadDeliveries(); }} />}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Ionicons name="checkmark-circle-outline" size={48} color={Colors.success} />
-                  <Text style={styles.emptyStateTitle}>No hay domiciliarios</Text>
-                  <Text style={styles.emptyStateText}>Aún no tienes domiciliarios registrados.</Text>
-                </View>
-              }
-            />
-          )}
-        </>
-      )}
+        }
+      />
     </View>
   );
 }
@@ -106,23 +101,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.Background,
-  },
-  header: {
-    backgroundColor: Colors.gradientStart,
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    paddingTop: 30,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: Colors.Background,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: Colors.Background,
-    marginTop: 4,
-    opacity: 0.8,
   },
   listContent: {
     paddingHorizontal: 16,

@@ -74,7 +74,7 @@ export default function StoreOrderCard({ pedido, onPress, showCreatedAt = false 
             {pedido.zoneId && (
               <View style={styles.zoneBadge}>
                 <Ionicons name="map-outline" size={12} color={Colors.menuText} />
-                <Text style={styles.zoneText}>{pedido.zoneId}</Text>
+                <Text style={styles.zoneText}>{pedido.zoneName || pedido.zoneId}</Text>
               </View>
             )}
 

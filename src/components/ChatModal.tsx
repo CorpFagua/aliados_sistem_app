@@ -10,6 +10,8 @@ import {
   Platform,
   Dimensions,
   Image,
+  KeyboardAvoidingView,
+  StatusBar,
 } from "react-native";
 import Animated, { FadeInRight, FadeInLeft } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,7 +30,6 @@ export default function ChatModal({
 }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -69,18 +70,38 @@ export default function ChatModal({
 
   const handleSend = async () => {
     if (!text.trim()) return;
-    setLoading(true);
+    
+    const messageText = text;
+    setText(""); // Limpiar input inmediatamente
+    
+    // Crear mensaje optimista
+    const optimisticMsg = {
+      id: Date.now().toString(),
+      message: messageText,
+      sender_id: userId,
+      sender_role: "user",
+      created_at: new Date().toISOString(),
+      sending: true, // Flag para indicar que se está enviando
+    };
+
+    // Agregar inmediatamente a la lista (visual)
+    const updatedMessages = [...messages, optimisticMsg];
+    setMessages(updatedMessages);
+    listRef.current?.scrollToEnd({ animated: true });
+
+    // Enviar en background
     try {
-      const newMsg = await sendMessage(serviceId, text, token);
-      const updated = [...messages, newMsg];
-      setMessages(updated);
-      await saveChatMessages(serviceId, updated);
-      setText("");
-      listRef.current?.scrollToEnd({ animated: true });
+      const newMsg = await sendMessage(serviceId, messageText, token);
+      // Reemplazar el mensaje optimista por el real
+      const finalMessages = updatedMessages.map((m) =>
+        m.id === optimisticMsg.id ? newMsg : m
+      );
+      setMessages(finalMessages);
+      await saveChatMessages(serviceId, finalMessages);
     } catch (err) {
       console.error("Error enviando mensaje:", err);
-    } finally {
-      setLoading(false);
+      // Opcionalmente: marcar el mensaje como error o removarlo
+      setMessages(updatedMessages.filter((m) => m.id !== optimisticMsg.id));
     }
   };
 
@@ -137,6 +158,10 @@ export default function ChatModal({
                 {item.sender_role?.toUpperCase()}
               </Text>
             )}
+            {/* Indicador de enviando */}
+            {item.sending && (
+              <Ionicons name="time-outline" size={11} color="#8E8E93" />
+            )}
             <Text style={styles.timeText}>
               {new Date(item.created_at).toLocaleTimeString([], {
                 hour: "2-digit",
@@ -151,68 +176,88 @@ export default function ChatModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.overlay}>
-        <View
-          style={[
-            styles.container,
-            Platform.OS === "web" ? styles.modalWeb : styles.modalMobile,
-          ]}
+      <View style={styles.fullOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "position" : "height"}
+          style={styles.keyboardView}
+          enabled={Platform.OS !== "web"}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Chat del pedido</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={22} color={Colors.normalText} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Lista de mensajes */}
-          <FlatList
-            ref={listRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMessage}
-            onContentSizeChange={() =>
-              listRef.current?.scrollToEnd({ animated: true })
-            }
-          />
-
-          {/* Input */}
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.input}
-              placeholder="Escribe un mensaje..."
-              placeholderTextColor="#aaa"
-              value={text}
-              onChangeText={setText}
-            />
-            <TouchableOpacity
-              style={styles.sendBtn}
-              onPress={handleSend}
-              disabled={loading}
+          <View style={styles.overlay}>
+            <View style={{ flex: 1 }} pointerEvents="none" />
+            <View
+              style={[
+                styles.container,
+                Platform.OS === "web" ? styles.modalWeb : styles.modalMobile,
+              ]}
             >
-              <Ionicons name="send" size={18} color="#fff" />
-            </TouchableOpacity>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.title}>Chat del pedido</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={22} color={Colors.normalText} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Lista de mensajes */}
+            <FlatList
+              ref={listRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              renderItem={renderMessage}
+              onContentSizeChange={() =>
+                listRef.current?.scrollToEnd({ animated: true })
+              }
+              keyboardShouldPersistTaps="handled"
+            />
+
+            {/* Input */}
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                placeholder="Escribe un mensaje..."
+                placeholderTextColor="#aaa"
+                value={text}
+                onChangeText={setText}
+              />
+              <TouchableOpacity
+                style={styles.sendBtn}
+                onPress={handleSend}
+                disabled={!text.trim()}
+              >
+                <Ionicons name="send" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
+  fullOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end",
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: "transparent",
+    flexDirection: "column",
+    pointerEvents: "box-none",
   },
   container: {
+    flex: 1,
     backgroundColor: Colors.activeMenuBackground,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
     borderColor: Colors.Border,
     overflow: "hidden",
+    flexDirection: "column",
   },
   modalWeb: {
     width: 450,
@@ -223,16 +268,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   modalMobile: {
-    height: screenHeight * 0.9,
+    height: screenHeight * 0.65,
     paddingBottom: 20,
+    pointerEvents: "auto",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 14,
+    paddingLeft: 14,
+    paddingRight: 14,
+    paddingBottom: 14,
+    paddingTop: 14,
     borderBottomWidth: 1,
     borderColor: Colors.Border,
+    zIndex: 10,
   },
   title: {
     color: Colors.normalText,

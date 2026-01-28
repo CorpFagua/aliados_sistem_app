@@ -120,9 +120,6 @@ export default function StoresScreen() {
                 <Text style={styles.cardSubtitle}>
                   Tipo: {item.type === "credito" ? "Crédito" : "Efectivo"}
                 </Text>
-                <Text style={styles.cardSubtitle}>
-                  Admin: {item.profiles?.[0]?.name || "No asignado"}
-                </Text>
               </View>
 
               <TouchableOpacity

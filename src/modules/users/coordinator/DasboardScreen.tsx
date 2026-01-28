@@ -13,7 +13,7 @@ import NotificationsScreen from "./screens/NotificationsScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import AnalyticsScreen from "./screens/AnalyticsScreen";
 import HistorialScreen from "./screens/HistorialScreen";
-import PaymentRequestsScreen from "./screens/PaymentRequestsScreen";
+import PaymentsScreen from "./screens/PaymentsScreen";
 import StoreDebtScreen from "./screens/StoreDebtScreen";
 
 const mobileMenuItems = [
@@ -52,7 +52,7 @@ export default function DashboardScreen() {
       case "analytics":
         return <AnalyticsScreen />;
       case "payments":
-        return <PaymentRequestsScreen />;
+        return <PaymentsScreen />;
       case "debt":
         return <StoreDebtScreen />;
       case "historial":
