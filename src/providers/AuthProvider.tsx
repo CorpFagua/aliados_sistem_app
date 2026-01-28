@@ -15,6 +15,7 @@ import { usePushRegistration } from "@/hooks/usePushNotifications";
 import { unregisterPushToken } from "@/services/notifications";
 
 import { User, Role } from "@/models/user";
+import SessionLoadingOverlay from "@/components/SessionLoadingOverlay";
 
 type UserRole = Role;
 
@@ -77,46 +78,65 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
    * 🚀 Carga inicial:
    *  - Obtiene sesión si existe
    *  - Carga perfil del backend
-   *  - Redirige
+   *  - Redirige solo cuando todo está listo
    */
   useEffect(() => {
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+
     const initSession = async () => {
       try {
         const { data } = await getSession();
         const currentSession = data.session ?? null;
 
-        setSession(currentSession);
+        if (!isMounted) return;
 
         // Si hay usuario cargamos perfil
         if (currentSession?.user) {
           const token = currentSession.access_token;
 
           const profileData = await fetchCurrentUser(token);
-          setProfile(profileData);
+
+          if (!isMounted) return;
 
           const userRole = profileData.role ?? null;
           const active = profileData.isActive ?? false;
 
+          // Actualizar estado primero MIENTRAS LOADING SIGUE EN TRUE
+          setSession(currentSession);
+          setProfile(profileData);
           setRole(userRole);
           setIsActive(active);
 
           // ❌ Si el usuario está inactivo → forzar logout
           if (!active) {
+            setLoading(false);
             await logout();
-            router.replace("/(auth)/login");
             return;
           }
 
+          // Aquí loading sigue siendo true, el modal sigue visible
+          // Redirigir primero
           redirectByRole(userRole);
+          
+          // Luego de redirigir, apagamos el loading
+          timeoutId = setTimeout(() => {
+            if (isMounted) {
+              setLoading(false);
+            }
+          }, 300);
         } else {
+          if (!isMounted) return;
+          setSession(null);
+          setLoading(false);
           router.replace("/(auth)/login");
         }
 
       } catch (error: any) {
         console.error("Error cargando sesión:", error.message);
-        router.replace("/(auth)/login");
-      } finally {
+        if (!isMounted) return;
         setLoading(false);
+        router.replace("/(auth)/login");
       }
     };
 
@@ -128,6 +148,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
      *  - Actualiza perfil y estado
      */
     const { data: subscription } = onAuthStateChange(async (newSession) => {
+      if (!isMounted) return;
+
       setSession(newSession);
 
       if (newSession?.user) {
@@ -135,23 +157,26 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           const token = newSession.access_token;
           const profileData = await fetchCurrentUser(token);
 
+          if (!isMounted) return;
+
           setProfile(profileData);
           setRole(profileData.role);
           setIsActive(profileData.isActive);
 
           if (!profileData.isActive) {
             await logout();
-            router.replace("/(auth)/login");
             return;
           }
 
           redirectByRole(profileData.role);
         } catch (err: any) {
           console.error("Error actualizando sesión:", err.message);
+          if (!isMounted) return;
           router.replace("/(auth)/login");
         }
 
       } else {
+        if (!isMounted) return;
         setRole(null);
         setProfile(null);
         setIsActive(false);
@@ -159,7 +184,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       }
     });
 
-    return () => subscription?.subscription?.unsubscribe();
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+      subscription?.subscription?.unsubscribe();
+    };
 
   }, []);
 
@@ -270,6 +299,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         isActive,
       }}
     >
+      <SessionLoadingOverlay visible={loading} />
       {children}
     </AuthContext.Provider>
   );
