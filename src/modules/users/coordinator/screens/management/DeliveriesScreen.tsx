@@ -18,7 +18,6 @@ import {
   deleteUser,
   updateUser,
   createUser,
-  updateUserVIP,
 } from "@/services/users";
 import { User } from "@/models/user";
 import DeliveryFormModal from "../../components/DeliveryFormModal";
@@ -111,34 +110,19 @@ export default function DeliveriesScreen() {
     }
   };
 
-  const handleToggleVIP = async (user: User) => {
-    try {
-      console.log("⭐ Actualizando VIP para:", user.name, "Nuevo valor:", !user.isVIP);
-      const updated = await updateUserVIP(user.id, !user.isVIP, token);
-      setDeliveries((prev) =>
-        prev.map((u) => (u.id === user.id ? updated : u))
-      );
-      Toast.show({
-        type: "success",
-        text1: "Estado VIP actualizado",
-        text2: `${user.name} ${updated.isVIP ? "es ahora VIP ⭐" : "ya no es VIP"}`,
-        position: "top",
-      });
-    } catch (err) {
-      console.error("❌ Error actualizando VIP:", err);
-      Toast.show({
-        type: "error",
-        text1: "Error al actualizar VIP",
-        text2: "No se pudo cambiar el estado VIP del domiciliario.",
-        position: "top",
-      });
-    }
-  };
-
   const handleSave = async (values: any) => {
     try {
       if (editingUser) {
-        await updateUser(editingUser.id, values, token);
+        // Filtrar solo los campos que se pueden actualizar en la tabla profiles
+        const updatePayload = {
+          name: values.name,
+          phone: values.phone,
+          address: values.address,
+          is_VIP: values.is_VIP,
+        };
+        console.log("[DeliveriesScreen] UPDATE PAYLOAD construido:", JSON.stringify(updatePayload, null, 2));
+        console.log("[DeliveriesScreen] is_VIP type:", typeof values.is_VIP, "value:", values.is_VIP);
+        await updateUser(editingUser.id, updatePayload, token);
         Toast.show({
           type: "success",
           text1: "Domiciliario actualizado",
@@ -146,15 +130,16 @@ export default function DeliveriesScreen() {
           position: "top",
         });
       } else {
-        await createUser(
-          {
-            ...values,
-            role: "delivery",
-            branch_id: profile?.branchId,
-            isActive: true,
-          },
-          token
-        );
+        console.log("[DeliveriesScreen] CREATING - Values del modal:", JSON.stringify(values, null, 2));
+        console.log("[DeliveriesScreen] is_VIP en values:", typeof values.is_VIP, "=", values.is_VIP);
+        const createPayload = {
+          ...values,
+          role: "delivery",
+          branch_id: profile?.branchId,
+          isActive: true,
+        };
+        console.log("[DeliveriesScreen] CREATE PAYLOAD final:", JSON.stringify(createPayload, null, 2));
+        await createUser(createPayload, token);
         Toast.show({
           type: "success",
           text1: "Domiciliario creado",
@@ -253,13 +238,6 @@ export default function DeliveriesScreen() {
 
               {/* Actions Row */}
               <View style={styles.actions}>
-                <TouchableOpacity
-                  onPress={() => handleToggleVIP(item)}
-                  style={[styles.actionBtn, { backgroundColor: item.isVIP ? "#ffc107" : "#9e9e9e" }]}
-                >
-                  <Ionicons name="star" size={16} color="#fff" />
-                </TouchableOpacity>
-
                 <TouchableOpacity
                   onPress={() => handleToggleActive(item)}
                   style={[styles.actionBtn, { backgroundColor: "#ff9800" }]}

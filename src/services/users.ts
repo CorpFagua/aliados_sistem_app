@@ -9,13 +9,24 @@ import {
 // ✅ Crear usuario
 export async function createUser(payload: UserPayload, token: string): Promise<User> {
   try {
+    console.log("[FRONTEND CREATE USER] ===== INICIO =====");
+    console.log("[FRONTEND CREATE USER] Payload keys:", Object.keys(payload));
+    console.log("[FRONTEND CREATE USER] Payload completo:", JSON.stringify(payload, null, 2));
+    console.log("[FRONTEND CREATE USER] is_VIP:", typeof payload.is_VIP, "=", payload.is_VIP);
+
     const res = await api.post<{ ok: boolean; data: UserResponse }>("/users", payload, {
       headers: authHeaders(token),
     });
+    
+    console.log("[FRONTEND CREATE USER] Response status:", res.status);
+    console.log("[FRONTEND CREATE USER] Response is_VIP:", res.data.data.is_VIP);
+    
     if (!res.data.ok) throw res.data;
-    return toUser(res.data.data);
+    const mapped = toUser(res.data.data);
+    console.log("[FRONTEND CREATE USER] Mapped user isVIP:", mapped.isVIP);
+    return mapped;
   } catch (err: any) {
-    console.error("❌ Error creando usuario:", err.response?.data || err.message);
+    console.error("[FRONTEND CREATE USER] ❌ Error:", err.response?.data || err.message);
     throw err;
   }
 }
@@ -51,16 +62,35 @@ export async function fetchUserById(id: string, token: string): Promise<User> {
 // ✅ Actualizar usuario
 export async function updateUser(id: string, payload: Partial<UserPayload>, token: string): Promise<User> {
   try {
-    console.log("Updating user with payload:", payload);
+    console.log("[FRONTEND UPDATE USER] ===== INICIO =====");
+    console.log("[FRONTEND UPDATE USER] ID:", id);
+    console.log("[FRONTEND UPDATE USER] Payload tipo:", typeof payload);
+    console.log("[FRONTEND UPDATE USER] Payload keys:", Object.keys(payload));
+    console.log("[FRONTEND UPDATE USER] Payload completo:", JSON.stringify(payload, null, 2));
+    
+    // Verificar tipos de cada campo
+    Object.entries(payload).forEach(([key, value]) => {
+      console.log(`[FRONTEND UPDATE USER]   ${key}: ${typeof value} = ${JSON.stringify(value)}`);
+    });
+
     const res = await api.patch<{ ok: boolean; data: UserResponse }>(
       `/users/${id}`,
       payload,
       { headers: authHeaders(token) }
     );
+    
+    console.log("[FRONTEND UPDATE USER] Status:", res.status);
+    console.log("[FRONTEND UPDATE USER] Response ok:", res.data.ok);
+    console.log("[FRONTEND UPDATE USER] Response data keys:", Object.keys(res.data.data));
+    console.log("[FRONTEND UPDATE USER] Response is_VIP:", res.data.data.is_VIP);
+    console.log("[FRONTEND UPDATE USER] Respuesta del backend:", JSON.stringify(res.data.data, null, 2));
+    
     if (!res.data.ok) throw res.data;
-    return toUser(res.data.data);
+    const mapped = toUser(res.data.data);
+    console.log("[FRONTEND UPDATE USER] Mapped user isVIP:", mapped.isVIP);
+    return mapped;
   } catch (err: any) {
-    console.error("❌ Error actualizando usuario:", err.response?.data || err.message);
+    console.error("[FRONTEND UPDATE USER] ❌ Error:", err.response?.data || err.message);
     throw err;
   }
 }
@@ -75,23 +105,6 @@ export async function deleteUser(id: string, token: string): Promise<boolean> {
     return true;
   } catch (err: any) {
     console.error("❌ Error eliminando usuario:", err.response?.data || err.message);
-    throw err;
-  }
-}
-
-// ⭐ Actualizar estado VIP de un usuario
-export async function updateUserVIP(id: string, isVIP: boolean, token: string): Promise<User> {
-  try {
-    console.log(`⭐ Actualizando VIP para usuario ${id}:`, isVIP);
-    const res = await api.patch<{ ok: boolean; data: UserResponse }>(
-      `/users/${id}`,
-      { is_VIP: isVIP }, // Enviar en snake_case como espera el backend
-      { headers: authHeaders(token) }
-    );
-    if (!res.data.ok) throw res.data;
-    return toUser(res.data.data);
-  } catch (err: any) {
-    console.error("❌ Error actualizando VIP:", err.response?.data || err.message);
     throw err;
   }
 }
