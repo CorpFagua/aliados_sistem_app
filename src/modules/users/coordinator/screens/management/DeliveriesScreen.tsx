@@ -18,6 +18,7 @@ import {
   deleteUser,
   updateUser,
   createUser,
+  updateUserVIP,
 } from "@/services/users";
 import { User } from "@/models/user";
 import DeliveryFormModal from "../../components/DeliveryFormModal";
@@ -110,6 +111,30 @@ export default function DeliveriesScreen() {
     }
   };
 
+  const handleToggleVIP = async (user: User) => {
+    try {
+      console.log("⭐ Actualizando VIP para:", user.name, "Nuevo valor:", !user.isVIP);
+      const updated = await updateUserVIP(user.id, !user.isVIP, token);
+      setDeliveries((prev) =>
+        prev.map((u) => (u.id === user.id ? updated : u))
+      );
+      Toast.show({
+        type: "success",
+        text1: "Estado VIP actualizado",
+        text2: `${user.name} ${updated.isVIP ? "es ahora VIP ⭐" : "ya no es VIP"}`,
+        position: "top",
+      });
+    } catch (err) {
+      console.error("❌ Error actualizando VIP:", err);
+      Toast.show({
+        type: "error",
+        text1: "Error al actualizar VIP",
+        text2: "No se pudo cambiar el estado VIP del domiciliario.",
+        position: "top",
+      });
+    }
+  };
+
   const handleSave = async (values: any) => {
     try {
       if (editingUser) {
@@ -163,7 +188,7 @@ export default function DeliveriesScreen() {
         <FlatList
           data={deliveries}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingVertical: 12 }}
+          contentContainerStyle={{ paddingVertical: 16 }}
           renderItem={({ item }) => (
             <View style={[styles.card, item.isVIP && styles.cardVIP]}>
               {/* VIP Bar Left */}
@@ -182,7 +207,7 @@ export default function DeliveriesScreen() {
                 <View style={[styles.avatar, item.isVIP && styles.avatarVIP]}>
                   <Ionicons 
                     name="person-circle" 
-                    size={40} 
+                    size={44} 
                     color={item.isVIP ? "#ffc107" : Colors.normalText} 
                   />
                 </View>
@@ -204,7 +229,7 @@ export default function DeliveriesScreen() {
                 <View style={styles.status}>
                   <Ionicons 
                     name={item.isActive ? "checkmark-circle" : "close-circle"} 
-                    size={13} 
+                    size={15} 
                     color={item.isActive ? "#4caf50" : "#f44336"} 
                   />
                   <Text style={[styles.statusText, { color: item.isActive ? "#4caf50" : "#f44336" }]}>
@@ -213,18 +238,33 @@ export default function DeliveriesScreen() {
                 </View>
 
                 <View style={styles.phone}>
-                  <Ionicons name="call" size={11} color={Colors.menuText} />
+                  <Ionicons name="call" size={13} color={Colors.menuText} />
                   <Text style={styles.phoneText}>{item.phone || "Sin tel"}</Text>
                 </View>
               </View>
 
+              {/* Email */}
+              {item.email && (
+                <View style={styles.emailLine}>
+                  <Ionicons name="mail" size={13} color={Colors.menuText} />
+                  <Text style={styles.emailText} numberOfLines={1}>{item.email}</Text>
+                </View>
+              )}
+
               {/* Actions Row */}
               <View style={styles.actions}>
+                <TouchableOpacity
+                  onPress={() => handleToggleVIP(item)}
+                  style={[styles.actionBtn, { backgroundColor: item.isVIP ? "#ffc107" : "#9e9e9e" }]}
+                >
+                  <Ionicons name="star" size={16} color="#fff" />
+                </TouchableOpacity>
+
                 <TouchableOpacity
                   onPress={() => handleToggleActive(item)}
                   style={[styles.actionBtn, { backgroundColor: "#ff9800" }]}
                 >
-                  <Ionicons name={item.isActive ? "pause" : "play"} size={14} color="#fff" />
+                  <Ionicons name={item.isActive ? "pause" : "play"} size={16} color="#fff" />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -234,14 +274,14 @@ export default function DeliveriesScreen() {
                   }}
                   style={[styles.actionBtn, { backgroundColor: "#2196f3" }]}
                 >
-                  <Ionicons name="pencil" size={14} color="#fff" />
+                  <Ionicons name="pencil" size={16} color="#fff" />
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => handleDelete(item)}
                   style={[styles.actionBtn, { backgroundColor: "#f44336" }]}
                 >
-                  <Ionicons name="trash" size={14} color="#fff" />
+                  <Ionicons name="trash" size={16} color="#fff" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -258,7 +298,7 @@ export default function DeliveriesScreen() {
         }}
         activeOpacity={0.8}
       >
-        <Ionicons name="add" size={28} color="#000" />
+        <Ionicons name="add" size={32} color="#000" />
       </TouchableOpacity>
 
       {/* Modal para crear/editar */}
@@ -279,27 +319,32 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     backgroundColor: Colors.Background, 
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
+    maxWidth: 900,
+    alignSelf: "center",
+    width: "100%",
   },
   title: { 
-    fontSize: 24, 
+    fontSize: 28, 
     fontWeight: "800", 
     color: Colors.normalText, 
-    marginBottom: 4,
-    marginTop: 12,
+    marginBottom: 6,
+    marginTop: 16,
+    letterSpacing: 0.3,
   },
   subtitle: { 
-    fontSize: 13, 
+    fontSize: 15, 
     color: Colors.menuText, 
-    marginBottom: 12,
+    marginBottom: 16,
+    letterSpacing: 0.2,
   },
   card: {
-    marginVertical: 6,
+    marginVertical: 8,
     marginHorizontal: 0,
-    paddingHorizontal: 11,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     backgroundColor: Colors.activeMenuBackground,
-    borderRadius: 11,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.Border,
     shadowColor: "#000",
@@ -350,15 +395,15 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 7,
+    marginBottom: 8,
   },
   avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
+    marginRight: 12,
     backgroundColor: "transparent",
   },
   avatarVIP: {
@@ -372,10 +417,10 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 6,
   },
   name: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "700",
     color: Colors.normalText,
     flex: 1,
@@ -393,48 +438,64 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 7,
-    paddingLeft: 48,
+    paddingLeft: 54,
   },
   status: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
+    gap: 4,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "600",
+    letterSpacing: 0.2,
   },
   phone: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
+    gap: 4,
   },
   phoneText: {
-    fontSize: 11,
+    fontSize: 13,
     color: Colors.menuText,
     fontWeight: "500",
   },
+  emailLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 10,
+    paddingLeft: 54,
+    paddingRight: 12,
+  },
+  emailText: {
+    fontSize: 12,
+    color: Colors.menuText,
+    fontWeight: "400",
+    flex: 1,
+  },
   actions: {
     flexDirection: "row",
-    gap: 7,
+    gap: 9,
     justifyContent: "flex-end",
-    paddingLeft: 48,
+    paddingLeft: 54,
+    paddingTop: 4,
   },
   actionBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 5,
+    width: 36,
+    height: 36,
+    borderRadius: 6,
     justifyContent: "center",
     alignItems: "center",
   },
   fab: {
     position: "absolute",
-    right: 20,
-    bottom: 20,
+    right: 24,
+    bottom: 24,
     backgroundColor: Colors.normalText,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",

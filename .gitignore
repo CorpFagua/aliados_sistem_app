@@ -33,12 +33,18 @@ yarn-error.*
 # local env files
 .env*.local
 
+# IMPORTANTE: Nunca commitear archivos .env
+.env
+.env.local
+.env.*.local
+
+# Variables sensibles (usar EAS Secrets en producción)
+# No incluir: .env.production con datos sensibles
+# Usar en su lugar: eas secret:create
+
 # typescript
 *.tsbuildinfo
 
 # construcciones
 android/
 ios/
-
-
-eas.json

@@ -2,9 +2,14 @@
 import { Platform } from "react-native"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { createClient } from "@supabase/supabase-js"
+import ENV from "@/config/environment"
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL 
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY 
+const supabaseUrl = ENV.SUPABASE_URL
+const supabaseAnonKey = ENV.SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('❌ Variables de Supabase no configuradas. Verifica .env y app.config.js')
+} 
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

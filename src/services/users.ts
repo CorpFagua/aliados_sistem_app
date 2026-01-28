@@ -79,6 +79,23 @@ export async function deleteUser(id: string, token: string): Promise<boolean> {
   }
 }
 
+// ⭐ Actualizar estado VIP de un usuario
+export async function updateUserVIP(id: string, isVIP: boolean, token: string): Promise<User> {
+  try {
+    console.log(`⭐ Actualizando VIP para usuario ${id}:`, isVIP);
+    const res = await api.patch<{ ok: boolean; data: UserResponse }>(
+      `/users/${id}`,
+      { is_VIP: isVIP }, // Enviar en snake_case como espera el backend
+      { headers: authHeaders(token) }
+    );
+    if (!res.data.ok) throw res.data;
+    return toUser(res.data.data);
+  } catch (err: any) {
+    console.error("❌ Error actualizando VIP:", err.response?.data || err.message);
+    throw err;
+  }
+}
+
 /* 🔹 NUEVOS MÉTODOS */
 
 /**
