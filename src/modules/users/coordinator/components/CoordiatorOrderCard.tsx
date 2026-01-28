@@ -88,7 +88,7 @@ export default function CoordinatorOrderCard({ pedido, onPress }: Props) {
             {/* Badge de mensajes no leídos */}
             {unreadCount > 0 && (
               <LinearGradient
-                colors={["#00D9FF", "#00B8A9"]}
+                colors={["#10B981", "#059669"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.unreadBadge}

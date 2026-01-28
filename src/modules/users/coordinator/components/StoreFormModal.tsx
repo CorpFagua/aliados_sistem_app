@@ -86,6 +86,7 @@ export default function StoreFormModal({
           type: "success",
           text1: "Tienda actualizada",
           text2: `"${updated.name}" fue actualizada correctamente.`,
+          position: "top",
         });
         onSave(updated);
       } else {
@@ -94,11 +95,12 @@ export default function StoreFormModal({
           type: "success",
           text1: "Tienda creada",
           text2: `"${created.name}" fue creada correctamente.`,
+          position: "top",
         });
         onSave(created);
       }
 
-      onClose();
+      setTimeout(() => onClose(), 300);
     } catch (err) {
       console.error("❌ Error guardando tienda:", err);
       Toast.show({

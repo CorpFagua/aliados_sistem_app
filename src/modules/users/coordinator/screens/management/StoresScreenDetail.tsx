@@ -59,30 +59,15 @@ export default function StoreDetailScreen({
     }
   };
 
-  const handleUpdateStore = async (values: {
-    name: string;
-    type: "credito" | "efectivo";
-    admin_id?: string;
-  }) => {
-    try {
-      if (!store) return;
-      const updated = await updateStore(store.id, values, token);
-      setStore(updated);
-      Toast.show({
-        type: "success",
-        text1: "Tienda actualizada",
-        text2: `"${updated.name}" se actualizó correctamente.`,
-        position: "top",
-      });
-    } catch (err) {
-      console.error("❌ Error actualizando tienda:", err);
-      Toast.show({
-        type: "error",
-        text1: "Error al actualizar",
-        text2: "No se pudo actualizar la tienda.",
-        position: "top",
-      });
-    }
+  const handleUpdateStore = (updated: Store) => {
+    // El modal envía el Store actualizado directamente
+    setStore(updated);
+    Toast.show({
+      type: "success",
+      text1: "Tienda actualizada",
+      text2: `"${updated.name}" se actualizó correctamente.`,
+      position: "top",
+    });
   };
 
   if (loading) {
