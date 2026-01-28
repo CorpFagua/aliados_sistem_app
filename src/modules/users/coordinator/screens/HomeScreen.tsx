@@ -18,6 +18,7 @@ import CoordinatorOrderCard from "../components/CoordiatorOrderCard";
 import OrderDetailModal from "../components/OrderDetailModal";
 import { useAuth } from "@/providers/AuthProvider";
 import { useServices } from "@/providers/ServicesProvider";
+import { useUnreadMessagesContext } from "@/providers/UnreadMessagesProvider";
 import { Service } from "@/models/service";
 import { filterServicesByType } from "@/utils/serviceTypeUtils";
 import { fetchMyBranchConfig, updateMyBranchConfig, BranchConfig } from "@/services/branches";
@@ -33,6 +34,7 @@ export default function HomeScreen() {
 
   const { session } = useAuth();
   const { services, loading, refetch } = useServices();
+  const { registerServices } = useUnreadMessagesContext();
 
   const [activeTab, setActiveTab] = useState("Disponibles");
   const [activeServiceTypeFilter, setActiveServiceTypeFilter] = useState("Todos");
@@ -54,6 +56,16 @@ export default function HomeScreen() {
       "En ruta": services.filter((s) => s.status === "en_ruta"),
     };
   }, [services]);
+
+  // Registrar todos los servicios visibles (disponibles, asignados, en_ruta)
+  useEffect(() => {
+    const visibleIds = [
+      ...pedidos.Disponibles.map((s) => s.id),
+      ...pedidos.Tomados.map((s) => s.id),
+      ...pedidos["En ruta"].map((s) => s.id),
+    ];
+    registerServices(visibleIds);
+  }, [pedidos, registerServices]);
 
   // Cargar configuración de sucursal al montar (solo coordinador/super_admin)
   useEffect(() => {

@@ -10,6 +10,7 @@ import {
   getServiceTypeLabel,
   getServiceTypeIcon,
 } from "@/utils/serviceTypeUtils";
+import { useUnreadMessagesContextOptional } from "@/providers/UnreadMessagesProvider";
 
 interface Props {
   pedido: Service;
@@ -17,7 +18,11 @@ interface Props {
 }
 
 export default function CoordinatorOrderCard({ pedido, onPress }: Props) {
-  // 🕒 Calcular minutos desde creación
+  // � Obtener contador de mensajes no leídos
+  const unreadContext = useUnreadMessagesContextOptional();
+  const unreadCount = unreadContext?.getUnreadCount(pedido.id) || 0;
+
+  // �🕒 Calcular minutos desde creación
   const elapsedMinutes = useMemo(() => {
     const diffMs = Date.now() - new Date(pedido.createdAt).getTime();
     return Math.floor(diffMs / 60000);
@@ -79,11 +84,28 @@ export default function CoordinatorOrderCard({ pedido, onPress }: Props) {
             </View>
           </View>
 
-          <View style={[styles.timeBadge, { backgroundColor: getTimeColor() + "22" }]}>
-            <Ionicons name="time-outline" size={14} color={getTimeColor()} />
-            <Text style={[styles.timeText, { color: getTimeColor() }]}>
-              {elapsedMinutes} min
-            </Text>
+          <View style={styles.rightBadges}>
+            {/* Badge de mensajes no leídos */}
+            {unreadCount > 0 && (
+              <LinearGradient
+                colors={["#00D9FF", "#00B8A9"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.unreadBadge}
+              >
+                <Ionicons name="chatbubble" size={12} color="#FFFFFF" />
+                <Text style={styles.unreadText}>
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Text>
+              </LinearGradient>
+            )}
+            
+            <View style={[styles.timeBadge, { backgroundColor: getTimeColor() + "22" }]}>
+              <Ionicons name="time-outline" size={14} color={getTimeColor()} />
+              <Text style={[styles.timeText, { color: getTimeColor() }]}>
+                {elapsedMinutes} min
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -182,6 +204,24 @@ const styles = StyleSheet.create({
   serviceTypeText: {
     fontSize: 11,
     fontWeight: "600",
+  },
+  rightBadges: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  unreadBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    gap: 3,
+  },
+  unreadText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   timeBadge: {
     flexDirection: "row",

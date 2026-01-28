@@ -25,7 +25,7 @@ export function getServiceType(service: Service): "domicilio" | "paqueteria" | "
  */
 export function getServiceTypeColor(serviceType: "domicilio" | "paqueteria" | "desconocido"): string {
   const colors: Record<string, string> = {
-    domicilio: "#7C3AED",      // Púrpura vibrante
+    domicilio: "#10B981",      // Verde esmeralda brillante
     paqueteria: "#0EA5E9",     // Azul celeste
     desconocido: "#6B7280",    // Gris
   };

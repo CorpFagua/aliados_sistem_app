@@ -6,6 +6,7 @@ import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { updateServiceStatus } from "@/services/services";
 import { useServices } from "@/providers/ServicesProvider";
+import { useUnreadMessagesContext } from "@/providers/UnreadMessagesProvider";
 import OrderRow from "../components/OrderRow";
 
 const DELAY_FOR_NON_VIP = 10000; // 10 segundos en ms
@@ -13,8 +14,17 @@ const DELAY_FOR_NON_VIP = 10000; // 10 segundos en ms
 export default function DisponiblesScreen() {
   const { session } = useAuth();
   const { services, loading, refetch, initialOrderIds, visibleNewOrderIds, orderTimestamps, isUserVIP } = useServices();
+  const { registerServices } = useUnreadMessagesContext();
   const [refreshing, setRefreshing] = useState(false);
   const refetchedServiceIds = useRef<Set<string>>(new Set()); // Evitar refetch múltiple por mismo servicio
+
+  // Registrar servicios disponibles para tracking de mensajes
+  useEffect(() => {
+    const disponiblesIds = services
+      .filter((s) => s.status === "disponible")
+      .map((s) => s.id);
+    registerServices(disponiblesIds);
+  }, [services, registerServices]);
 
   // ⏱️ Contador regresivo: actualizar cada 1s solo para verificar si pasó el delay
   useEffect(() => {

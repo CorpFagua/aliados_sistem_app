@@ -5,8 +5,10 @@
 
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Colors } from "../constans/colors";
 import { ServiceHistorySummary } from "../hooks/useServiceHistory";
+import { useUnreadMessagesContext } from "../providers/UnreadMessagesProvider";
 
 interface CardServiceProps {
   service: ServiceHistorySummary;
@@ -76,6 +78,10 @@ export default function CardService({ service, onPress }: CardServiceProps) {
   const profileStoreName = service.profileStore?.name || "Sucursal";
   const deliveryName = service.delivery?.name || "Sin asignar";
 
+  // Obtener conteo de mensajes sin leer
+  const { getUnreadCount } = useUnreadMessagesContext();
+  const unreadCount = getUnreadCount(service.id);
+
   return (
     <View style={styles.cardWrapper}>
       <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
@@ -86,14 +92,28 @@ export default function CardService({ service, onPress }: CardServiceProps) {
             <Text style={styles.serviceId}>#{service.id.slice(-6)}</Text>
           </View>
 
-          <View style={styles.statusBadge}>
-            <View
-              style={[
-                styles.statusDot,
-                { backgroundColor: getStatusColor(service.status) },
-              ]}
-            />
-            <Text style={styles.statusLabel}>{getStatusLabel(service.status)}</Text>
+          <View style={styles.headerRight}>
+            {/* Badge de mensajes sin leer */}
+            {unreadCount > 0 && (
+              <LinearGradient
+                colors={["#00D9FF", "#00B8A9"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.unreadBadge}
+              >
+                <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+              </LinearGradient>
+            )}
+
+            <View style={styles.statusBadge}>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: getStatusColor(service.status) },
+                ]}
+              />
+              <Text style={styles.statusLabel}>{getStatusLabel(service.status)}</Text>
+            </View>
           </View>
         </View>
 
@@ -157,6 +177,27 @@ const styles = StyleSheet.create({
 
   titleSection: {
     flex: 1,
+  },
+
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  unreadBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+
+  unreadBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
 
   storeName: {
