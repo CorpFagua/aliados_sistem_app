@@ -28,6 +28,8 @@ type AuthContextType = {
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isActive: boolean;
+  hasReachedLowDemandLimit: boolean;
+  setHasReachedLowDemandLimit: (value: boolean) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -39,6 +41,8 @@ const AuthContext = createContext<AuthContextType>({
   register: async () => {},
   logout: async () => {},
   isActive: false,
+  hasReachedLowDemandLimit: false,
+  setHasReachedLowDemandLimit: () => {},
 });
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -47,6 +51,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [role, setRole] = useState<UserRole>(null);
   const [isActive, setIsActive] = useState(false);
   const [profile, setProfile] = useState<User | null>(null);
+  const [hasReachedLowDemandLimit, setHasReachedLowDemandLimit] = useState(false);
 
   /**
    * 🔀 Redirige según el rol del usuario
@@ -297,6 +302,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         register,
         logout,
         isActive,
+        hasReachedLowDemandLimit,
+        setHasReachedLowDemandLimit,
       }}
     >
       <SessionLoadingOverlay visible={loading} />
