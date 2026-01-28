@@ -31,6 +31,12 @@
     "scheme": "aliados_sistem_app",
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "63881507-c862-49b7-aa39-ca74fad214b5"
+      }
+    }
   }
 }
