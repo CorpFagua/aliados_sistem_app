@@ -10,7 +10,8 @@ export async function signUp(email: string, password: string) {
 }
 
 export async function signOut() {
-  return supabase.auth.signOut()
+  // Usar scope 'local' para permitir múltiples sesiones en diferentes dispositivos
+  return supabase.auth.signOut({ scope: 'local' })
 }
 
 export async function getSession() {

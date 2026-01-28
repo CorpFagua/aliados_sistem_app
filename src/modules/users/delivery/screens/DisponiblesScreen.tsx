@@ -140,7 +140,7 @@ export default function DisponiblesScreen() {
         });
         
         const segundos = Math.ceil(tiempoMinimo / 1000);
-        const mensaje = `No eres VIP, en ${segundos}s podrás verlo`;
+        const mensaje = `Cargando... ${segundos}s restantes`;
         
         ToastAndroid.show(mensaje, ToastAndroid.LONG);
       }

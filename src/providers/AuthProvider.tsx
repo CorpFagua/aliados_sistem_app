@@ -12,7 +12,7 @@ import {
 
 import { fetchCurrentUser } from "@/services/profile";
 import { usePushRegistration } from "@/hooks/usePushNotifications";
-import { unregisterAllPushTokens } from "@/services/notifications";
+import { unregisterPushToken } from "@/services/notifications";
 
 import { User, Role } from "@/models/user";
 
@@ -167,7 +167,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
    * 🔔 Registrar notificaciones push
    *    → Se ejecuta SOLO cuando `session.user` cambia
    */
-  usePushRegistration(session);
+  const pushNotifications = usePushRegistration(session);
 
   /**
    * 🧩 Login
@@ -213,27 +213,35 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     
     // Guardar el access_token antes de limpiarlo
     const currentAccessToken = session?.access_token;
+    const currentDeviceToken = pushNotifications.getToken();
     
     try {
-      // Eliminar todos los tokens de notificaciones antes de cerrar sesión
-      if (currentAccessToken) {
-        console.log(`📲 [AUTH] Eliminando tokens de notificaciones...`);
+      // Eliminar solo el token del dispositivo actual (no todos)
+      if (currentAccessToken && currentDeviceToken) {
+        console.log(`📲 [AUTH] Eliminando token de notificaciones del dispositivo actual...`);
         console.log(`🔑 [AUTH] Access Token disponible: ${currentAccessToken.substring(0, 20)}...`);
+        console.log(`📱 [AUTH] Device Token: ${currentDeviceToken.substring(0, 30)}...`);
         try {
-          await unregisterAllPushTokens(currentAccessToken);
-          console.log(`✅ [AUTH] Tokens de notificaciones eliminados`);
+          await unregisterPushToken(currentDeviceToken, currentAccessToken);
+          console.log(`✅ [AUTH] Token del dispositivo actual eliminado`);
+          pushNotifications.clearToken();
         } catch (notifErr: any) {
-          console.warn(`⚠️  [AUTH] No se pudieron eliminar tokens (continuando con logout):`, notifErr.message);
-          // Continuar con el logout aunque falle la eliminación de tokens
+          console.warn(`⚠️  [AUTH] No se pudo eliminar el token (continuando con logout):`, notifErr.message);
+          // Continuar con el logout aunque falle la eliminación del token
         }
       } else {
-        console.warn(`⚠️  [AUTH] No hay access_token disponible para eliminar notificaciones`);
+        if (!currentAccessToken) {
+          console.warn(`⚠️  [AUTH] No hay access_token disponible`);
+        }
+        if (!currentDeviceToken) {
+          console.warn(`⚠️  [AUTH] No hay device token disponible (notificaciones no configuradas)`);
+        }
       }
     } catch (err) {
-      console.error(`❌ [AUTH] Error inesperado eliminando tokens de notificaciones:`, err);
+      console.error(`❌ [AUTH] Error inesperado eliminando token de notificaciones:`, err);
     }
 
-    console.log(`🔑 [AUTH] Cerrando sesión en Supabase...`);
+    console.log(`🔑 [AUTH] Cerrando sesión en Supabase (scope: local)...`);
     const { error } = await signOut();
     if (error) {
       console.error(`❌ [AUTH] Error en signOut:`, error);

@@ -17,6 +17,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false, // ya no usamos magic link
+    // Cada instancia de la app tendrá su propia clave de sesión
+    // Esto permite múltiples sesiones independientes en diferentes dispositivos
+    storageKey: 'supabase.auth.token',
   },
 
   realtime: {
