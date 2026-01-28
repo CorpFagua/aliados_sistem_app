@@ -19,9 +19,7 @@ interface FormInputFieldProps {
   fieldKey: string;
   multiline?: boolean;
   rightNode?: React.ReactNode;
-  focusedField: string | null;
-  onFocus: (fieldKey: string) => void;
-  onBlur: () => void;
+  // removed focusedField/onFocus/onBlur to avoid cross-input re-renders
 }
 
 export const FormInputField: React.FC<FormInputFieldProps> = ({
@@ -34,18 +32,11 @@ export const FormInputField: React.FC<FormInputFieldProps> = ({
   fieldKey,
   multiline = false,
   rightNode,
-  focusedField,
-  onFocus,
-  onBlur,
+  // no focus props
 }) => (
   <>
     {label && <Text style={styles.label}>{label}</Text>}
-    <View
-      style={[
-        styles.inputIcon,
-        focusedField === fieldKey && styles.inputIconFocused,
-      ]}
-    >
+    <View style={styles.inputIcon}>
       <Ionicons name={iconName} size={18} color={Colors.menuText} />
 
       <TextInput
@@ -55,9 +46,7 @@ export const FormInputField: React.FC<FormInputFieldProps> = ({
         keyboardType={keyboardType}
         value={value}
         onChangeText={onChange}
-        onFocus={() => onFocus(fieldKey)}
-        onBlur={onBlur}
-        selectionColor="transparent"
+        // let native selection and focus behave normally
         multiline={multiline}
       />
 

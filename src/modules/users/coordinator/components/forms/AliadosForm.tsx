@@ -27,11 +27,6 @@ interface AliadosFormProps {
   amount: string;
   onPaymentChange: (method: string) => void;
   onAmountChange: (amount: string) => void;
-
-  // Estado de foco
-  focusedField: string | null;
-  onFocus: (fieldKey: string) => void;
-  onBlur: () => void;
 }
 
 export const AliadosForm: React.FC<AliadosFormProps> = ({
@@ -53,9 +48,6 @@ export const AliadosForm: React.FC<AliadosFormProps> = ({
   amount,
   onPaymentChange,
   onAmountChange,
-  focusedField,
-  onFocus,
-  onBlur,
 }) => {
   return (
     <View>
@@ -66,9 +58,6 @@ export const AliadosForm: React.FC<AliadosFormProps> = ({
         value={pickupAddress}
         onChange={onPickupAddressChange}
         fieldKey="pickupAddress"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -78,9 +67,6 @@ export const AliadosForm: React.FC<AliadosFormProps> = ({
         value={destination}
         onChange={onDestinationChange}
         fieldKey="destinationAliado"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -90,9 +76,6 @@ export const AliadosForm: React.FC<AliadosFormProps> = ({
         value={phone}
         onChange={onPhoneChange}
         fieldKey="clientPhoneAliado"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -102,9 +85,6 @@ export const AliadosForm: React.FC<AliadosFormProps> = ({
         value={clientName}
         onChange={onClientNameChange}
         fieldKey="clientNameAliado"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -115,9 +95,6 @@ export const AliadosForm: React.FC<AliadosFormProps> = ({
         onChange={onNotesChange}
         fieldKey="notes"
         multiline
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <PaymentSection
@@ -125,9 +102,6 @@ export const AliadosForm: React.FC<AliadosFormProps> = ({
         onPaymentChange={onPaymentChange}
         amount={amount}
         onAmountChange={onAmountChange}
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -138,9 +112,6 @@ export const AliadosForm: React.FC<AliadosFormProps> = ({
         value={aliadosPrice}
         onChange={onAliadosPriceChange}
         fieldKey="aliadosPrice"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -151,9 +122,6 @@ export const AliadosForm: React.FC<AliadosFormProps> = ({
         value={aliadosPriceDeliverySrv}
         onChange={onAliadosPriceDeliverySrvChange}
         fieldKey="aliadosPriceDeliverySrv"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
     </View>
   );

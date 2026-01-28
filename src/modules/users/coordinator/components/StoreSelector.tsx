@@ -18,9 +18,6 @@ interface StoreSelectorProps {
   onSearch: (query: string) => void;
   onSelectStore: (store: { id: string; name: string }) => void;
   onClearStore: () => void;
-  focusedField: string | null;
-  onFocus: (fieldKey: string) => void;
-  onBlur: () => void;
 }
 
 export const StoreSelector: React.FC<StoreSelectorProps> = ({
@@ -31,9 +28,6 @@ export const StoreSelector: React.FC<StoreSelectorProps> = ({
   onSearch,
   onSelectStore,
   onClearStore,
-  focusedField,
-  onFocus,
-  onBlur,
 }) => {
   return (
     <>
@@ -58,9 +52,7 @@ export const StoreSelector: React.FC<StoreSelectorProps> = ({
             </TouchableOpacity>
           ) : null
         }
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
+        // focus handled locally by TextInput
       />
 
       {/* LISTA DE RESULTADOS */}

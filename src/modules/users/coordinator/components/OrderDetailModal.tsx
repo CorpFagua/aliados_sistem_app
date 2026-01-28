@@ -314,44 +314,38 @@ export default function OrderDetailModal({
 
           {/* FOOTER */}
           <View style={styles.footer}>
-            <Text style={styles.price}>${pedido.amount.toLocaleString()}</Text>
-            <View style={styles.actionRow}>
-              {renderActionButton()}
-              {renderTransferButton()} {/* 🟢 Mostrar botón de transferencia */}
-
-              {/* 🔴 BOTÓN CANCELAR SERVICIO - Coordinator siempre puede (excepto entregado, pago, cancelado) */}
-              {pedido.status !== "entregado" && pedido.status !== "pago" && pedido.status !== "cancelado" && (
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: "#FF3B30" }]}
-                  onPress={() => setShowCancelModal(true)}
-                >
-                  <Ionicons name="close-circle-outline" size={18} color="#fff" />
-                  <Text style={[styles.actionText, { color: "#fff" }]}>Cancelar</Text>
-                </TouchableOpacity>
-              )}
-
-              {/* 🟢 BOTÓN CHAT */}
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "#FFD54F" }]}
-                onPress={() => setShowChatModal(true)}
+            <View style={styles.footerContent}>
+              <Text style={styles.price}>${pedido.amount.toLocaleString()}</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.actionRowScroll}
               >
-                <Ionicons name="chatbubbles-outline" size={18} color="#000" />
-                <Text style={styles.actionText}>Ver chat</Text>
-              </TouchableOpacity>
+                <View style={styles.actionRow}>
+                  {renderActionButton()}
+                  {renderTransferButton()}
 
-              {pedido.status === "disponible" && (
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: "#ff4444" }]}
-                  onPress={handleReject}
-                >
-                  <Ionicons
-                    name="close-circle-outline"
-                    size={18}
-                    color="#000"
-                  />
-                  <Text style={styles.actionText}>Rechazar</Text>
-                </TouchableOpacity>
-              )}
+                  {/* � BOTÓN CHAT */}
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: "#FFD54F" }]}
+                    onPress={() => setShowChatModal(true)}
+                  >
+                    <Ionicons name="chatbubbles-outline" size={18} color="#000" />
+                    <Text style={styles.actionText}>Ver chat</Text>
+                  </TouchableOpacity>
+
+                  {/* 🔴 BOTÓN CANCELAR SERVICIO - Coordinator siempre puede (excepto entregado, pago, cancelado) */}
+                  {pedido.status !== "entregado" && pedido.status !== "pago" && pedido.status !== "cancelado" && (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: "#FF3B30" }]}
+                      onPress={() => setShowCancelModal(true)}
+                    >
+                      <Ionicons name="close-circle-outline" size={18} color="#fff" />
+                      <Text style={[styles.actionText, { color: "#fff" }]}>Cancelar</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </ScrollView>
             </View>
           </View>
 
@@ -436,8 +430,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.activeMenuBackground,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: "80%",
-    padding: 20,
+    maxHeight: "85%",
+    padding: 16,
     borderWidth: 1,
     borderColor: Colors.Border,
   },
@@ -446,11 +440,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 14,
+    gap: 8,
   },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
   headerContent: { flex: 1, justifyContent: "center" },
-  modalTitle: { fontSize: 18, fontWeight: "700", color: Colors.normalText },
-  modalSubtitle: { fontSize: 12, color: Colors.menuText, marginTop: 2 },
+  modalTitle: { fontSize: 16, fontWeight: "700", color: Colors.normalText },
+  modalSubtitle: { fontSize: 11, color: Colors.menuText, marginTop: 2 },
   modalBody: { marginBottom: 16 },
   infoRow: {
     flexDirection: "row",
@@ -478,16 +473,24 @@ const styles = StyleSheet.create({
   },
   notesText: { color: Colors.normalText, fontSize: 14, flex: 1 },
   footer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     borderTopWidth: 1,
     borderColor: Colors.Border,
     paddingTop: 12,
     marginTop: 10,
   },
+  footerContent: {
+    flexDirection: "column",
+    gap: 12,
+  },
   price: { fontSize: 18, fontWeight: "700", color: Colors.gradientStart },
-  actionRow: { flexDirection: "row", gap: 10 },
+  actionRowScroll: {
+    flexGrow: 0,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingRight: 10,
+  },
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -495,6 +498,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 12,
+    minHeight: 40,
+    justifyContent: "center",
   },
   actionText: { color: "#000", fontWeight: "600", fontSize: 14 },
 });

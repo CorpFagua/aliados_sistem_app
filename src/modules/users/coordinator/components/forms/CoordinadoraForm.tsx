@@ -23,11 +23,6 @@ interface CoordinadoraFormProps {
   amount: string;
   onPaymentChange: (method: string) => void;
   onAmountChange: (amount: string) => void;
-
-  // Estado de foco
-  focusedField: string | null;
-  onFocus: (fieldKey: string) => void;
-  onBlur: () => void;
 }
 
 export const CoordinadoraForm: React.FC<CoordinadoraFormProps> = ({
@@ -45,9 +40,6 @@ export const CoordinadoraForm: React.FC<CoordinadoraFormProps> = ({
   amount,
   onPaymentChange,
   onAmountChange,
-  focusedField,
-  onFocus,
-  onBlur,
 }) => {
   return (
     <View>
@@ -58,9 +50,7 @@ export const CoordinadoraForm: React.FC<CoordinadoraFormProps> = ({
         value={guideId}
         onChange={onGuideIdChange}
         fieldKey="guideId"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
+        
       />
 
       <FormInputField
@@ -70,9 +60,6 @@ export const CoordinadoraForm: React.FC<CoordinadoraFormProps> = ({
         value={destination}
         onChange={onDestinationChange}
         fieldKey="destinationCoord"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -82,9 +69,6 @@ export const CoordinadoraForm: React.FC<CoordinadoraFormProps> = ({
         value={clientName}
         onChange={onClientNameChange}
         fieldKey="clientNameCoord"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -94,9 +78,6 @@ export const CoordinadoraForm: React.FC<CoordinadoraFormProps> = ({
         value={phone}
         onChange={onPhoneChange}
         fieldKey="clientPhoneCoord"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -107,9 +88,6 @@ export const CoordinadoraForm: React.FC<CoordinadoraFormProps> = ({
         onChange={onNotesChange}
         fieldKey="notes"
         multiline
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <PaymentSection
@@ -117,9 +95,6 @@ export const CoordinadoraForm: React.FC<CoordinadoraFormProps> = ({
         onPaymentChange={onPaymentChange}
         amount={amount}
         onAmountChange={onAmountChange}
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
     </View>
   );

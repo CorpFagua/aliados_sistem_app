@@ -32,7 +32,6 @@ export default function ServiceFormModal({
   editing = null,
 }: ServiceFormModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>("domicilios");
-  const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -240,9 +239,6 @@ export default function ServiceFormModal({
                   onStoreSelect={handleProfileStoreSelect}
                   onStoreClear={() => profileStoreSearch.setSelectedProfileStore(null)}
                   showStoreSelector={role === "coordinator" || role === "super_admin"}
-                  focusedField={focusedField}
-                  onFocus={(fieldKey) => setFocusedField(fieldKey)}
-                  onBlur={() => setFocusedField(null)}
                 />
               )}
 
@@ -267,9 +263,6 @@ export default function ServiceFormModal({
                   amount={formState.amount}
                   onPaymentChange={formState.setPayment}
                   onAmountChange={formState.setAmount}
-                  focusedField={focusedField}
-                  onFocus={(fieldKey) => setFocusedField(fieldKey)}
-                  onBlur={() => setFocusedField(null)}
                 />
               )}
 
@@ -290,9 +283,6 @@ export default function ServiceFormModal({
                   amount={formState.amount}
                   onPaymentChange={formState.setPayment}
                   onAmountChange={formState.setAmount}
-                  focusedField={focusedField}
-                  onFocus={(fieldKey) => setFocusedField(fieldKey)}
-                  onBlur={() => setFocusedField(null)}
                 />
               )}
             </ScrollView>
