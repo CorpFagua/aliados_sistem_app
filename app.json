@@ -23,7 +23,8 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.wolfagua.aliados_sistem_app",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "favicon": "./assets/favicon.png"
