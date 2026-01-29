@@ -1,6 +1,6 @@
 // src/modules/users/delivery/screens/EnRutaScreen.tsx
 import React, { useMemo, useState } from "react";
-import { StyleSheet, View, FlatList, Text, ActivityIndicator, RefreshControl } from "react-native";
+import { StyleSheet, View, FlatList, Text, ActivityIndicator, RefreshControl, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
@@ -49,13 +49,23 @@ export default function EnRutaScreen() {
           <Text style={styles.loadingText}>Cargando servicios...</Text>
         </View>
       ) : pedidos.length === 0 ? (
-        <View style={styles.emptyState}>
+        <ScrollView
+          contentContainerStyle={styles.emptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[Colors.activeMenuText, Colors.gradientEnd]}
+              progressBackgroundColor={Colors.activeMenuBackground}
+            />
+          }
+        >
           <Ionicons name="car-outline" size={48} color={Colors.normalText} style={styles.emptyStateIcon} />
           <Text style={styles.emptyStateTitle}>No hay servicios en ruta</Text>
           <Text style={styles.emptyStateText}>
             Una vez asignes una zona, aparecerán aquí
           </Text>
-        </View>
+        </ScrollView>
       ) : (
         <FlatList
           data={pedidos}
