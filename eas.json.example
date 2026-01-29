@@ -41,3 +41,12 @@
     "production": {}
   }
 }
+
+
+
+#se ejecuta este comando para crear el apk
+
+cd /Users/alejandrofagua/Documents/GitHub/Aliados_sistem/aliados_sistem_app
+rm -rf node_modules .expo dist build
+npm install
+eas build --platform android --local
