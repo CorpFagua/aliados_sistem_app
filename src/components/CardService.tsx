@@ -6,6 +6,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constans/colors";
 import { ServiceHistorySummary } from "../hooks/useServiceHistory";
 import { useUnreadMessagesContext } from "../providers/UnreadMessagesProvider";
@@ -13,6 +14,8 @@ import { useUnreadMessagesContext } from "../providers/UnreadMessagesProvider";
 interface CardServiceProps {
   service: ServiceHistorySummary;
   onPress: () => void;
+  onEdit?: () => void; // 👈 Nuevo: callback para editar
+  showEditButton?: boolean; // 👈 Nuevo: mostrar botón de editar
 }
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -73,7 +76,7 @@ const getStatusLabel = (status: string): string => {
   }
 };
 
-export default function CardService({ service, onPress }: CardServiceProps) {
+export default function CardService({ service, onPress, onEdit, showEditButton = false }: CardServiceProps) {
   const typeName = service.type?.name || "Domicilio";
   const profileStoreName = service.profileStore?.name || "Sucursal";
   const deliveryName = service.delivery?.name || "Sin asignar";
@@ -81,6 +84,11 @@ export default function CardService({ service, onPress }: CardServiceProps) {
   // Obtener conteo de mensajes sin leer
   const { getUnreadCount } = useUnreadMessagesContext();
   const unreadCount = getUnreadCount(service.id);
+
+  const handleEditPress = (e: any) => {
+    e.stopPropagation(); // Evitar que se dispare onPress
+    if (onEdit) onEdit();
+  };
 
   return (
     <View style={styles.cardWrapper}>
@@ -93,6 +101,17 @@ export default function CardService({ service, onPress }: CardServiceProps) {
           </View>
 
           <View style={styles.headerRight}>
+            {/* Botón de editar (solo si showEditButton es true) */}
+            {showEditButton && onEdit && (
+              <TouchableOpacity 
+                style={styles.editButton} 
+                onPress={handleEditPress}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="edit" size={18} color={Colors.activeMenuText} />
+              </TouchableOpacity>
+            )}
+
             {/* Badge de mensajes sin leer */}
             {unreadCount > 0 && (
               <LinearGradient
@@ -183,6 +202,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+
+  editButton: {
+    padding: 6,
+    backgroundColor: Colors.Background,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.Border,
   },
 
   unreadBadge: {

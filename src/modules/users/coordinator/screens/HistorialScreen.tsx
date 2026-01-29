@@ -26,6 +26,7 @@ import { Colors } from "../../../../constans/colors";
 import CardService from "../../../../components/CardService";
 import HistoryFilters from "../../../../components/HistoryFilters";
 import ServiceDetailModal from "../../../../components/ServiceDetailModal";
+import EditServiceModal from "../components/EditServiceModal";
 import { ServiceHistorySummary } from "../../../../services/serviceHistory";
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -56,6 +57,8 @@ export default function CoordinatorHistoryScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingService, setEditingService] = useState<ServiceHistorySummary | null>(null);
 
   const flatListRef = useRef<FlatList>(null);
   const scrollPositionRef = useRef({ offset: 0, index: 0 });
@@ -123,6 +126,21 @@ export default function CoordinatorHistoryScreen() {
     await getServiceDetail(serviceId);
   };
 
+  const handleEditPress = async (serviceId: string) => {
+    // Obtener el detalle completo del servicio para editar
+    await getServiceDetail(serviceId);
+    // Esperar un poco para que selectedService se actualice
+    setTimeout(() => {
+      setShowEditModal(true);
+    }, 100);
+  };
+
+  const handleEditSuccess = async () => {
+    // Refrescar la lista después de editar
+    await refresh();
+    setShowEditModal(false);
+  };
+
   const handleScroll = (event: any) => {
     const offset = event.nativeEvent.contentOffset.y;
     const index = Math.floor(
@@ -140,7 +158,12 @@ export default function CoordinatorHistoryScreen() {
   };
 
   const renderServiceItem = ({ item }: ListRenderItemInfo<ServiceHistorySummary>) => (
-    <CardService service={item} onPress={() => handleServicePress(item.id)} />
+    <CardService 
+      service={item} 
+      onPress={() => handleServicePress(item.id)}
+      onEdit={() => handleEditPress(item.id)}
+      showEditButton={true}
+    />
   );
 
   const renderEmpty = () => (
@@ -250,6 +273,16 @@ export default function CoordinatorHistoryScreen() {
           setShowDetailModal(false);
           setSelectedService(null);
         }}
+      />
+
+      <EditServiceModal
+        visible={showEditModal}
+        service={selectedService}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedService(null);
+        }}
+        onSuccess={handleEditSuccess}
       />
     </View>
   );

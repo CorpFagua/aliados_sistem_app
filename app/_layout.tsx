@@ -9,6 +9,14 @@ import { ServicesProvider } from "@/providers/ServicesProvider" // 👈 NUEVO
 import { UnreadMessagesProvider } from "@/providers/UnreadMessagesProvider" // 👈 NUEVO
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import Toast from "react-native-toast-message"
+import { useEffect } from "react"
+import { LogBox } from "react-native"
+
+// Suprimir warnings específicos de keep-awake que no afectan la funcionalidad
+LogBox.ignoreLogs([
+  'Unable to activate keep awake',
+  'Uncaught (in promise',
+]);
 
 
 function AppContent() {

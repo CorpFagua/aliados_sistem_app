@@ -8,21 +8,23 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constans/colors";
 import ChatModal from "@/components/ChatModal";
 import CancelServiceModal from "../../../../components/CancelServiceModal";
-import { useAuth } from "@/providers/AuthProvider";''
+import { useAuth } from "@/providers/AuthProvider";
 export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }) {
   if (!pedido) return null;
 
   const [chatVisible, setChatVisible] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const { session, profile } = useAuth();
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
-        <View style={styles.modal}>
+        <View style={[styles.modal, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           {/* Header */}
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>

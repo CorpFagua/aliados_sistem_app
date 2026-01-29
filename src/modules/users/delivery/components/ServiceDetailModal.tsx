@@ -12,6 +12,7 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constans/colors";
 import { Service } from "@/models/service";
 import { useAuth } from "@/providers/AuthProvider";
@@ -201,11 +202,12 @@ export default function OrderDetailModal({
   const [chatVisible, setChatVisible] = useState(false);
   const [transferVisible, setTransferVisible] = useState(false);
   const [contactVisible, setContactVisible] = useState(false);
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
-        <View style={styles.modal}>
+        <View style={[styles.modal, { paddingBottom: Math.max(insets.bottom, 20) }]}>
           {/* Header */}
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>

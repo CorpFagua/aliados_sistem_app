@@ -8,6 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { updateServiceStatus } from "@/services/services";
@@ -16,6 +17,7 @@ import AssignZoneModal from "./AssignZoneModal";
 import ServiceFormModal from "./ServiceFormModalCoordinator";
 import TransferDeliveryModal from "./TransferDeliveryModal";
 import CancelServiceModal from "../../../../components/CancelServiceModal";
+import EditServiceModal from "./EditServiceModal";
 import { Service } from "@/models/service";
 import ChatModal from "@/components/ChatModal";
 import { getServiceType } from "@/utils/serviceTypeUtils";
@@ -34,6 +36,7 @@ export default function OrderDetailModal({
   onRefresh,
 }: Props) {
   const { session } = useAuth();
+  const insets = useSafeAreaInsets();
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showZoneModal, setShowZoneModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -182,7 +185,7 @@ export default function OrderDetailModal({
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
-        <View style={styles.modal}>
+        <View style={[styles.modal, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           {/* HEADER */}
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
@@ -372,10 +375,10 @@ export default function OrderDetailModal({
           />
 
           {/* 🟢 MODAL DE EDICIÓN */}
-          <ServiceFormModal
+          <EditServiceModal
             visible={showEditModal}
+            service={pedido}
             onClose={() => setShowEditModal(false)}
-            editing={pedido}
             onSuccess={() => {
               setShowEditModal(false);
               onClose();
