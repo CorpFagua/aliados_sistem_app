@@ -1,4 +1,4 @@
-import { View, StyleSheet, useWindowDimensions, KeyboardAvoidingView, Platform } from "react-native";
+import { View, StyleSheet, useWindowDimensions, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
@@ -12,26 +12,32 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.container}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        keyboardVerticalOffset={0}
       >
-        {isLargeScreen ? (
-          <LinearGradient
-            colors={["#00FF75", "#2563EB"]}
-            start={[0, 0]}
-            end={[1, 1]}
-            style={[styles.card, { width: cardWidth }]}
-          >
-            <View style={styles.innerCard}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {isLargeScreen ? (
+            <LinearGradient
+              colors={["#00FF75", "#2563EB"]}
+              start={[0, 0]}
+              end={[1, 1]}
+              style={[styles.card, { width: cardWidth }]}
+            >
+              <View style={styles.innerCard}>
+                <LoginForm />
+              </View>
+            </LinearGradient>
+          ) : (
+            <View style={styles.mobileContainer}>
               <LoginForm />
             </View>
-          </LinearGradient>
-        ) : (
-          <View style={styles.mobileContainer}>
-            <LoginForm />
-          </View>
-        )}
+          )}
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -45,8 +51,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#111",
+  },
+  scrollContent: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 20,
   },
   card: {
     borderRadius: 22,
@@ -68,11 +78,10 @@ const styles = StyleSheet.create({
   },
   mobileContainer: {
     width: "100%",
-    height: "100%",
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === "android" ? 40 : 0,
-    backgroundColor: "#171717",
+    paddingVertical: 40,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: 500,
   },
 });
