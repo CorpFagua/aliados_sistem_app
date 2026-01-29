@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { fetchMessages, sendMessage, subscribeToChat } from "@/services/chat";
 import { loadChatMessages, saveChatMessages } from "@/lib/chatStorage";
+import { useUnreadMessagesContext } from "@/providers/UnreadMessagesProvider";
 
 const screenHeight = Dimensions.get("window").height;
 
@@ -31,10 +32,14 @@ export default function ChatModal({
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const listRef = useRef(null);
+  const { markServiceAsRead } = useUnreadMessagesContext();
 
   useEffect(() => {
     if (!visible || !serviceId) return;
     let unsubscribe = null;
+
+    // Marcar como leído cuando se abre el chat
+    markServiceAsRead(serviceId);
 
     (async () => {
       // 1️⃣ Cargar mensajes locales

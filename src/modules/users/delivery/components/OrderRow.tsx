@@ -9,6 +9,7 @@ import {
   GestureResponderEvent,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable"; // recomendado por docs
 import Animated, {
   interpolate,
@@ -17,6 +18,7 @@ import Animated, {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Colors } from "@/constans/colors";
 import { Service } from "@/models/service";
+import { useUnreadMessagesContextOptional } from "@/providers/UnreadMessagesProvider";
 
 /**
  * Calcula el estado (ok|alerta|critico) y la etiqueta (label) para mostrar en la tarjeta.
@@ -105,6 +107,10 @@ export default function OrderRow({
   closeOnAction = true,
   onActionComplete,
 }: Props) {
+  // 📬 Obtener contador de mensajes no leídos
+  const unreadContext = useUnreadMessagesContextOptional();
+  const unreadCount = unreadContext?.getUnreadCount(pedido.id) || 0;
+
   // estado tiempo / semáforo
   const [tiempo, setTiempo] = useState(() => calcularEstadoTiempo(pedido));
   const { estado, label } = tiempo;
@@ -261,7 +267,23 @@ export default function OrderRow({
             {/* Columna izquierda: información principal */}
             <View style={styles.left}>
               {pedido.profileStoreName && (
-                <Text style={styles.store}>{pedido.profileStoreName}</Text>
+                <View style={styles.storeRow}>
+                  <Text style={styles.store}>{pedido.profileStoreName}</Text>
+                  {/* Badge de mensajes no leídos */}
+                  {unreadCount > 0 && (
+                    <LinearGradient
+                      colors={["#10B981", "#059669"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.unreadBadge}
+                    >
+                      <Ionicons name="chatbubble" size={10} color="#FFFFFF" />
+                      <Text style={styles.unreadText}>
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </Text>
+                    </LinearGradient>
+                  )}
+                </View>
               )}
 
               <Text style={styles.destination}>
@@ -326,11 +348,29 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     justifyContent: "flex-start",
   },
+  storeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
   store: {
     fontSize: 16,
     fontWeight: "700",
     color: Colors.normalText,
-    marginBottom: 6,
+  },
+  unreadBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    gap: 3,
+  },
+  unreadText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   orderId: {
     fontSize: 18,

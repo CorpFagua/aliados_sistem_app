@@ -6,15 +6,37 @@ import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { updateServiceStatus } from "@/services/services";
 import { useServices } from "@/providers/ServicesProvider";
+import { useUnreadMessagesContext } from "@/providers/UnreadMessagesProvider";
 import OrderRow from "../components/OrderRow";
 
 const DELAY_FOR_NON_VIP = 10000; // 10 segundos en ms
 
 export default function DisponiblesScreen() {
-  const { session } = useAuth();
+  const { session, hasReachedLowDemandLimit, setHasReachedLowDemandLimit } = useAuth();
   const { services, loading, refetch, initialOrderIds, visibleNewOrderIds, orderTimestamps, isUserVIP } = useServices();
+  const { registerServices } = useUnreadMessagesContext();
   const [refreshing, setRefreshing] = useState(false);
   const refetchedServiceIds = useRef<Set<string>>(new Set()); // Evitar refetch múltiple por mismo servicio
+
+  // 🎯 Contar pedidos activos (asignado + en_ruta) y resetear límite cuando llegue a 0
+  useEffect(() => {
+    const activeServices = services.filter((s) => s.status === "asignado" || s.status === "en_ruta");
+    const activeCount = activeServices.length;
+
+    // Si no hay pedidos activos y alcanzó el límite, resetear
+    if (activeCount === 0 && hasReachedLowDemandLimit) {
+      console.log("[DisponiblesScreen] ✅ Sin pedidos activos, reseteando límite de baja demanda");
+      setHasReachedLowDemandLimit(false);
+    }
+  }, [services, hasReachedLowDemandLimit, setHasReachedLowDemandLimit]);
+
+  // Registrar servicios disponibles para tracking de mensajes
+  useEffect(() => {
+    const disponiblesIds = services
+      .filter((s) => s.status === "disponible")
+      .map((s) => s.id);
+    registerServices(disponiblesIds);
+  }, [services, registerServices]);
 
   // ⏱️ Contador regresivo: actualizar cada 1s solo para verificar si pasó el delay
   useEffect(() => {
@@ -130,7 +152,7 @@ export default function DisponiblesScreen() {
         });
         
         const segundos = Math.ceil(tiempoMinimo / 1000);
-        const mensaje = `No eres VIP, en ${segundos}s podrás verlo`;
+        const mensaje = `Cargando... ${segundos}s restantes`;
         
         ToastAndroid.show(mensaje, ToastAndroid.LONG);
       }
@@ -169,6 +191,16 @@ export default function DisponiblesScreen() {
               leftColor="#2563EB"
               onLeftAction={async (p) => {
                 try {
+                  // 🚫 Validar si ya alcanzó el límite de baja demanda
+                  if (hasReachedLowDemandLimit) {
+                    ToastAndroid.show(
+                      "Debes finalizar los pedidos que tienes actualmente para tomar nuevamente pedidos.",
+                      ToastAndroid.LONG
+                    );
+                    console.log("⛔ [DisponiblesScreen] Usuario alcanzó límite de baja demanda");
+                    return false; // mantiene la tarjeta abierta
+                  }
+
                   console.log("✔️ Intentando asignar pedido:", p.id);
                   await updateServiceStatus(
                     p.id,
@@ -179,9 +211,20 @@ export default function DisponiblesScreen() {
                   return true; // cierra la tarjeta al éxito
                 } catch (err: any) {
                   console.error("❌ Error al tomar servicio:", err);
-                  const message = err?.message ||
-                    "No se pudo tomar el servicio. Intenta de nuevo.";
-                  alert(message);
+                  
+                  // 🚫 Si el error es de baja demanda, actualizar la variable
+                  if (err?.message && err.message.includes("baja demanda")) {
+                    console.log("[DisponiblesScreen] 🚫 Límite de baja demanda alcanzado");
+                    setHasReachedLowDemandLimit(true);
+                    ToastAndroid.show(
+                      "Debes finalizar los pedidos que tienes actualmente para tomar nuevamente pedidos.",
+                      ToastAndroid.LONG
+                    );
+                  } else {
+                    const message = err?.message ||
+                      "No se pudo tomar el servicio. Intenta de nuevo.";
+                    ToastAndroid.show(message, ToastAndroid.LONG);
+                  }
                   return false; // mantiene la tarjeta abierta
                 }
               }}

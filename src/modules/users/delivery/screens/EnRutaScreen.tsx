@@ -6,14 +6,24 @@ import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { updateServiceStatus } from "@/services/services";
 import { useServices } from "@/providers/ServicesProvider";
+import { useUnreadMessagesContext } from "@/providers/UnreadMessagesProvider";
 import OrderRow from "../components/OrderRow";
 import OrderDetailModal from "../components/ServiceDetailModal";
 
 export default function EnRutaScreen() {
   const { session } = useAuth();
   const { services, loading, refetch } = useServices();
+  const { registerServices } = useUnreadMessagesContext();
   const [selectedPedido, setSelectedPedido] = useState<Service | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Registrar servicios en ruta para tracking de mensajes
+  React.useEffect(() => {
+    const enRutaIds = services
+      .filter((s) => s.status === "en_ruta")
+      .map((s) => s.id);
+    registerServices(enRutaIds);
+  }, [services, registerServices]);
 
   // 🎯 Filtrar servicios en ruta
   const pedidos = useMemo(

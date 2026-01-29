@@ -12,9 +12,10 @@ import {
 
 import { fetchCurrentUser } from "@/services/profile";
 import { usePushRegistration } from "@/hooks/usePushNotifications";
-import { unregisterAllPushTokens } from "@/services/notifications";
+import { unregisterPushToken } from "@/services/notifications";
 
 import { User, Role } from "@/models/user";
+import SessionLoadingOverlay from "@/components/SessionLoadingOverlay";
 
 type UserRole = Role;
 
@@ -27,6 +28,8 @@ type AuthContextType = {
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isActive: boolean;
+  hasReachedLowDemandLimit: boolean;
+  setHasReachedLowDemandLimit: (value: boolean) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -38,6 +41,8 @@ const AuthContext = createContext<AuthContextType>({
   register: async () => {},
   logout: async () => {},
   isActive: false,
+  hasReachedLowDemandLimit: false,
+  setHasReachedLowDemandLimit: () => {},
 });
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -46,6 +51,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [role, setRole] = useState<UserRole>(null);
   const [isActive, setIsActive] = useState(false);
   const [profile, setProfile] = useState<User | null>(null);
+  const [hasReachedLowDemandLimit, setHasReachedLowDemandLimit] = useState(false);
 
   /**
    * 🔀 Redirige según el rol del usuario
@@ -77,46 +83,65 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
    * 🚀 Carga inicial:
    *  - Obtiene sesión si existe
    *  - Carga perfil del backend
-   *  - Redirige
+   *  - Redirige solo cuando todo está listo
    */
   useEffect(() => {
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+
     const initSession = async () => {
       try {
         const { data } = await getSession();
         const currentSession = data.session ?? null;
 
-        setSession(currentSession);
+        if (!isMounted) return;
 
         // Si hay usuario cargamos perfil
         if (currentSession?.user) {
           const token = currentSession.access_token;
 
           const profileData = await fetchCurrentUser(token);
-          setProfile(profileData);
+
+          if (!isMounted) return;
 
           const userRole = profileData.role ?? null;
           const active = profileData.isActive ?? false;
 
+          // Actualizar estado primero MIENTRAS LOADING SIGUE EN TRUE
+          setSession(currentSession);
+          setProfile(profileData);
           setRole(userRole);
           setIsActive(active);
 
           // ❌ Si el usuario está inactivo → forzar logout
           if (!active) {
+            setLoading(false);
             await logout();
-            router.replace("/(auth)/login");
             return;
           }
 
+          // Aquí loading sigue siendo true, el modal sigue visible
+          // Redirigir primero
           redirectByRole(userRole);
+          
+          // Luego de redirigir, apagamos el loading
+          timeoutId = setTimeout(() => {
+            if (isMounted) {
+              setLoading(false);
+            }
+          }, 300);
         } else {
+          if (!isMounted) return;
+          setSession(null);
+          setLoading(false);
           router.replace("/(auth)/login");
         }
 
       } catch (error: any) {
         console.error("Error cargando sesión:", error.message);
-        router.replace("/(auth)/login");
-      } finally {
+        if (!isMounted) return;
         setLoading(false);
+        router.replace("/(auth)/login");
       }
     };
 
@@ -128,6 +153,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
      *  - Actualiza perfil y estado
      */
     const { data: subscription } = onAuthStateChange(async (newSession) => {
+      if (!isMounted) return;
+
       setSession(newSession);
 
       if (newSession?.user) {
@@ -135,23 +162,26 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           const token = newSession.access_token;
           const profileData = await fetchCurrentUser(token);
 
+          if (!isMounted) return;
+
           setProfile(profileData);
           setRole(profileData.role);
           setIsActive(profileData.isActive);
 
           if (!profileData.isActive) {
             await logout();
-            router.replace("/(auth)/login");
             return;
           }
 
           redirectByRole(profileData.role);
         } catch (err: any) {
           console.error("Error actualizando sesión:", err.message);
+          if (!isMounted) return;
           router.replace("/(auth)/login");
         }
 
       } else {
+        if (!isMounted) return;
         setRole(null);
         setProfile(null);
         setIsActive(false);
@@ -159,7 +189,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       }
     });
 
-    return () => subscription?.subscription?.unsubscribe();
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+      subscription?.subscription?.unsubscribe();
+    };
 
   }, []);
 
@@ -167,7 +201,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
    * 🔔 Registrar notificaciones push
    *    → Se ejecuta SOLO cuando `session.user` cambia
    */
-  usePushRegistration(session);
+  const pushNotifications = usePushRegistration(session);
 
   /**
    * 🧩 Login
@@ -213,27 +247,35 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     
     // Guardar el access_token antes de limpiarlo
     const currentAccessToken = session?.access_token;
+    const currentDeviceToken = pushNotifications.getToken();
     
     try {
-      // Eliminar todos los tokens de notificaciones antes de cerrar sesión
-      if (currentAccessToken) {
-        console.log(`📲 [AUTH] Eliminando tokens de notificaciones...`);
+      // Eliminar solo el token del dispositivo actual (no todos)
+      if (currentAccessToken && currentDeviceToken) {
+        console.log(`📲 [AUTH] Eliminando token de notificaciones del dispositivo actual...`);
         console.log(`🔑 [AUTH] Access Token disponible: ${currentAccessToken.substring(0, 20)}...`);
+        console.log(`📱 [AUTH] Device Token: ${currentDeviceToken.substring(0, 30)}...`);
         try {
-          await unregisterAllPushTokens(currentAccessToken);
-          console.log(`✅ [AUTH] Tokens de notificaciones eliminados`);
+          await unregisterPushToken(currentDeviceToken, currentAccessToken);
+          console.log(`✅ [AUTH] Token del dispositivo actual eliminado`);
+          pushNotifications.clearToken();
         } catch (notifErr: any) {
-          console.warn(`⚠️  [AUTH] No se pudieron eliminar tokens (continuando con logout):`, notifErr.message);
-          // Continuar con el logout aunque falle la eliminación de tokens
+          console.warn(`⚠️  [AUTH] No se pudo eliminar el token (continuando con logout):`, notifErr.message);
+          // Continuar con el logout aunque falle la eliminación del token
         }
       } else {
-        console.warn(`⚠️  [AUTH] No hay access_token disponible para eliminar notificaciones`);
+        if (!currentAccessToken) {
+          console.warn(`⚠️  [AUTH] No hay access_token disponible`);
+        }
+        if (!currentDeviceToken) {
+          console.warn(`⚠️  [AUTH] No hay device token disponible (notificaciones no configuradas)`);
+        }
       }
     } catch (err) {
-      console.error(`❌ [AUTH] Error inesperado eliminando tokens de notificaciones:`, err);
+      console.error(`❌ [AUTH] Error inesperado eliminando token de notificaciones:`, err);
     }
 
-    console.log(`🔑 [AUTH] Cerrando sesión en Supabase...`);
+    console.log(`🔑 [AUTH] Cerrando sesión en Supabase (scope: local)...`);
     const { error } = await signOut();
     if (error) {
       console.error(`❌ [AUTH] Error en signOut:`, error);
@@ -260,8 +302,11 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         register,
         logout,
         isActive,
+        hasReachedLowDemandLimit,
+        setHasReachedLowDemandLimit,
       }}
     >
+      <SessionLoadingOverlay visible={loading} />
       {children}
     </AuthContext.Provider>
   );

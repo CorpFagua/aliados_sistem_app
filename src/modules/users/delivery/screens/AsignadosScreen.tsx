@@ -6,6 +6,7 @@ import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { updateServiceStatus } from "@/services/services";
 import { useServices } from "@/providers/ServicesProvider";
+import { useUnreadMessagesContext } from "@/providers/UnreadMessagesProvider";
 import { Service } from "@/models/service";
 import OrderRow from "../components/OrderRow";
 import OrderDetailModal from "../components/ServiceDetailModal";
@@ -14,9 +15,18 @@ import AssignZoneModal from "../components/AssignZoneModal";
 export default function AsignadosScreen() {
   const { session } = useAuth();
   const { services, loading, refetch } = useServices();
+  const { registerServices } = useUnreadMessagesContext();
   const [selectedPedido, setSelectedPedido] = useState<Service | null>(null);
   const [assigning, setAssigning] = useState<Service | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Registrar servicios asignados para tracking de mensajes
+  React.useEffect(() => {
+    const asignadosIds = services
+      .filter((s) => s.status === "asignado")
+      .map((s) => s.id);
+    registerServices(asignadosIds);
+  }, [services, registerServices]);
 
   // 🎯 Filtrar servicios asignados
   const pedidos = useMemo(

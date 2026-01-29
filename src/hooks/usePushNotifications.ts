@@ -40,15 +40,12 @@ export function usePushRegistration(session: any) {
     })();
   }, [session]);
 
-  // Devolver función para limpiar el token
+  // Devolver función para obtener y limpiar el token
   return {
     getToken: () => {
-      console.log(`📍 [HOOK] Obteniendo token... ${tokenRef.current?.substring(0, 20) || "null"}`);
       return tokenRef.current;
     },
-    clearToken: async (token: string) => {
-      console.log(`🧹 [HOOK] Limpiando token (delegado a AuthProvider)`);
-      // La limpieza real la hace AuthProvider.logout()
+    clearToken: () => {
       tokenRef.current = null;
     },
   };

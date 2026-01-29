@@ -8,9 +8,7 @@ interface PaymentSectionProps {
   onPaymentChange: (method: string) => void;
   amount: string;
   onAmountChange: (amount: string) => void;
-  focusedField: string | null;
-  onFocus: (fieldKey: string) => void;
-  onBlur: () => void;
+  // removed focus props
 }
 
 export const PaymentSection: React.FC<PaymentSectionProps> = ({
@@ -18,9 +16,6 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({
   onPaymentChange,
   amount,
   onAmountChange,
-  focusedField,
-  onFocus,
-  onBlur,
 }) => {
   const paymentMethods = ["efectivo", "transferencia", "tarjeta"];
 
@@ -58,9 +53,6 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({
           value={amount}
           onChange={onAmountChange}
           fieldKey="amount"
-          focusedField={focusedField}
-          onFocus={onFocus}
-          onBlur={onBlur}
         />
       ) : null}
     </>

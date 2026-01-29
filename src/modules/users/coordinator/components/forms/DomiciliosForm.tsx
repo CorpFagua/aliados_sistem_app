@@ -34,11 +34,6 @@ interface DomiciliosFormProps {
   onStoreSelect: (store: { id: string; name: string }) => void;
   onStoreClear: () => void;
   showStoreSelector?: boolean;
-
-  // Estado de foco
-  focusedField: string | null;
-  onFocus: (fieldKey: string) => void;
-  onBlur: () => void;
 }
 
 export const DomiciliosForm: React.FC<DomiciliosFormProps> = ({
@@ -64,9 +59,6 @@ export const DomiciliosForm: React.FC<DomiciliosFormProps> = ({
   onStoreSelect,
   onStoreClear,
   showStoreSelector = true,
-  focusedField,
-  onFocus,
-  onBlur,
 }) => {
   return (
     <View>
@@ -80,9 +72,6 @@ export const DomiciliosForm: React.FC<DomiciliosFormProps> = ({
           onSearch={onStoreSearch}
           onSelectStore={onStoreSelect}
           onClearStore={onStoreClear}
-          focusedField={focusedField}
-          onFocus={onFocus}
-          onBlur={onBlur}
         />
       )}
 
@@ -93,9 +82,6 @@ export const DomiciliosForm: React.FC<DomiciliosFormProps> = ({
         value={destination}
         onChange={onDestinationChange}
         fieldKey="destination"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -106,9 +92,6 @@ export const DomiciliosForm: React.FC<DomiciliosFormProps> = ({
         value={phone}
         onChange={onPhoneChange}
         fieldKey="phone"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -118,9 +101,6 @@ export const DomiciliosForm: React.FC<DomiciliosFormProps> = ({
         value={clientName}
         onChange={onClientNameChange}
         fieldKey="clientName"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -131,9 +111,6 @@ export const DomiciliosForm: React.FC<DomiciliosFormProps> = ({
         onChange={onNotesChange}
         fieldKey="notes"
         multiline
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <PaymentSection
@@ -141,9 +118,6 @@ export const DomiciliosForm: React.FC<DomiciliosFormProps> = ({
         onPaymentChange={onPaymentChange}
         amount={amount}
         onAmountChange={onAmountChange}
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
 
       <FormInputField
@@ -154,9 +128,6 @@ export const DomiciliosForm: React.FC<DomiciliosFormProps> = ({
         value={prepTime}
         onChange={onPrepTimeChange}
         fieldKey="prepTime"
-        focusedField={focusedField}
-        onFocus={onFocus}
-        onBlur={onBlur}
       />
     </View>
   );

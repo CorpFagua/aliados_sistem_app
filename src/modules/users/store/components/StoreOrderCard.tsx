@@ -1,9 +1,13 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Colors } from "@/constans/colors";
-import { Service } from "@/models/service"; // 👈 importa tu modelo tipado
+import { Service } from "@/models/service";
+import { useUnreadMessagesContextOptional } from "@/providers/UnreadMessagesProvider";
+
+const { width: screenWidth } = Dimensions.get("window");
+const isLargeScreen = screenWidth > 600;
 
 interface Props {
   pedido: Service;
@@ -12,6 +16,10 @@ interface Props {
 }
 
 export default function StoreOrderCard({ pedido, onPress, showCreatedAt = false }: Props) {
+  // 📬 Obtener contador de mensajes no leídos
+  const unreadContext = useUnreadMessagesContextOptional();
+  const unreadCount = unreadContext?.getUnreadCount(pedido.id) || 0;
+
   const statusColors: Record<string, string> = {
     disponible: Colors.gradientStart,
     asignado: Colors.iconActive,
@@ -34,7 +42,23 @@ export default function StoreOrderCard({ pedido, onPress, showCreatedAt = false 
         {/* Contenido */}
         <View>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Servicio #{pedido.id}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.cardTitle}>#{pedido.id.slice(-4)}</Text>
+              {/* Badge de mensajes no leídos */}
+              {unreadCount > 0 && (
+                <LinearGradient
+                  colors={["#10B981", "#059669"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.unreadBadge}
+                >
+                  <Ionicons name="chatbubble" size={10} color="#FFFFFF" />
+                  <Text style={styles.unreadText}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Text>
+                </LinearGradient>
+              )}
+            </View>
             <View
               style={[
                 styles.statusBadge,
@@ -94,51 +118,78 @@ export default function StoreOrderCard({ pedido, onPress, showCreatedAt = false 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.activeMenuBackground,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: isLargeScreen ? 12 : 14,
+    padding: isLargeScreen ? 12 : 14,
     overflow: "hidden",
     position: "relative",
     shadowColor: "#000",
-    shadowOffset: { width: -4, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: -2, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
     borderRightWidth: 1,
     borderTopWidth: 1,
     borderColor: "rgba(255,255,255,0.07)",
+    maxWidth: isLargeScreen ? 500 : "100%",
+    alignSelf: "center",
+    width: "100%",
   },
   highlightOverlay: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 16,
+    borderRadius: isLargeScreen ? 12 : 14,
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 8,
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 1,
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: isLargeScreen ? 14 : 15,
     fontWeight: "700",
     color: Colors.normalText,
+    letterSpacing: 0.5,
+  },
+  unreadBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    gap: 3,
+    minWidth: 20,
+  },
+  unreadText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   cardBody: {
-    gap: 6,
+    gap: 5,
   },
   infoText: {
-    fontSize: 14,
+    fontSize: isLargeScreen ? 12 : 13,
     color: Colors.normalText,
+    flexWrap: "wrap",
   },
   priceText: {
-    fontSize: 15,
+    fontSize: isLargeScreen ? 13 : 14,
     fontWeight: "600",
     color: Colors.gradientStart,
-    marginTop: 4,
+    marginTop: 2,
   },
   createdAt: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.menuText,
-    marginTop: 6,
+    marginTop: 4,
   },
   zoneBadge: {
     flexDirection: "row",
@@ -147,21 +198,23 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     backgroundColor: Colors.Border,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 8,
-    marginTop: 6,
+    marginTop: 4,
   },
   zoneText: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.menuText,
+    fontWeight: "500",
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: isLargeScreen ? 8 : 10,
+    paddingVertical: isLargeScreen ? 3 : 4,
     borderRadius: 8,
+    flexShrink: 0,
   },
   statusText: {
-    fontSize: 13,
+    fontSize: isLargeScreen ? 11 : 12,
     fontWeight: "600",
     textTransform: "capitalize",
   },
