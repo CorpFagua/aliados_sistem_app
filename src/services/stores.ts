@@ -70,3 +70,11 @@ export async function fetchStoreProfiles(token: string): Promise<Array<{ id: str
     return [];
   }
 }
+
+// Activar/Desactivar tienda
+export async function toggleStoreStatus(id: string, token: string): Promise<Store> {
+  const res = await api.patch(`/stores/${id}/toggle-status`, {}, {
+    headers: authHeaders(token),
+  });
+  return toStore(res.data.data as StoreResponse);
+}

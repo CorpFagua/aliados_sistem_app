@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
@@ -31,12 +32,15 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
   const [payment, setPayment] = useState<Service["payment"]>("efectivo");
   const [amount, setAmount] = useState("");
   const [prepTime, setPrepTime] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const { session } = useAuth(); // 🔑 token de Supabase Auth
 
   const handleSubmit = async () => {
   if (!session) return alert("Debes estar autenticado");
+  if (loading) return; // Prevenir doble envío
 
+  setLoading(true);
   const createdAt = new Date();
 
   const newService: Service = {
@@ -67,8 +71,23 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
     setPayment("efectivo");
     setAmount("");
     setPrepTime("");
-  } catch (err) {
-    alert("❌ Error creando el servicio");
+  } catch (err: any) {
+    console.error("❌ Error creando servicio:", err);
+    
+    // Si es error de cuenta inactiva, el interceptor ya lo manejó
+    if (err.response?.status === 403 && err.response?.data?.error === 'inactive_account') {
+      // No hacer nada, el interceptor ya mostró el toast y cerró sesión
+      return;
+    }
+    
+    // Para otros errores, mostrar alerta
+    Alert.alert(
+      "Error",
+      "No se pudo crear el servicio. Intenta nuevamente.",
+      [{ text: "OK" }]
+    );
+  } finally {
+    setLoading(false);
   }
 };
 
@@ -170,11 +189,17 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
               onChangeText={setPrepTime}
             />
 
-            <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-              <Text style={styles.buttonText}>Crear servicio</Text>
+            <TouchableOpacity 
+              style={[styles.button, loading && styles.buttonDisabled]} 
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? "Creando..." : "Crear servicio"}
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+            <TouchableOpacity style={styles.cancelButton} onPress={onClose} disabled={loading}>
               <Text style={styles.cancelText}>Cancelar</Text>
             </TouchableOpacity>
           </View>
@@ -202,6 +227,7 @@ const styles = StyleSheet.create({
   paymentText: { color: Colors.menuText, fontSize: 13, fontWeight: "500" },
   paymentTextActive: { color: "#000", fontWeight: "700" },
   button: { backgroundColor: Colors.normalText, borderRadius: 12, paddingVertical: 14, alignItems: "center", marginTop: 12 },
+  buttonDisabled: { opacity: 0.5 },
   buttonText: { fontSize: 15, fontWeight: "700", color: "#000" },
   cancelButton: { marginTop: 14, alignItems: "center", paddingVertical: 12 },
   cancelText: { color: Colors.menuText, fontSize: 14, fontWeight: "500" },

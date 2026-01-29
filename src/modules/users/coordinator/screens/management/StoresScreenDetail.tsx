@@ -12,7 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { fetchStoreWithProfiles, updateStore } from "@/services/stores";
+import { fetchStoreWithProfiles, updateStore, toggleStoreStatus } from "@/services/stores";
 import { Store } from "@/models/store";
 import Toast from "react-native-toast-message";
 import StoreFormModal from "../../components/StoreFormModal";
@@ -70,6 +70,31 @@ export default function StoreDetailScreen({
     });
   };
 
+  const handleToggleStatus = async () => {
+    if (!store) return;
+    try {
+      const newStatus = !store.isActive;
+      const updated = await toggleStoreStatus(store.id, token);
+      setStore(updated);
+      Toast.show({
+        type: "success",
+        text1: newStatus ? "Tienda activada" : "Tienda desactivada",
+        text2: newStatus
+          ? "La tienda y sus usuarios han sido activados"
+          : "La tienda y sus usuarios han sido desactivados. Las sesiones activas se cerraron.",
+        position: "top",
+      });
+    } catch (err) {
+      console.error("❌ Error cambiando estado de tienda:", err);
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "No se pudo cambiar el estado de la tienda",
+        position: "top",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -109,6 +134,19 @@ export default function StoreDetailScreen({
 
         {/* Tarjeta informativa */}
         <View style={styles.infoCard}>
+          <Text style={styles.label}>Estado:</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+            <View
+              style={[
+                styles.statusIndicator,
+                { backgroundColor: store.isActive ? "#4CAF50" : "#f44336" },
+              ]}
+            />
+            <Text style={[styles.value, { fontWeight: "600" }]}>
+              {store.isActive ? "Activa" : "Inactiva"}
+            </Text>
+          </View>
+
           <Text style={styles.label}>Tipo:</Text>
           <Text style={styles.value}>
             {store.type === "credito" ? "Crédito" : "Efectivo"}
@@ -124,6 +162,24 @@ export default function StoreDetailScreen({
             {new Date(store.createdAt).toLocaleDateString()}
           </Text>
         </View>
+
+        {/* Botón de activar/desactivar (prominente) */}
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            { backgroundColor: store.isActive ? "#f44336" : "#4CAF50" },
+          ]}
+          onPress={handleToggleStatus}
+        >
+          <Ionicons
+            name={store.isActive ? "close-circle" : "checkmark-circle"}
+            size={22}
+            color="#FFF"
+          />
+          <Text style={styles.toggleButtonText}>
+            {store.isActive ? "Desactivar tienda" : "Activar tienda"}
+          </Text>
+        </TouchableOpacity>
 
         {/* Botones de acción */}
         <View style={styles.actionsRow}>
@@ -245,6 +301,33 @@ const styles = StyleSheet.create({
   },
   label: { color: Colors.menuText, fontSize: 13, marginTop: 4 },
   value: { color: Colors.normalText, fontSize: 15, fontWeight: "500" },
+
+  statusIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+
+  toggleButton: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  toggleButtonText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "700",
+    marginLeft: 8,
+  },
 
   actionsRow: {
     flexDirection: "row",
