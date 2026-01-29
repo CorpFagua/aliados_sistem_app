@@ -44,7 +44,18 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       const data = await fetchServices(session.access_token);
       console.log('[ServicesProvider] Servicios cargados:', data.length);
-      setServices(data);
+      
+      // 🔒 Filtrar servicios según rol del usuario
+      const filteredData = profile?.role === 'delivery'
+        ? data.filter(service => {
+            // Para deliveries: ver solo disponibles O los asignados a mí
+            if (service.status === 'disponible') return true;
+            return service.assignedDelivery === session.user.id;
+          })
+        : data; // Otros roles ven todos
+      
+      console.log('[ServicesProvider] Servicios filtrados:', filteredData.length);
+      setServices(filteredData);
       
       // 🎯 En el primer load (sin timestamps): marcar todos como iniciales
       // En refreshes posteriores: mantener iniciales y timestamps tal como están
@@ -52,11 +63,11 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
         // Si es el primer load (no hay iniciales previas), marcar todos
         if (prevInitialIds.size === 0) {
           return new Set(
-            data.filter((s) => s.status === "disponible").map((s) => s.id)
+            filteredData.filter((s) => s.status === "disponible").map((s) => s.id)
           );
         }
         // Si ya hay iniciales, mantener solo los que siguen disponibles
-        const availableIds = new Set(data.filter((s) => s.status === "disponible").map((s) => s.id));
+        const availableIds = new Set(filteredData.filter((s) => s.status === "disponible").map((s) => s.id));
         const preserved = new Set<string>();
         for (const id of prevInitialIds) {
           if (availableIds.has(id)) {
@@ -68,7 +79,7 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
       
       // 🎯 Limpiar timestamps de órdenes que ya no están disponibles
       setOrderTimestamps((prevTimestamps) => {
-        const availableIds = new Set(data.filter((s) => s.status === "disponible").map((s) => s.id));
+        const availableIds = new Set(filteredData.filter((s) => s.status === "disponible").map((s) => s.id));
         const newTimestamps = new Map(prevTimestamps);
         
         for (const [serviceId] of prevTimestamps.entries()) {
@@ -123,16 +134,16 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
                 // Actualizar existente
                 console.log(`🔄 [STATE] Actualizando servicio existente`);
                 
-                // 🔒 FILTRO CRÍTICO: Si el servicio fue asignado a otro usuario, 
-                // y el usuario actual es delivery, no debe verlo
+                // 🔒 FILTRO CRÍTICO: Si el servicio tiene un delivery asignado diferente al usuario actual,
+                // y el usuario actual es delivery, no debe verlo (excepto si está "disponible")
                 if (
                   eventType === 'UPDATE' && 
                   profile?.role === 'delivery' &&
-                  updatedService.status === 'asignado' && 
+                  updatedService.status !== 'disponible' && 
                   updatedService.assignedDelivery && 
                   updatedService.assignedDelivery !== session?.user?.id
                 ) {
-                  console.log(`⚠️ [FILTER] Servicio ${serviceId} asignado a otro delivery, removiendo del estado local`);
+                  console.log(`⚠️ [FILTER] Servicio ${serviceId} (${updatedService.status}) asignado a otro delivery, removiendo del estado local`);
                   return prev.filter((s) => s.id !== serviceId);
                 }
                 
@@ -140,6 +151,17 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
               } else {
                 // Agregar nuevo (INSERT) - No es inicial
                 console.log(`➕ [STATE] Agregando nuevo servicio (será mostrado con delay)`);
+                
+                // 🔒 FILTRO CRÍTICO para INSERT: Si es delivery, solo agregar si es disponible O si es mío
+                if (
+                  eventType === 'INSERT' && 
+                  profile?.role === 'delivery' &&
+                  updatedService.status !== 'disponible' && 
+                  updatedService.assignedDelivery !== session?.user?.id
+                ) {
+                  console.log(`⚠️ [FILTER] Nuevo servicio ${serviceId} (${updatedService.status}) no disponible ni asignado a mí, ignorando`);
+                  return prev; // No agregar
+                }
                 
                 // Registrar como nuevo (no inicial)
                 if (updatedService.status === "disponible") {
