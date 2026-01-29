@@ -1,4 +1,5 @@
-import { View, StyleSheet, useWindowDimensions, KeyboardAvoidingView, Platform, SafeAreaView } from "react-native";
+import { View, StyleSheet, useWindowDimensions, KeyboardAvoidingView, Platform } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import LoginForm from "../../src/modules/auth/components/LoginForm";
@@ -9,7 +10,7 @@ export default function LoginScreen() {
   const cardWidth = isLargeScreen ? 400 : width;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.container}
