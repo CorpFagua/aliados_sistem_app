@@ -8,6 +8,7 @@ export interface Store {
   type: "credito" | "efectivo";
   adminEmail?: string;
   createdAt: string;
+  deletedAt?: string | null;
   branch?: {
     id: string;
     name: string;
@@ -29,6 +30,7 @@ export interface StoreResponse {
   type: "credito" | "efectivo";
   admin_email?: string;
   created_at: string;
+  deleted_at?: string | null;
   branches?: {
     id: string;
     name: string;
@@ -60,6 +62,7 @@ export function toStore(r: StoreResponse): Store {
     type: r.type,
     adminEmail: r.admin_email,
     createdAt: r.created_at,
+    deletedAt: r.deleted_at ?? null,
     branch: r.branches
       ? {
           id: r.branches.id,
