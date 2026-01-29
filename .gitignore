@@ -3,6 +3,12 @@
 # dependencies
 node_modules/
 
+# Environment files (con credenciales)
+.env.local
+.env.production
+.env.*.local
+eas.json
+
 # Expo
 .expo/
 dist/
