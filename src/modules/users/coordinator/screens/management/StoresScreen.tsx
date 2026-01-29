@@ -16,6 +16,7 @@ import { fetchStores, deleteStore } from "@/services/stores";
 import { Store } from "@/models/store";
 import Toast from "react-native-toast-message";
 import StoreFormModal from "../../components/StoreFormModal";
+import DeleteStoreModal from "../../components/DeleteStoreModal";
 import StoreDetailScreen from "./StoresScreenDetail"; // 👈 importar tu componente existente
 
 export default function StoresScreen() {
@@ -23,6 +24,8 @@ export default function StoresScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [storeToDelete, setStoreToDelete] = useState<Store | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { session } = useAuth();
   const token = session?.access_token || "";
@@ -50,22 +53,30 @@ export default function StoresScreen() {
   };
 
   const handleDelete = async (store: Store) => {
-    Toast.show({
-      type: "info",
-      text1: "Eliminando tienda...",
-      text2: `"${store.name}"`,
-      position: "top",
-    });
+    // 🔥 Abrir el modal de confirmación
+    setStoreToDelete(store);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!storeToDelete) return;
+
+    setIsDeleting(true);
 
     try {
-      await deleteStore(store.id, token);
-      setStores((prev) => prev.filter((s) => s.id !== store.id));
+      await deleteStore(storeToDelete.id, token);
+      
+      // Eliminar de la lista local
+      setStores((prev) => prev.filter((s) => s.id !== storeToDelete.id));
+      
       Toast.show({
         type: "success",
         text1: "Tienda eliminada",
-        text2: `"${store.name}" fue eliminada correctamente.`,
+        text2: `"${storeToDelete.name}" fue eliminada correctamente.`,
         position: "top",
       });
+
+      // Cerrar modal
+      setStoreToDelete(null);
     } catch (err) {
       console.error("❌ Error eliminando tienda:", err);
       Toast.show({
@@ -74,6 +85,8 @@ export default function StoresScreen() {
         text2: "No se pudo eliminar la tienda.",
         position: "top",
       });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -141,6 +154,15 @@ export default function StoresScreen() {
       >
         <Ionicons name="add" size={28} color="#000" />
       </TouchableOpacity>
+
+      {/* 🔥 Modal para confirmar eliminación */}
+      <DeleteStoreModal
+        visible={!!storeToDelete}
+        store={storeToDelete}
+        onClose={() => setStoreToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        isDeleting={isDeleting}
+      />
 
       {/* Modal para crear tienda */}
       <StoreFormModal

@@ -1,6 +1,6 @@
 // src/modules/users/delivery/screens/DisponiblesScreen.tsx
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import { StyleSheet, FlatList, View, Text, ActivityIndicator, RefreshControl, ToastAndroid } from "react-native";
+import { StyleSheet, FlatList, View, Text, ActivityIndicator, RefreshControl, ToastAndroid, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
@@ -169,7 +169,17 @@ export default function DisponiblesScreen() {
           <Text style={styles.loadingText}>Cargando servicios...</Text>
         </View>
       ) : pedidosVisibles.length === 0 ? (
-        <View style={styles.emptyState}>
+        <ScrollView
+          contentContainerStyle={styles.emptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[Colors.activeMenuText, Colors.gradientEnd]}
+              progressBackgroundColor={Colors.activeMenuBackground}
+            />
+          }
+        >
           <Ionicons name="baseball-outline" size={48} color={Colors.normalText} style={styles.emptyStateIcon} />
           <Text style={styles.emptyStateTitle}>No hay servicios disponibles</Text>
           <Text style={styles.emptyStateText}>
@@ -177,7 +187,7 @@ export default function DisponiblesScreen() {
               ? "Vuelve más tarde para ver nuevos servicios"
               : "Los nuevos servicios aparecerán con 10s de delay"}
           </Text>
-        </View>
+        </ScrollView>
       ) : (
         <FlatList
           data={pedidosVisibles}

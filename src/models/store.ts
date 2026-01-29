@@ -7,7 +7,9 @@ export interface Store {
   branchId: string;
   type: "credito" | "efectivo";
   adminEmail?: string;
+  isActive: boolean;
   createdAt: string;
+  deletedAt?: string | null;
   branch?: {
     id: string;
     name: string;
@@ -28,7 +30,9 @@ export interface StoreResponse {
   branch_id: string;
   type: "credito" | "efectivo";
   admin_email?: string;
+  is_active: boolean;
   created_at: string;
+  deleted_at?: string | null;
   branches?: {
     id: string;
     name: string;
@@ -59,7 +63,9 @@ export function toStore(r: StoreResponse): Store {
     branchId: r.branch_id,
     type: r.type,
     adminEmail: r.admin_email,
+    isActive: r.is_active,
     createdAt: r.created_at,
+    deletedAt: r.deleted_at ?? null,
     branch: r.branches
       ? {
           id: r.branches.id,

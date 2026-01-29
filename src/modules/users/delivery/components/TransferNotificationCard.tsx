@@ -1,6 +1,6 @@
 // src/modules/users/delivery/components/TransferNotificationCard.tsx
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 
@@ -24,12 +24,14 @@ interface Props {
   currentDeliveryId: string;
   onAccept?: () => void;
   onReject?: () => void;
+  isProcessing?: boolean;
 }
 
 export default function TransferNotificationCard({
   notification,
   currentDeliveryId,
   onAccept,
+  isProcessing = false,
   onReject,
 }: Props) {
   const isReceived = notification.to_delivery_id === currentDeliveryId;
@@ -120,23 +122,37 @@ export default function TransferNotificationCard({
       {isReceived && isPending && (
         <View style={styles.cardActions}>
           <TouchableOpacity
-            style={styles.rejectBtn}
+            style={[styles.rejectBtn, isProcessing && styles.buttonDisabled]}
             onPress={onReject}
+            disabled={isProcessing}
           >
-            <Ionicons name="close-circle-outline" size={18} color="#FF3B30" />
-            <Text style={styles.rejectText}>Rechazar</Text>
+            {isProcessing ? (
+              <ActivityIndicator size="small" color="#FF3B30" />
+            ) : (
+              <>
+                <Ionicons name="close-circle-outline" size={18} color="#FF3B30" />
+                <Text style={styles.rejectText}>Rechazar</Text>
+              </>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.acceptBtn}
+            style={[styles.acceptBtn, isProcessing && styles.buttonDisabled]}
             onPress={onAccept}
+            disabled={isProcessing}
           >
-            <Ionicons
-              name="checkmark-circle-outline"
-              size={18}
-              color="#4CAF50"
-            />
-            <Text style={styles.acceptText}>Aceptar</Text>
+            {isProcessing ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={18}
+                  color="#fff"
+                />
+                <Text style={styles.acceptText}>Aceptar</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -252,6 +268,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#fff",
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   timestamp: {
     fontSize: 11,

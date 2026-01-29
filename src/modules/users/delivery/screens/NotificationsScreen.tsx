@@ -40,6 +40,7 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"inbox" | "history">("inbox");
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   // Cargar notificaciones cuando la pantalla se enfoca
   useFocusEffect(
@@ -96,8 +97,10 @@ export default function NotificationsScreen() {
   const displayData = activeTab === "inbox" ? inbox : history;
 
   const handleAccept = async (notificationId: string) => {
+    if (processingId) return; // Evitar múltiples clicks
+    
     try {
-      setLoading(true);
+      setProcessingId(notificationId);
       await respondToTransfer(
         notificationId,
         "accept",
@@ -108,13 +111,15 @@ export default function NotificationsScreen() {
     } catch (err) {
       Alert.alert("Error", "No se pudo aceptar la solicitud");
     } finally {
-      setLoading(false);
+      setProcessingId(null);
     }
   };
 
   const handleReject = async (notificationId: string) => {
+    if (processingId) return; // Evitar múltiples clicks
+    
     try {
-      setLoading(true);
+      setProcessingId(notificationId);
       await respondToTransfer(
         notificationId,
         "reject",
@@ -126,12 +131,13 @@ export default function NotificationsScreen() {
     } catch (err) {
       Alert.alert("Error", "No se pudo rechazar la solicitud");
     } finally {
-      setLoading(false);
+      setProcessingId(null);
     }
   };
 
   const renderNotificationCard = ({ item }: { item: TransferNotification }) => (
     <TransferNotificationCard
+      isProcessing={processingId === item.id}
       notification={item}
       currentDeliveryId={profile.id}
       onAccept={() => handleAccept(item.id)}
