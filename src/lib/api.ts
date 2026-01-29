@@ -1,6 +1,5 @@
 import axios from "axios";
 import { getApiUrl } from "@/config/environment";
-import Toast from "react-native-toast-message";
 
 const API_URL = getApiUrl();
 
@@ -9,35 +8,64 @@ export const api = axios.create({
   baseURL: `${API_URL}/api`, // 👈 agregamos /api automáticamente
 });
 
-// Interceptor para manejar cuenta inactiva
+// Bandera para prevenir múltiples ejecuciones del logout
+let isLoggingOut = false;
+
+// Interceptor para detectar cuenta inactiva
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // Si es error 403 y el error es "inactive_account"
-    if (error.response?.status === 403 && error.response?.data?.error === 'inactive_account') {
-      console.log('🚫 [API] Cuenta inactiva detectada');
+    // Solo ejecutar una vez
+    if (error.response?.status === 403 && 
+        error.response?.data?.error === 'inactive_account' && 
+        !isLoggingOut) {
       
-      // Mostrar toast
-      Toast.show({
-        type: 'error',
-        text1: 'Cuenta desactivada',
-        text2: error.response?.data?.message || 'Tu cuenta ha sido desactivada. Contacta al administrador.',
-        position: 'top',
-        visibilityTime: 5000,
-      });
-
-      // Importar dinámicamente para evitar dependencia circular
-      const { signOut } = await import('@/services/auth');
-      const { router } = await import('expo-router');
+      isLoggingOut = true;
+      console.log('🚫 [API] Cuenta inactiva detectada - Cerrando sesión...');
       
-      // Cerrar sesión
-      await signOut();
-      router.replace('/(auth)/login');
+      // Ejecutar en el siguiente tick para evitar bucles de render
+      setTimeout(async () => {
+        try {
+          // Importar dinámicamente para evitar dependencias circulares
+          const Toast = (await import('react-native-toast-message')).default;
+          const { router } = await import('expo-router');
+          const { signOut } = await import('@/services/auth');
+          
+          // Mostrar toast
+          Toast.show({
+            type: 'error',
+            text1: 'Cuenta desactivada',
+            text2: error.response?.data?.message || 'Tu cuenta ha sido desactivada. Contacta al administrador.',
+            position: 'top',
+            visibilityTime: 4000,
+          });
+          
+          // Cerrar sesión
+          await signOut();
+          
+          // Redirigir a login
+          router.replace('/(auth)/login');
+          
+          // Reset bandera después de un tiempo
+          setTimeout(() => {
+            isLoggingOut = false;
+          }, 2000);
+          
+        } catch (logoutError) {
+          console.error('❌ Error en logout automático:', logoutError);
+          isLoggingOut = false;
+        }
+      }, 100);
     }
     
     return Promise.reject(error);
   }
 );
+
+// Función para resetear la bandera (útil para testing)
+export function resetLogoutFlag() {
+  isLoggingOut = false;
+}
 
 // Log para debugging (solo en desarrollo)
 if (__DEV__) {

@@ -14,6 +14,7 @@ import { Colors } from "@/constans/colors";
 import { createService } from "@/services/services";
 import { Service, toServicePayload } from "@/models/service"; // 👈 importa tu modelo y mapper
 import { useAuth } from "@/providers/AuthProvider";
+import Toast from "react-native-toast-message";
 
 const { width } = Dimensions.get("window");
 const isLargeScreen = width > 768;
@@ -34,7 +35,7 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
   const [prepTime, setPrepTime] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { session } = useAuth(); // 🔑 token de Supabase Auth
+  const { session, logout } = useAuth(); // 🔑 token de Supabase Auth + función logout
 
   const handleSubmit = async () => {
   if (!session) return alert("Debes estar autenticado");
@@ -74,9 +75,24 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
   } catch (err: any) {
     console.error("❌ Error creando servicio:", err);
     
-    // Si es error de cuenta inactiva, el interceptor ya lo manejó
+    // Si es error de cuenta inactiva
     if (err.response?.status === 403 && err.response?.data?.error === 'inactive_account') {
-      // No hacer nada, el interceptor ya mostró el toast y cerró sesión
+      Toast.show({
+        type: 'error',
+        text1: 'Cuenta desactivada',
+        text2: err.response?.data?.message || 'Tu cuenta ha sido desactivada. Contacta al administrador.',
+        position: 'top',
+        visibilityTime: 4000,
+      });
+      
+      // Cerrar modal primero
+      onClose();
+      
+      // Forzar logout después de un pequeño delay
+      setTimeout(async () => {
+        await logout();
+      }, 1000);
+      
       return;
     }
     

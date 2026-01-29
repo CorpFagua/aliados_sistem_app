@@ -32,6 +32,7 @@ export default function StoreDetailScreen({
 
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
+  const [toggleLoading, setToggleLoading] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
@@ -71,7 +72,9 @@ export default function StoreDetailScreen({
   };
 
   const handleToggleStatus = async () => {
-    if (!store) return;
+    if (!store || toggleLoading) return;
+    
+    setToggleLoading(true);
     try {
       const newStatus = !store.isActive;
       const updated = await toggleStoreStatus(store.id, token);
@@ -92,6 +95,8 @@ export default function StoreDetailScreen({
         text2: "No se pudo cambiar el estado de la tienda",
         position: "top",
       });
+    } finally {
+      setToggleLoading(false);
     }
   };
 
@@ -168,16 +173,26 @@ export default function StoreDetailScreen({
           style={[
             styles.toggleButton,
             { backgroundColor: store.isActive ? "#f44336" : "#4CAF50" },
+            toggleLoading && styles.toggleButtonDisabled,
           ]}
           onPress={handleToggleStatus}
+          disabled={toggleLoading}
         >
-          <Ionicons
-            name={store.isActive ? "close-circle" : "checkmark-circle"}
-            size={22}
-            color="#FFF"
-          />
+          {toggleLoading ? (
+            <ActivityIndicator size="small" color="#FFF" style={{ marginRight: 8 }} />
+          ) : (
+            <Ionicons
+              name={store.isActive ? "close-circle" : "checkmark-circle"}
+              size={22}
+              color="#FFF"
+            />
+          )}
           <Text style={styles.toggleButtonText}>
-            {store.isActive ? "Desactivar tienda" : "Activar tienda"}
+            {toggleLoading
+              ? "Procesando..."
+              : store.isActive
+              ? "Desactivar tienda"
+              : "Activar tienda"}
           </Text>
         </TouchableOpacity>
 
@@ -321,6 +336,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
+  },
+  toggleButtonDisabled: {
+    opacity: 0.6,
   },
   toggleButtonText: {
     color: "#FFF",
