@@ -208,6 +208,7 @@ export default function DisponiblesScreen() {
                     session.access_token,
                     session.user.id
                   );
+                  ToastAndroid.show("Pedido asignado exitosamente", ToastAndroid.SHORT);
                   return true; // cierra la tarjeta al éxito
                 } catch (err: any) {
                   console.error("❌ Error al tomar servicio:", err);
@@ -220,6 +221,17 @@ export default function DisponiblesScreen() {
                       "Debes finalizar los pedidos que tienes actualmente para tomar nuevamente pedidos.",
                       ToastAndroid.LONG
                     );
+                  } else if (err?.message && err.message.includes("ya no está disponible")) {
+                    // 🔒 Error de concurrencia: otro delivery tomó el pedido
+                    console.log("[DisponiblesScreen] ⚠️ Servicio ya tomado por otro delivery - Refrescando...");
+                    ToastAndroid.show(
+                      "Este pedido ya fue tomado por otro delivery.",
+                      ToastAndroid.SHORT
+                    );
+                    // 🔄 REFRESCAR INMEDIATAMENTE para sincronizar con la BD
+                    setTimeout(() => {
+                      refetch();
+                    }, 500);
                   } else {
                     const message = err?.message ||
                       "No se pudo tomar el servicio. Intenta de nuevo.";
