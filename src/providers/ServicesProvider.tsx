@@ -122,6 +122,20 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
               if (exists) {
                 // Actualizar existente
                 console.log(`🔄 [STATE] Actualizando servicio existente`);
+                
+                // 🔒 FILTRO CRÍTICO: Si el servicio fue asignado a otro usuario, 
+                // y el usuario actual es delivery, no debe verlo
+                if (
+                  eventType === 'UPDATE' && 
+                  profile?.role === 'delivery' &&
+                  updatedService.status === 'asignado' && 
+                  updatedService.assignedDelivery && 
+                  updatedService.assignedDelivery !== session?.user?.id
+                ) {
+                  console.log(`⚠️ [FILTER] Servicio ${serviceId} asignado a otro delivery, removiendo del estado local`);
+                  return prev.filter((s) => s.id !== serviceId);
+                }
+                
                 return prev.map((s) => (s.id === serviceId ? updatedService : s));
               } else {
                 // Agregar nuevo (INSERT) - No es inicial
