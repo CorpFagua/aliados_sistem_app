@@ -45,8 +45,9 @@
 
 
 #se ejecuta este comando para crear el apk
+# IMPORTANTE: NO borrar .expo para evitar problemas con TypeScript
 
 cd /Users/alejandrofagua/Documents/GitHub/Aliados_sistem/aliados_sistem_app
-rm -rf node_modules .expo dist build
+rm -rf node_modules dist build android/build android/.gradle
 npm install
 eas build --platform android --local
