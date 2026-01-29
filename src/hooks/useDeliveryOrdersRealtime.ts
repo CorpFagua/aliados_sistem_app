@@ -145,5 +145,40 @@ export function useDeliveryOrdersRealtime() {
     debug: true,
   });
 
+  // 🔵 Escuchar transferencias - cuando un servicio mío es transferido a otro
+  useRealtimeListener({
+    table: 'services',
+    events: ['UPDATE'],
+    filter: undefined, // Escuchar todos los updates
+    onData: (payload) => {
+      const oldService = payload.old as Service;
+      const newService = payload.new as Service;
+
+      // Verificar si el servicio ERA MÍO y ahora es de OTRO
+      const wasMyService = oldService.assignedDelivery === session?.user?.id;
+      const isNowOtherService = newService.assignedDelivery !== session?.user?.id;
+
+      if (wasMyService && isNowOtherService) {
+        console.log(
+          '[DELIVERY] 📤 Servicio transferido desde mi cuenta:',
+          newService.id,
+          '→ nuevo delivery:',
+          newService.assignedDelivery
+        );
+
+        // Remover de todas mis listas
+        setPedidos((prev) => {
+          const updated = { ...prev };
+          ['Asignados', 'En ruta', 'Entregados'].forEach((key) => {
+            updated[key] = updated[key].filter((p) => p.id !== newService.id);
+          });
+          return updated;
+        });
+      }
+    },
+    enabled: !!session?.user?.id,
+    debug: true,
+  });
+
   return { pedidos, loading };
 }
