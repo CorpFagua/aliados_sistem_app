@@ -145,6 +145,11 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
     setShowCalendar(null);
   };
 
+  const isBetween = (iso: string) => {
+    if (!startDate || !endDate) return false;
+    return iso > startDate && iso < endDate;
+  };
+
   const parseDate = (s: string) => {
     if (!s) return null;
     const parts = s.split("-");
@@ -381,14 +386,31 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
       <Modal visible={!!showCalendar} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={[styles.modal, { width: '92%', maxWidth: 420 }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <TouchableOpacity onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}>
-                <Ionicons name="chevron-back" size={22} color={Colors.menuText} />
-              </TouchableOpacity>
-              <Text style={{ color: Colors.normalText, fontWeight: 'bold' }}>{calendarMonth.toLocaleString(undefined, { month: 'long', year: 'numeric' })}</Text>
-              <TouchableOpacity onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}>
-                <Ionicons name="chevron-forward" size={22} color={Colors.menuText} />
-              </TouchableOpacity>
+            <View style={{ marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <TouchableOpacity onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}>
+                  <Ionicons name="chevron-back" size={22} color={Colors.menuText} />
+                </TouchableOpacity>
+                <Text style={{ color: Colors.normalText, fontWeight: 'bold' }}>{calendarMonth.toLocaleString(undefined, { month: 'long', year: 'numeric' })}</Text>
+                <TouchableOpacity onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}>
+                  <Ionicons name="chevron-forward" size={22} color={Colors.menuText} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <Text style={{ color: Colors.menuText, fontSize: 12 }}>Inicio:</Text>
+                  <Text style={{ color: Colors.normalText, fontWeight: '700' }}>{startDate || '-'}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <Text style={{ color: Colors.menuText, fontSize: 12 }}>Fin:</Text>
+                  <Text style={{ color: Colors.normalText, fontWeight: '700' }}>{endDate || '-'}</Text>
+                </View>
+              </View>
+
+              <View style={{ marginTop: 8 }}>
+                <Text style={{ color: Colors.menuText, fontSize: 12 }}>Seleccionando: {showCalendar?.field === 'start' ? 'Desde' : 'Hasta'}</Text>
+              </View>
             </View>
 
             {/* Weekday labels */}
@@ -409,10 +431,20 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
                 for (let d = 1; d <= total; d++) {
                   const cur = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), d);
                   const iso = formatISO(cur);
-                  const selected = iso === startDate || iso === endDate;
+                  const isStart = iso === startDate;
+                  const isEnd = iso === endDate;
+                  const inRange = isBetween(iso);
+
+                  const dayStyle: any = { width: 36, height: 36, margin: 2, borderRadius: 6, justifyContent: 'center', alignItems: 'center' };
+                  const textStyle: any = { color: Colors.menuText };
+
+                  if (isStart) { dayStyle.backgroundColor = Colors.activeMenuText; textStyle.color = Colors.Background; }
+                  else if (isEnd) { dayStyle.backgroundColor = Colors.success; textStyle.color = Colors.Background; }
+                  else if (inRange) { dayStyle.backgroundColor = Colors.gradientStart; textStyle.color = Colors.Background; }
+
                   nodes.push(
-                    <TouchableOpacity key={iso} onPress={() => onPickDate(cur)} style={{ width: 36, height: 36, margin: 2, borderRadius: 6, justifyContent: 'center', alignItems: 'center', backgroundColor: selected ? Colors.gradientStart : undefined }}>
-                      <Text style={{ color: selected ? Colors.Background : Colors.menuText }}>{d}</Text>
+                    <TouchableOpacity key={iso} onPress={() => onPickDate(cur)} style={dayStyle}>
+                      <Text style={textStyle}>{d}</Text>
                     </TouchableOpacity>
                   );
                 }

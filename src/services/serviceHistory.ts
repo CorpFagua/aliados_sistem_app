@@ -8,7 +8,7 @@ import { api, authHeaders } from "../lib/api";
 
 // ===== TIPOS (Sincronizados con backend) =====
 
-export type ServiceStatus = 'disponible' | 'asignado' | 'en_ruta' | 'entregado' | 'cancelado' | 'eliminado';
+export type ServiceStatus = 'disponible' | 'asignado' | 'en_ruta' | 'entregado' | 'cancelado' | 'eliminado'| 'pago' | 'pagado' | 'paid';
 export type ServiceType = 'domicilio' | 'paqueteria_aliados' | 'paqueteria_coordinadora';
 export type PaymentMethod = 'efectivo' | 'transferencia' | 'tarjeta';
 
