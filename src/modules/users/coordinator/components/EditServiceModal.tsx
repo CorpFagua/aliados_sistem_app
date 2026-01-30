@@ -21,7 +21,7 @@
  * - Tipo de servicio
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   Modal,
   View,
@@ -45,7 +45,9 @@ import { Service } from "@/models/service";
 
 interface EditServiceModalProps {
   visible: boolean;
-  service: Service | null;
+  // El modal puede recibir un `Service` (desde Home) o un detalle de historial
+  // (`ServiceHistoryDetail`) desde Historial; aceptar `any` permite compatibilidad.
+  service: Service | any | null;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -58,6 +60,7 @@ const STATUS_OPTIONS = [
   { label: "Asignado", value: "asignado" },
   { label: "En Ruta", value: "en_ruta" },
   { label: "Entregado", value: "entregado" },
+  { label: "Pago", value: "pago" },
   { label: "Cancelado", value: "cancelado" },
 ];
 
@@ -91,6 +94,43 @@ export default function EditServiceModal({
   onSuccess,
 }: EditServiceModalProps) {
   const { session } = useAuth();
+
+  // Normalizar diferentes shapes (`Service` desde Home vs `ServiceHistoryDetail` desde Historial)
+  const svc = useMemo(() => {
+    if (!service) return null;
+
+    const get = (obj: any, keys: string[], fallback: any = null) => {
+      for (const k of keys) {
+        if (obj && obj[k] !== undefined && obj[k] !== null) return obj[k];
+      }
+      return fallback;
+    };
+
+    const created = get(service, ["createdAt", "created_at"]);
+    const assignedAt = get(service, ["assignedAt", "assigned_at"]);
+    const completedAt = get(service, ["completedAt", "completed_at"]);
+
+    return {
+      id: service.id,
+      profileStoreName: get(service, ["profileStoreName", "profile_store", "store"], null)?.name ?? get(service, ["profileStoreName", "storeName", "store"] , null),
+      typeId: get(service, ["typeId", "type", "type_id"]),
+      price: get(service, ["price", "price"]),
+      payment: get(service, ["payment", "paymentMethod", "payment_method"]),
+      amount: get(service, ["amount", "totalToCollect", "total_to_collect"] , 0),
+      createdAt: created ? (created instanceof Date ? created : new Date(created)) : null,
+      assignedAt: assignedAt ? (assignedAt instanceof Date ? assignedAt : new Date(assignedAt)) : null,
+      completedAt: completedAt ? (completedAt instanceof Date ? completedAt : new Date(completedAt)) : null,
+      status: get(service, ["status", "status"]),
+      zoneId: get(service, ["zoneId", "zone", "zone_id"], null) && (service.zoneId ?? (service.zone && service.zone.id) ?? service.zone_id) || null,
+      assignedDelivery: get(service, ["assignedDelivery", "assigned_delivery"]) ?? (service.delivery && service.delivery.id) ?? null,
+      assignedDeliveryName: get(service, ["assignedDeliveryName", "assigned_delivery_name"]) ?? (service.delivery && service.delivery.name) ?? null,
+      branchId: get(service, ["branchId", "branch_id"], null),
+      // Mantener referencia al objeto original por si hace falta
+      raw: service,
+    };
+  }, [service]);
+
+  const originalAssignedDeliveryRef = useRef<string | null>(null);
 
   // Estados para campos editables
   const [deliverySearch, setDeliverySearch] = useState("");
@@ -138,27 +178,43 @@ export default function EditServiceModal({
     try {
       // Cargar zonas
       const zones = await fetchZones(session.access_token);
-      const branchZones = zones.filter((z) => z.branchId === service.branchId);
+
+      // Intentar obtener branchId desde la versión normalizada
+      const branchId = svc?.branchId ?? svc?.raw?.branchId ?? svc?.raw?.branch_id ?? null;
+
+      const branchZones = branchId
+        ? zones.filter((z) => z.branchId === branchId)
+        : zones;
+
       setZoneItems(branchZones.map((z) => ({ label: z.name, value: z.id })));
 
-      // Setear valores iniciales
-      setNotes(service.notes || "");
-      setClientPhone(service.phone || "");
-      setClientName(service.clientName || "");
-      setDestination(service.destination || "");
-      setStatus(service.status || "disponible");
-      setZoneId(service.zoneId || null);
+      // Setear valores iniciales desde `svc` (normalizado)
+      const destinationVal = svc?.raw?.destination ?? svc?.raw?.deliveryAddress ?? svc?.raw?.delivery_address ?? "";
+      const phoneVal = svc?.raw?.phone ?? svc?.raw?.clientPhone ?? svc?.raw?.client_phone ?? "";
+      const clientNameVal = svc?.raw?.clientName ?? svc?.raw?.client_name ?? "";
+      const notesVal = svc?.raw?.notes ?? "";
+      const statusVal = svc?.status ?? "disponible";
+      const zoneIdVal = svc?.zoneId ?? (svc?.raw?.zone && svc.raw.zone.id) ?? svc?.raw?.zone_id ?? null;
 
-      // Si hay delivery asignado, cargarlo
-      if (service.assignedDelivery && service.assignedDeliveryName) {
-        setSelectedDelivery({
-          id: service.assignedDelivery,
-          name: service.assignedDeliveryName,
-        });
-        setDeliverySearch(service.assignedDeliveryName);
+      setNotes(notesVal);
+      setClientPhone(phoneVal);
+      setClientName(clientNameVal);
+      setDestination(destinationVal);
+      setStatus(statusVal);
+      setZoneId(zoneIdVal);
+
+      // Si hay delivery asignado, cargarlo (puede venir en distintas formas)
+      const assignedId = svc?.assignedDelivery ?? svc?.raw?.assignedDelivery ?? svc?.raw?.assigned_delivery ?? (svc?.raw?.delivery && svc.raw.delivery.id) ?? null;
+      const assignedName = svc?.assignedDeliveryName ?? svc?.raw?.assignedDeliveryName ?? svc?.raw?.assigned_delivery_name ?? (svc?.raw?.delivery && svc.raw.delivery.name) ?? null;
+
+      if (assignedId && assignedName) {
+        setSelectedDelivery({ id: assignedId, name: assignedName });
+        setDeliverySearch(assignedName);
+        originalAssignedDeliveryRef.current = assignedId;
       } else {
         setSelectedDelivery(null);
         setDeliverySearch("");
+        originalAssignedDeliveryRef.current = null;
       }
     } catch (err) {
       console.error("❌ Error cargando datos iniciales:", err);
@@ -215,6 +271,7 @@ export default function EditServiceModal({
     setDeliverySearch(delivery.name);
     setShowDeliveryDropdown(false);
     setDeliveryResults([]);
+    // No forzamos cambio de estado aquí; la regla de 'disponible' se aplica al guardar
   };
 
   const handleClearDelivery = () => {
@@ -253,33 +310,35 @@ export default function EditServiceModal({
       };
 
       // Incluir zone_id si cambió
-      if (zoneId !== service.zoneId) {
+      if (zoneId !== (svc?.zoneId ?? svc?.raw?.zone_id ?? null)) {
         updatePayload.zoneId = zoneId || undefined;
       }
 
-      await updateServiceData(service.id, updatePayload, token);
+      await updateServiceData(svc?.id ?? service.id, updatePayload, token);
 
-      // 2️⃣ Si el estado cambió, actualizar el estado
-      if (status !== service.status) {
-        // 🔴 REGLA ESPECIAL: Si cambia a "disponible", borrar delivery_id
-        const newDeliveryId = status === "disponible" ? null : selectedDelivery?.id || service.assignedDelivery;
-        
+      // 2️⃣ Actualizar estado/domiciliario cuando haya cambios
+      const currentAssignedId =
+        originalAssignedDeliveryRef.current ??
+        svc?.assignedDelivery ??
+        svc?.raw?.assigned_delivery ??
+        (svc?.raw?.delivery && svc.raw.delivery.id) ??
+        null;
+
+      // Si se guarda con estado 'disponible' el delivery debe ser null por regla
+      const newDeliveryId = status === "disponible" ? null : selectedDelivery?.id ?? currentAssignedId;
+
+      const deliveryChanged = (selectedDelivery?.id ?? null) !== currentAssignedId;
+      const statusChanged = status !== (svc?.status ?? svc?.raw?.status ?? null);
+
+      if (statusChanged || deliveryChanged) {
+        const deliveryParam = newDeliveryId === null ? null : (newDeliveryId as string | undefined);
+
         await updateServiceStatus(
-          service.id,
+          svc?.id ?? service.id,
           status as "disponible" | "asignado" | "en_ruta" | "entregado" | "cancelado",
           token,
-          newDeliveryId || undefined
+          deliveryParam as any
         );
-      } else {
-        // Si el estado no cambió pero el delivery sí, actualizar el delivery
-        if (selectedDelivery?.id !== service.assignedDelivery) {
-          await updateServiceStatus(
-            service.id,
-            status as "disponible" | "asignado" | "en_ruta" | "entregado" | "cancelado",
-            token,
-            selectedDelivery?.id || undefined
-          );
-        }
       }
 
       Alert.alert("Éxito", "Servicio actualizado correctamente");
@@ -303,10 +362,10 @@ export default function EditServiceModal({
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
           {/* Header */}
-          <View style={styles.header}>
+              <View style={styles.header}>
             <View>
               <Text style={styles.headerTitle}>Editar Servicio</Text>
-              <Text style={styles.headerSubtitle}>ID: {service.id.slice(0, 8)}</Text>
+              <Text style={styles.headerSubtitle}>ID: {(svc?.id ?? service?.id ?? "").slice(0, 8)}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={Colors.normalText} />
@@ -327,36 +386,36 @@ export default function EditServiceModal({
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Tienda:</Text>
                   <Text style={styles.infoValue}>
-                    {service.profileStoreName || "N/A"}
+                    {svc?.profileStoreName || "N/A"}
                   </Text>
                 </View>
 
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Tipo:</Text>
                   <Text style={styles.infoValue}>
-                    {service.typeId === "paqueteria_aliados" ? "Paquetería Aliados" : service.typeId === "paqueteria_coordinadora" ? "Paquetería Coordinadora" : "Domicilio"}
+                    {svc?.typeId === "paqueteria_aliados" ? "Paquetería Aliados" : svc?.typeId === "paqueteria_coordinadora" ? "Paquetería Coordinadora" : "Domicilio"}
                   </Text>
                 </View>
 
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Precio:</Text>
                   <Text style={styles.infoValue}>
-                    {formatCurrency(service.price || 0)}
+                    {formatCurrency(svc?.price || 0)}
                   </Text>
                 </View>
 
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Método de pago:</Text>
                   <Text style={styles.infoValue}>
-                    {service.payment || "N/A"}
+                    {svc?.payment || "N/A"}
                   </Text>
                 </View>
 
-                {service.amount && service.amount > 0 && (
+                {svc?.amount && svc.amount > 0 && (
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Total a recaudar:</Text>
                     <Text style={styles.infoValue}>
-                      {formatCurrency(service.amount)}
+                      {formatCurrency(svc?.amount || 0)}
                     </Text>
                   </View>
                 )}
@@ -368,20 +427,20 @@ export default function EditServiceModal({
                 
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Creado:</Text>
-                  <Text style={styles.infoValue}>{formatDate(service.createdAt)}</Text>
+                  <Text style={styles.infoValue}>{formatDate(svc?.createdAt ?? svc?.raw?.created_at ?? null)}</Text>
                 </View>
 
-                {service.assignedAt && (
+                {svc?.assignedAt && (
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Asignado:</Text>
-                    <Text style={styles.infoValue}>{formatDate(service.assignedAt)}</Text>
+                    <Text style={styles.infoValue}>{formatDate(svc?.assignedAt ?? svc?.raw?.assigned_at ?? null)}</Text>
                   </View>
                 )}
 
-                {service.completedAt && (
+                {svc?.completedAt && (
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Entregado:</Text>
-                    <Text style={styles.infoValue}>{formatDate(service.completedAt)}</Text>
+                    <Text style={styles.infoValue}>{formatDate(svc?.completedAt ?? svc?.raw?.completed_at ?? null)}</Text>
                   </View>
                 )}
               </View>
@@ -422,9 +481,9 @@ export default function EditServiceModal({
                     style={styles.searchInput}
                     placeholder="Buscar por nombre..."
                     placeholderTextColor={Colors.menuText}
-                    value={deliverySearch}
-                    onChangeText={handleDeliverySearch}
-                    editable={status !== "disponible"}
+                      value={deliverySearch}
+                      onChangeText={handleDeliverySearch}
+                      editable={true}
                   />
                   {selectedDelivery && status !== "disponible" && (
                     <TouchableOpacity onPress={handleClearDelivery} style={styles.clearButton}>

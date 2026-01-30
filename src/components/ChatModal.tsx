@@ -21,6 +21,7 @@ import { loadChatMessages, saveChatMessages } from "@/lib/chatStorage";
 import { useUnreadMessagesContext } from "@/providers/UnreadMessagesProvider";
 
 const screenHeight = Dimensions.get("window").height;
+const screenWidth = Dimensions.get("window").width;
 
 export default function ChatModal({
   visible,
@@ -31,8 +32,28 @@ export default function ChatModal({
 }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+  const [dimensions, setDimensions] = useState({
+    width: Dimensions.get("window").width,
+    height: Dimensions.get("window").height,
+  });
   const listRef = useRef(null);
   const { markServiceAsRead } = useUnreadMessagesContext();
+
+  // Escuchar cambios de dimensiones en tiempo real (solo web)
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    
+    const subscription = Dimensions.addEventListener("change", ({ window }) => {
+      setDimensions({
+        width: window.width,
+        height: window.height,
+      });
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!visible || !serviceId) return;
@@ -127,7 +148,17 @@ export default function ChatModal({
     return (
       <Animated.View
         entering={isMine ? FadeInRight.springify() : FadeInLeft.springify()}
-        style={[styles.messageRow, isMine ? styles.myRow : styles.otherRow]}
+        style={[
+          Platform.OS === "web" 
+            ? {
+                flexDirection: "row",
+                alignItems: "flex-end",
+                marginVertical: 6,
+                marginHorizontal: dimensions.width < 500 ? 6 : 10,
+              }
+            : styles.messageRow,
+          isMine ? styles.myRow : styles.otherRow
+        ]}
       >
         {/* Avatar solo para el otro usuario */}
         {!isMine && (
@@ -136,9 +167,38 @@ export default function ChatModal({
 
         <View
           style={[
-            styles.bubble,
+            Platform.OS === "web"
+              ? {
+                  maxWidth: dimensions.width < 500 ? dimensions.width * 0.75 : 450,
+                  width: "auto",
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  borderRadius: 18,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 2,
+                  elevation: 2,
+                }
+              : styles.bubble,
             isMine
-              ? [styles.myBubble, { borderColor }]
+              ? Platform.OS === "web"
+                ? { 
+                    backgroundColor: "#1F2937",
+                    borderTopRightRadius: 4,
+                    borderWidth: 1,
+                    borderColor: borderColor,
+                    marginLeft: dimensions.width < 500 ? 12 : 40,
+                  }
+                : [styles.myBubble, { borderColor }]
+              : Platform.OS === "web"
+              ? { 
+                  backgroundColor: "#2C2C2E",
+                  borderTopLeftRadius: 4,
+                  borderWidth: 1,
+                  borderColor: borderColor,
+                  marginRight: dimensions.width < 500 ? 12 : 40,
+                }
               : [styles.otherBubble, { borderColor }],
           ]}
         >
@@ -187,12 +247,28 @@ export default function ChatModal({
           style={styles.keyboardView}
           enabled={Platform.OS !== "web"}
         >
-          <View style={styles.overlay}>
+          <View 
+            style={[
+              styles.overlay,
+              Platform.OS === "web" && dimensions.width < 600 ? { justifyContent: "flex-end", alignItems: "center" } : {}
+            ]}
+          >
             <View style={{ flex: 1 }} pointerEvents="none" />
             <View
               style={[
                 styles.container,
-                Platform.OS === "web" ? styles.modalWeb : styles.modalMobile,
+                Platform.OS === "web" 
+                  ? {
+                      width: dimensions.width < 600 ? "100%" : 450,
+                      height: dimensions.width < 600 ? dimensions.height * 0.98 : 580,
+                      maxHeight: dimensions.width < 600 ? dimensions.height * 0.98 : 580,
+                      position: dimensions.width < 600 ? "relative" : "absolute",
+                      bottom: dimensions.width < 600 ? "auto" : 20,
+                      right: dimensions.width < 600 ? "auto" : 20,
+                      borderRadius: 16,
+                      margin: dimensions.width < 600 ? "auto" : 0,
+                    }
+                  : styles.modalMobile,
               ]}
             >
             {/* Header */}
@@ -298,7 +374,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     marginVertical: 6,
-    marginHorizontal: 10,
+    marginHorizontal: Platform.OS === "web" && screenWidth < 500 ? 6 : 10,
   },
   myRow: {
     justifyContent: "flex-end",
@@ -317,7 +393,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.Border,
   },
   bubble: {
-    maxWidth: Platform.OS === "web" ? 500 : "75%",
+    maxWidth: Platform.OS === "web" ? (screenWidth < 500 ? screenWidth * 0.75 : 450) : "75%",
     width: "auto",
     paddingVertical: 10,
     paddingHorizontal: 14,

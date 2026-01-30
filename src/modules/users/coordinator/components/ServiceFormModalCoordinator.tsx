@@ -11,6 +11,7 @@ import {
   Alert,
 } from "react-native";
 import { Colors } from "@/constans/colors";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/providers/AuthProvider";
 import { TabsNavigation, TabType } from "./TabsNavigation";
 import { DomiciliosForm } from "./forms/DomiciliosForm";
@@ -22,8 +23,10 @@ import { adminCreateService } from "@/services/services.admin";
 import type { ServiceFormModalProps } from "./types";
 import type { ServiceAdminPayload } from "@/models/service";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 const isLargeScreen = width > 768;
+const isMobile = width < 768;
+const isSmallDevice = width < 375;
 
 export default function ServiceFormModal({
   visible,
@@ -199,107 +202,118 @@ export default function ServiceFormModal({
         <View
           style={[styles.cardWrapper, isLargeScreen && styles.cardWrapperLarge]}
         >
-          <View style={styles.card}>
-            <Text style={styles.title}>
-              {editing ? "Editar Servicio" : "Crear Servicio"}
-            </Text>
-            <Text style={styles.subtitle}>Aliados Express</Text>
+          {/* HEADER FIJO */}
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.title}>
+                {editing ? "Editar Servicio" : "Crear Servicio"}
+              </Text>
+              <Text style={styles.subtitle}>Aliados Express</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} disabled={isLoading}>
+              <Ionicons name="close" size={24} color={Colors.normalText} />
+            </TouchableOpacity>
+          </View>
 
-            {/* TABS NAVIGATION */}
+          {/* TABS NAVIGATION */}
+          <View style={styles.tabsContainer}>
             <TabsNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+          </View>
 
-            {/* -------- SCROLL INTERNO -------- */}
-            <ScrollView
-              style={styles.scrollArea}
-              contentContainerStyle={{ paddingBottom: 30 }}
-              showsVerticalScrollIndicator={false}
-            >
-              {/* DOMICILIOS */}
-              {activeTab === "domicilios" && (
-                <DomiciliosForm
-                  destination={formState.destination}
-                  phone={formState.phone}
-                  clientName={formState.clientName}
-                  notes={formState.notes}
-                  prepTime={formState.prepTime}
-                  onDestinationChange={formState.setDestination}
-                  onPhoneChange={formState.setPhone}
-                  onClientNameChange={formState.setClientName}
-                  onNotesChange={formState.setNotes}
-                  onPrepTimeChange={formState.setPrepTime}
-                  payment={formState.payment}
-                  amount={formState.amount}
-                  onPaymentChange={formState.setPayment}
-                  onAmountChange={formState.setAmount}
-                  storeQuery={profileStoreSearch.profileQuery}
-                  selectedStore={profileStoreSearch.selectedProfileStore}
-                  storeResults={profileStoreSearch.profileResults}
-                  loadingStores={profileStoreSearch.loadingProfiles}
-                  onStoreSearch={profileStoreSearch.handleSearchProfileStores}
-                  onStoreSelect={handleProfileStoreSelect}
-                  onStoreClear={() => profileStoreSearch.setSelectedProfileStore(null)}
-                  showStoreSelector={role === "coordinator" || role === "super_admin"}
-                />
-              )}
+          {/* -------- SCROLL INTERNO -------- */}
+          <ScrollView
+            style={styles.scrollArea}
+            contentContainerStyle={styles.scrollContentContainer}
+            showsVerticalScrollIndicator={true}
+            scrollIndicatorInsets={{ right: 1 }}
+          >
+            {/* DOMICILIOS */}
+            {activeTab === "domicilios" && (
+              <DomiciliosForm
+                destination={formState.destination}
+                phone={formState.phone}
+                clientName={formState.clientName}
+                notes={formState.notes}
+                prepTime={formState.prepTime}
+                onDestinationChange={formState.setDestination}
+                onPhoneChange={formState.setPhone}
+                onClientNameChange={formState.setClientName}
+                onNotesChange={formState.setNotes}
+                onPrepTimeChange={formState.setPrepTime}
+                payment={formState.payment}
+                amount={formState.amount}
+                onPaymentChange={formState.setPayment}
+                onAmountChange={formState.setAmount}
+                storeQuery={profileStoreSearch.profileQuery}
+                selectedStore={profileStoreSearch.selectedProfileStore}
+                storeResults={profileStoreSearch.profileResults}
+                loadingStores={profileStoreSearch.loadingProfiles}
+                onStoreSearch={profileStoreSearch.handleSearchProfileStores}
+                onStoreSelect={handleProfileStoreSelect}
+                onStoreClear={() => profileStoreSearch.setSelectedProfileStore(null)}
+                showStoreSelector={role === "coordinator" || role === "super_admin"}
+              />
+            )}
 
-              {/* ALIADOS */}
-              {activeTab === "aliados" && (
-                <AliadosForm
-                  pickupAddress={formState.pickupAddress}
-                  destination={formState.destination}
-                  phone={formState.phone}
-                  clientName={formState.clientName}
-                  notes={formState.notes}
-                  aliadosPrice={formState.aliadosPrice}
-                  aliadosPriceDeliverySrv={formState.aliadosPriceDeliverySrv}
-                  onPickupAddressChange={formState.setPickupAddress}
-                  onDestinationChange={formState.setDestination}
-                  onPhoneChange={formState.setPhone}
-                  onClientNameChange={formState.setClientName}
-                  onNotesChange={formState.setNotes}
-                  onAliadosPriceChange={formState.setAliadosPrice}
-                  onAliadosPriceDeliverySrvChange={formState.setAliadosPriceDeliverySrv}
-                  payment={formState.payment}
-                  amount={formState.amount}
-                  onPaymentChange={formState.setPayment}
-                  onAmountChange={formState.setAmount}
-                />
-              )}
+            {/* ALIADOS */}
+            {activeTab === "aliados" && (
+              <AliadosForm
+                pickupAddress={formState.pickupAddress}
+                destination={formState.destination}
+                phone={formState.phone}
+                clientName={formState.clientName}
+                notes={formState.notes}
+                aliadosPrice={formState.aliadosPrice}
+                aliadosPriceDeliverySrv={formState.aliadosPriceDeliverySrv}
+                onPickupAddressChange={formState.setPickupAddress}
+                onDestinationChange={formState.setDestination}
+                onPhoneChange={formState.setPhone}
+                onClientNameChange={formState.setClientName}
+                onNotesChange={formState.setNotes}
+                onAliadosPriceChange={formState.setAliadosPrice}
+                onAliadosPriceDeliverySrvChange={formState.setAliadosPriceDeliverySrv}
+                payment={formState.payment}
+                amount={formState.amount}
+                onPaymentChange={formState.setPayment}
+                onAmountChange={formState.setAmount}
+              />
+            )}
 
-              {/* COORDINADORA */}
-              {activeTab === "coordinadora" && (
-                <CoordinadoraForm
-                  guideId={formState.guideId}
-                  destination={formState.destination}
-                  phone={formState.phone}
-                  clientName={formState.clientName}
-                  notes={formState.notes}
-                  onGuideIdChange={formState.setGuideId}
-                  onDestinationChange={formState.setDestination}
-                  onPhoneChange={formState.setPhone}
-                  onClientNameChange={formState.setClientName}
-                  onNotesChange={formState.setNotes}
-                  payment={formState.payment}
-                  amount={formState.amount}
-                  onPaymentChange={formState.setPayment}
-                  onAmountChange={formState.setAmount}
-                />
-              )}
-            </ScrollView>
+            {/* COORDINADORA */}
+            {activeTab === "coordinadora" && (
+              <CoordinadoraForm
+                guideId={formState.guideId}
+                destination={formState.destination}
+                phone={formState.phone}
+                clientName={formState.clientName}
+                notes={formState.notes}
+                onGuideIdChange={formState.setGuideId}
+                onDestinationChange={formState.setDestination}
+                onPhoneChange={formState.setPhone}
+                onClientNameChange={formState.setClientName}
+                onNotesChange={formState.setNotes}
+                payment={formState.payment}
+                amount={formState.amount}
+                onPaymentChange={formState.setPayment}
+                onAmountChange={formState.setAmount}
+              />
+            )}
+          </ScrollView>
 
+          {/* FOOTER FIJO */}
+          <View style={styles.footer}>
             {error && (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
-
             <TouchableOpacity
               style={[styles.button, isLoading && styles.buttonDisabled]}
               onPress={handleSubmit}
               disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator color="#000" />
+                <ActivityIndicator color="#000" size="small" />
               ) : (
                 <Text style={styles.buttonText}>Guardar servicio</Text>
               )}
@@ -322,79 +336,119 @@ export default function ServiceFormModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.85)",
+    backgroundColor: "rgba(0,0,0,0.95)",
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: isMobile ? 12 : 20,
   },
 
   cardWrapper: {
-    width: "90%",
-    maxHeight: "88%",
+    width: "100%",
+    maxWidth: isLargeScreen ? 550 : isMobile ? "100%" : 480,
+    maxHeight: isMobile ? Math.min(height * 0.9, 750) : Math.min(height * 0.85, 800),
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "#ffffff22",
+    overflow: "hidden",
+    backgroundColor: Colors.activeMenuBackground,
   },
 
   cardWrapperLarge: {
     width: 550,
-    maxHeight: "88%",
+    maxWidth: "100%",
+    maxHeight: Math.min(height * 0.85, 800),
   },
 
-  card: {
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     backgroundColor: Colors.activeMenuBackground,
-    borderRadius: 18,
-    padding: 20,
-    height: "100%",
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.Border,
+    paddingHorizontal: isSmallDevice ? 14 : 18,
+    paddingVertical: isSmallDevice ? 12 : 16,
+  },
+
+  title: {
+    fontSize: isSmallDevice ? 18 : 20,
+    fontWeight: "700",
+    color: Colors.normalText,
+    marginBottom: 4,
+  },
+
+  subtitle: {
+    fontSize: isSmallDevice ? 12 : 13,
+    color: Colors.menuText,
+  },
+
+  tabsContainer: {
+    backgroundColor: Colors.activeMenuBackground,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.Border,
+    paddingHorizontal: isSmallDevice ? 8 : 12,
+    paddingVertical: isSmallDevice ? 8 : 10,
   },
 
   scrollArea: {
     flex: 1,
-    marginBottom: 10,
   },
 
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: Colors.normalText,
-    textAlign: "center",
+  scrollContentContainer: {
+    paddingHorizontal: isSmallDevice ? 14 : 18,
+    paddingVertical: isSmallDevice ? 12 : 16,
+    paddingBottom: 16,
   },
 
-  subtitle: {
-    color: Colors.menuText,
-    textAlign: "center",
-    marginBottom: 15,
+  footer: {
+    backgroundColor: Colors.activeMenuBackground,
+    borderTopWidth: 1,
+    borderTopColor: Colors.Border,
+    paddingHorizontal: isSmallDevice ? 14 : 18,
+    paddingVertical: isSmallDevice ? 10 : 14,
   },
 
   button: {
     backgroundColor: Colors.normalText,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: isSmallDevice ? 12 : 14,
+    borderRadius: 10,
     alignItems: "center",
-    marginTop: 10,
+    marginBottom: 10,
   },
 
   buttonDisabled: {
     opacity: 0.6,
   },
 
-  buttonText: { color: "#000", fontWeight: "700", fontSize: 15 },
+  buttonText: {
+    color: "#000",
+    fontWeight: "700",
+    fontSize: isSmallDevice ? 13 : 14,
+  },
 
   errorContainer: {
     backgroundColor: "rgba(255, 0, 0, 0.2)",
     borderLeftWidth: 4,
     borderLeftColor: "#ff3333",
-    padding: 10,
+    paddingHorizontal: isSmallDevice ? 10 : 12,
+    paddingVertical: 8,
     borderRadius: 8,
-    marginBottom: 10,
+    marginBottom: 12,
   },
 
   errorText: {
     color: "#ff3333",
-    fontSize: 12,
+    fontSize: isSmallDevice ? 11 : 12,
     fontWeight: "600",
   },
 
-  cancelButton: { paddingVertical: 12, alignItems: "center" },
+  cancelButton: {
+    paddingVertical: isSmallDevice ? 10 : 12,
+    alignItems: "center",
+  },
 
-  cancelText: { color: Colors.menuText, fontSize: 14 },
+  cancelText: {
+    color: Colors.menuText,
+    fontSize: isSmallDevice ? 12 : 13,
+  },
 });

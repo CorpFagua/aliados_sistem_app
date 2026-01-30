@@ -300,14 +300,34 @@ export default function ServiceDetailModal({
                   <View style={styles.financeRowBottom}>
                     <View style={styles.financeRowContent}>
                       <Text style={styles.financeRowTitle}>Pago Recibido</Text>
-                      <Text style={styles.financeRowDesc}>¿La tienda ya te pagó?</Text>
+                      <Text style={styles.financeRowDesc}>¿La tienda ya pagó este pedido?</Text>
+                    </View>
+                    <View style={styles.paymentStatusContainer}>
+                      {(() => {
+                        const storePaid = service?.status === "pago"
+
+                        return (
+                          <View style={[styles.paymentStatusBadge, { backgroundColor: storePaid ? Colors.success + '20' : Colors.warning + '20' }]}>
+                            <View style={[styles.paymentStatusDot, { backgroundColor: storePaid ? Colors.success : Colors.warning }]} />
+                            <Text style={[styles.paymentStatusText, { color: storePaid ? Colors.success : Colors.warning }]}>
+                              {storePaid ? "Sí" : "No"}
+                            </Text>
+                          </View>
+                        );
+                      })()}
+                    </View>
+                  </View>
+
+                  {/* Pago domiciliario: si ya le pagaste al domiciliario (is_paid en la BD) */}
+                  <View style={[styles.financeRowBottom, { marginTop: 8 }] }>
+                    <View style={styles.financeRowContent}>
+                      <Text style={styles.financeRowTitle}>Pago domiciliario</Text>
+                      <Text style={styles.financeRowDesc}>¿Ya le pagaste al domiciliario?</Text>
                     </View>
                     <View style={styles.paymentStatusContainer}>
                       <View style={[styles.paymentStatusBadge, { backgroundColor: service.isPaid ? Colors.success + '20' : Colors.warning + '20' }]}>
                         <View style={[styles.paymentStatusDot, { backgroundColor: service.isPaid ? Colors.success : Colors.warning }]} />
-                        <Text style={[styles.paymentStatusText, { color: service.isPaid ? Colors.success : Colors.warning }]}>
-                          {service.isPaid ? "Sí" : "No"}
-                        </Text>
+                        <Text style={[styles.paymentStatusText, { color: service.isPaid ? Colors.success : Colors.warning }]}> {service.isPaid ? "Sí" : "No"} </Text>
                       </View>
                     </View>
                   </View>
