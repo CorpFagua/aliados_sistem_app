@@ -37,9 +37,12 @@ export default function UserFormModal({ visible, storeId,role, onClose, onSave }
     address: "",
     email: "",
     password: "",
+    confirmPassword: "",
   });
 
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
 
   const handleChange = (key: keyof typeof form, value: string) => {
@@ -52,6 +55,15 @@ export default function UserFormModal({ visible, storeId,role, onClose, onSave }
         type: "error",
         text1: "Campos obligatorios",
         text2: "Nombre, correo y contraseña son requeridos.",
+      });
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      Toast.show({
+        type: "error",
+        text1: "Contraseñas no coinciden",
+        text2: "La contraseña y la confirmación deben ser iguales.",
       });
       return;
     }
@@ -77,7 +89,7 @@ export default function UserFormModal({ visible, storeId,role, onClose, onSave }
         text2: `${form.name} fue agregado a la tienda.`,
       });
 
-      setForm({ name: "", phone: "", address: "", email: "", password: "" });
+      setForm({ name: "", phone: "", address: "", email: "", password: "", confirmPassword: "" });
       onSave();
     } catch (err) {
       console.error(err);
@@ -138,14 +150,46 @@ export default function UserFormModal({ visible, storeId,role, onClose, onSave }
               value={form.email}
               onChangeText={(text) => handleChange("email", text)}
             />
-            <TextInput
-              style={styles.input}
-              placeholder="Contraseña"
-              placeholderTextColor={Colors.menuText}
-              secureTextEntry
-              value={form.password}
-              onChangeText={(text) => handleChange("password", text)}
-            />
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Contraseña"
+                placeholderTextColor={Colors.menuText}
+                secureTextEntry={!showPassword}
+                value={form.password}
+                onChangeText={(text) => handleChange("password", text)}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeIcon}
+              >
+                <Ionicons
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={20}
+                  color={Colors.menuText}
+                />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Confirmar contraseña"
+                placeholderTextColor={Colors.menuText}
+                secureTextEntry={!showConfirmPassword}
+                value={form.confirmPassword}
+                onChangeText={(text) => handleChange("confirmPassword", text)}
+              />
+              <TouchableOpacity
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                style={styles.eyeIcon}
+              >
+                <Ionicons
+                  name={showConfirmPassword ? "eye-off" : "eye"}
+                  size={20}
+                  color={Colors.menuText}
+                />
+              </TouchableOpacity>
+            </View>
           </ScrollView>
 
           <TouchableOpacity
@@ -211,9 +255,20 @@ const styles = StyleSheet.create({
     color: Colors.normalText,
     borderRadius: 10,
     padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(0,255,178,0.25)",
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.Background,
+    borderRadius: 10,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: "rgba(0,255,178,0.25)",
+  },
+  eyeIcon: {
+    padding: 12,
   },
   submit: {
     backgroundColor: "#00FFB2",
