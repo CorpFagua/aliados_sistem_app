@@ -46,7 +46,6 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       setError(null);
       const data = await fetchServices(session.access_token);
-      console.log('[ServicesProvider] Servicios cargados:', data.length);
       setServices(data);
       
       // 🎯 En el primer load (sin timestamps): marcar todos como iniciales
@@ -99,13 +98,11 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
     const currentSessionId = session?.user?.id ?? null;
     
     if (currentSessionId === lastLoadedSessionId) {
-      console.log('[ServicesProvider] Misma sesión, no recargando servicios');
       setLoading(false);
       return;
     }
     
     if (currentSessionId) {
-      console.log(`[ServicesProvider] Sesión cambió: ${lastLoadedSessionId} → ${currentSessionId}, recargando servicios`);
       setLastLoadedSessionId(currentSessionId);
       loadServices();
     }
@@ -115,6 +112,37 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
   // LISTENER: ACTUALIZACIÓN FLUIDA EN REALTIME
   // CON GET para traer datos completos con relationships
   // ====================
+  
+  // 🔐 Función helper: Validar si el usuario debería ver este servicio
+  const shouldUserHaveAccessToService = (payload: any): boolean => {
+    const service = payload.new || payload.old;
+    if (!service) return false;
+
+    if (profile?.role === 'super_admin') {
+      return true;
+    }
+
+    if (profile?.role === 'coordinator') {
+      return service.branch_id === profile?.branchId;
+    }
+
+    if (profile?.role === 'store') {
+      return service.profile_store_id === session?.user?.id;
+    }
+
+    if (profile?.role === 'delivery') {
+      const isAvailable = service.status === 'disponible';
+      const isAssignedToHim = service.assigned_delivery === session?.user?.id;
+      return isAvailable || isAssignedToHim;
+    }
+
+    if (profile?.role === 'client') {
+      return service.requested_by === session?.user?.id;
+    }
+
+    return false;
+  };
+
   useRealtimeListener({
     table: 'services',
     events: ['INSERT', 'UPDATE', 'DELETE'],
@@ -122,42 +150,25 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
       const eventType = payload.eventType;
       const serviceId = payload.new?.id || payload.old?.id;
 
-      console.log('[ServicesProvider] Evento:', eventType, 'Id:', serviceId);
-
       if (eventType === 'DELETE') {
-        // Remover del estado
         setServices((prev) => prev.filter((s) => s.id !== serviceId));
       } else if (eventType === 'INSERT' || eventType === 'UPDATE') {
+        // 🔐 VALIDACIÓN PREVIA: ¿El usuario debería ver este servicio?
+        if (!shouldUserHaveAccessToService(payload)) {
+          return;
+        }
+
         // 🔄 GET el servicio completo con todas las relaciones
         if (session?.access_token) {
           try {
-            console.log(`\n📡 [REALTIME] Evento: ${eventType} - ID: ${serviceId}`);
             const updatedService = await getServiceById(serviceId, session.access_token);
 
             setServices((prev) => {
               const exists = prev.find((s) => s.id === serviceId);
+              
               if (exists) {
-                // Actualizar existente
-                console.log(`🔄 [STATE] Actualizando servicio existente`);
-                
-                // 🔒 FILTRO CRÍTICO: Si el servicio fue asignado a otro usuario, 
-                // y el usuario actual es delivery, no debe verlo
-                if (
-                  eventType === 'UPDATE' && 
-                  profile?.role === 'delivery' &&
-                  updatedService.status === 'asignado' && 
-                  updatedService.assignedDelivery && 
-                  updatedService.assignedDelivery !== session?.user?.id
-                ) {
-                  console.log(`⚠️ [FILTER] Servicio ${serviceId} asignado a otro delivery, removiendo del estado local`);
-                  return prev.filter((s) => s.id !== serviceId);
-                }
-                
                 return prev.map((s) => (s.id === serviceId ? updatedService : s));
               } else {
-                // Agregar nuevo (INSERT) - No es inicial
-                console.log(`➕ [STATE] Agregando nuevo servicio (será mostrado con delay)`);
-                
                 // Registrar como nuevo (no inicial)
                 if (updatedService.status === "disponible") {
                   setOrderTimestamps((prev) => new Map([...prev, [serviceId, Date.now()]]));
@@ -166,14 +177,10 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
                 return [updatedService, ...prev];
               }
             });
-
-            console.log(`✅ [PROVIDER] Actualizado: ${serviceId}`);
           } catch (err: any) {
             // Si es error 401, log pero no crash - el usuario puede reautenticarse
             if (err.response?.status === 401) {
               console.warn('[ServicesProvider] Token expirado al actualizar realtime:', serviceId);
-            } else {
-              console.error('[ServicesProvider] Error al obtener servicio completo:', err);
             }
             // No relanzar el error para que no crash el provider
           }
