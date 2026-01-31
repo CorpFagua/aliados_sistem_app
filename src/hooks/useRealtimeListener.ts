@@ -82,8 +82,13 @@ export function useRealtimeListener(config: UseRealtimeListenerConfig) {
     debug = false,
   } = config;
 
+  const onDataRef = useRef(onData);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
+
+  // Actualizar la referencia sin causar re-creación del listener
+  useEffect(() => {
+    onDataRef.current = onData;
+  }, [onData]);
 
   const log = (message: string, data?: any) => {
     if (debug || process.env.NODE_ENV === 'development') {
@@ -99,9 +104,20 @@ export function useRealtimeListener(config: UseRealtimeListenerConfig) {
 
     log('🔵 Iniciando listener');
 
+    // Si ya existe un canal, eliminarlo primero
+    if (channelRef.current) {
+      log('🧹 Eliminando canal anterior');
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
     // Crear canal único para esta instancia
     const channelName = `realtime-${table}-${Math.random().toString(36).substr(2, 9)}`;
-    const channel = supabase.channel(channelName);
+    const channel = supabase.channel(channelName, {
+      config: {
+        broadcast: { self: true },
+      },
+    });
 
     // Configurar payload
     const postgresChangesConfig: any = {
@@ -116,16 +132,15 @@ export function useRealtimeListener(config: UseRealtimeListenerConfig) {
       log('🔍 Filtro aplicado:', filter);
     }
 
+    log('📡 Suscribiendo a:', postgresChangesConfig);
+
     // Suscribirse a cambios
     channel
       .on('postgres_changes', postgresChangesConfig, (payload: any) => {
-        log(`📨 ${payload.eventType}:`, {
-          new: payload.new,
-          old: payload.old,
-        });
+        log(`📨 ${payload.eventType}:`, payload);
 
         try {
-          onData({
+          onDataRef.current({
             eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
             new: payload.new,
             old: payload.old,
@@ -141,6 +156,8 @@ export function useRealtimeListener(config: UseRealtimeListenerConfig) {
           log('⚠️ Conexión cerrada');
         } else if (status === 'CHANNEL_ERROR') {
           log('❌ Error del canal', err);
+        } else if (status === 'TIMED_OUT') {
+          log('⏱️ Timeout en conexión');
         } else if (err) {
           log('❌ Error:', err?.message);
         }
@@ -148,17 +165,13 @@ export function useRealtimeListener(config: UseRealtimeListenerConfig) {
 
     channelRef.current = channel;
 
-    // Función de limpieza
-    unsubscribeRef.current = () => {
+    // Cleanup al desmontar
+    return () => {
       log('🧹 Limpiando listener');
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
       }
-    };
-
-    // Cleanup al desmontar o cuando cambian dependencias
-    return () => {
-      unsubscribeRef.current?.();
     };
   }, [
     table,
@@ -170,6 +183,11 @@ export function useRealtimeListener(config: UseRealtimeListenerConfig) {
 
   return {
     channel: channelRef.current,
-    unsubscribe: () => unsubscribeRef.current?.(),
+    unsubscribe: () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    },
   };
 }

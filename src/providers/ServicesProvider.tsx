@@ -113,82 +113,145 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
   // CON GET para traer datos completos con relationships
   // ====================
   
-  // 🔐 Función helper: Validar si el usuario debería ver este servicio
-  const shouldUserHaveAccessToService = (payload: any): boolean => {
-    const service = payload.new || payload.old;
-    if (!service) return false;
+  // ✅ Envolver el handler en useCallback para evitar redefinición en cada render
+  const handleRealtimeData = useCallback((payload: any) => {
+    const eventType = payload.eventType;
+    const serviceId = payload.new?.id || payload.old?.id;
 
-    if (profile?.role === 'super_admin') {
-      return true;
+    console.log('[REALTIME] 📨 Evento:', eventType, serviceId);
+
+    // DELETE siempre se procesa
+    if (eventType === 'DELETE') {
+      console.log('[REALTIME] 🗑️ Eliminando');
+      setServices((prev) => prev.filter((s) => s.id !== serviceId));
+      return;
     }
 
-    if (profile?.role === 'coordinator') {
-      return service.branch_id === profile?.branchId;
-    }
+    if (eventType === 'INSERT' || eventType === 'UPDATE') {
+      const payloadData = payload.new || payload.old;
+      if (!payloadData) return;
 
-    if (profile?.role === 'store') {
-      return service.profile_store_id === session?.user?.id;
-    }
+      const userId = session?.user?.id;
+      const userRole = profile?.role;
+      const userBranch = profile?.branchId;
 
-    if (profile?.role === 'delivery') {
-      const isAvailable = service.status === 'disponible';
-      const isAssignedToHim = service.assigned_delivery === session?.user?.id;
-      return isAvailable || isAssignedToHim;
-    }
+      // 🔐 VALIDACIÓN RÁPIDA en el payload: ¿Es mío?
+      let shouldKeep = false;
 
-    if (profile?.role === 'client') {
-      return service.requested_by === session?.user?.id;
-    }
+      switch (userRole) {
+        case 'super_admin':
+          shouldKeep = true;
+          break;
+        case 'coordinator':
+          shouldKeep = payloadData.branch_id === userBranch;
+          break;
+        case 'store':
+          shouldKeep = payloadData.profile_store_id === userId;
+          break;
+        case 'delivery':
+          const isAvailable = payloadData.status === 'disponible';
+          const isAssignedToHim = payloadData.assigned_delivery === userId;
+          shouldKeep = (isAvailable || isAssignedToHim) && profile?.isActive;
+          break;
+        case 'client':
+          shouldKeep = payloadData.requested_by === userId;
+          break;
+      }
 
-    return false;
-  };
+      console.log('[REALTIME] 🔐 shouldKeep:', shouldKeep, { role: userRole });
 
-  useRealtimeListener({
-    table: 'services',
-    events: ['INSERT', 'UPDATE', 'DELETE'],
-    onData: async (payload) => {
-      const eventType = payload.eventType;
-      const serviceId = payload.new?.id || payload.old?.id;
-
-      if (eventType === 'DELETE') {
+      // Si NO es suyo, ELIMINAR de la lista inmediatamente
+      if (!shouldKeep) {
+        console.log('[REALTIME] ❌ NO ES SUYO - Eliminando del GUI');
         setServices((prev) => prev.filter((s) => s.id !== serviceId));
-      } else if (eventType === 'INSERT' || eventType === 'UPDATE') {
-        // 🔐 VALIDACIÓN PREVIA: ¿El usuario debería ver este servicio?
-        if (!shouldUserHaveAccessToService(payload)) {
-          return;
-        }
+        return;
+      }
 
-        // 🔄 GET el servicio completo con todas las relaciones
-        if (session?.access_token) {
+      // Si ES suyo, obtener datos completos
+      if (session?.access_token) {
+        (async () => {
           try {
+            console.log('[REALTIME] 📥 GET:', serviceId);
             const updatedService = await getServiceById(serviceId, session.access_token);
+            console.log('[REALTIME] ✅ Obtenido:', updatedService?.id);
 
             setServices((prev) => {
               const exists = prev.find((s) => s.id === serviceId);
-              
               if (exists) {
+                console.log('[REALTIME] 🔄 UPDATE');
                 return prev.map((s) => (s.id === serviceId ? updatedService : s));
               } else {
-                // Registrar como nuevo (no inicial)
-                if (updatedService.status === "disponible") {
+                console.log('[REALTIME] ➕ INSERT');
+                if (updatedService?.status === "disponible") {
                   setOrderTimestamps((prev) => new Map([...prev, [serviceId, Date.now()]]));
                 }
-                
                 return [updatedService, ...prev];
               }
             });
           } catch (err: any) {
-            // Si es error 401, log pero no crash - el usuario puede reautenticarse
-            if (err.response?.status === 401) {
-              console.warn('[ServicesProvider] Token expirado al actualizar realtime:', serviceId);
-            }
-            // No relanzar el error para que no crash el provider
+            console.error('[REALTIME] ❌ Error:', err?.message || err);
           }
-        }
+        })();
       }
-    },
+    }
+  }, [session?.access_token, session?.user?.id, profile?.role, profile?.branchId, profile?.isActive]);
+
+  const shouldUserHaveAccessToService = (payload: any): boolean => {
+    const service = payload.new || payload.old;
+    if (!service) {
+      console.log('[CHECK_ACCESS] ❌ Sin servicio en payload');
+      return false;
+    }
+
+    const userId = session?.user?.id;
+    const userRole = profile?.role;
+    const userBranch = profile?.branchId;
+
+    console.log('[CHECK_ACCESS] User:', { userId, userRole, userBranch });
+    console.log('[CHECK_ACCESS] Service:', { id: service.id, status: service.status, branch_id: service.branch_id, profile_store_id: service.profile_store_id, assigned_delivery: service.assigned_delivery });
+
+    // VALIDACIÓN POR ROL
+    switch (userRole) {
+      case 'super_admin':
+        console.log('[CHECK_ACCESS] ✅ super_admin = acceso total');
+        return true;
+
+      case 'coordinator':
+        const coordAccess = service.branch_id === userBranch;
+        console.log('[CHECK_ACCESS] coordinator:', { hasAccess: coordAccess, serviceBranch: service.branch_id, userBranch });
+        return coordAccess;
+
+      case 'store':
+        const storeAccess = service.profile_store_id === userId;
+        console.log('[CHECK_ACCESS] store:', { hasAccess: storeAccess, serviceStore: service.profile_store_id, userId });
+        return storeAccess;
+
+      case 'delivery':
+        const isAvailable = service.status === 'disponible';
+        const isAssignedToHim = service.assigned_delivery === userId;
+        const userIsActive = profile?.isActive === true;
+        const deliveryAccess = (isAvailable || isAssignedToHim) && userIsActive;
+        console.log('[CHECK_ACCESS] delivery:', { hasAccess: deliveryAccess, isAvailable, isAssignedToHim, userIsActive });
+        return deliveryAccess;
+
+      case 'client':
+        const clientAccess = service.requested_by === userId;
+        console.log('[CHECK_ACCESS] client:', { hasAccess: clientAccess, serviceRequester: service.requested_by, userId });
+        return clientAccess;
+
+      default:
+        console.log('[CHECK_ACCESS] ❌ Rol desconocido:', userRole);
+        return false;
+    }
+  };
+
+  // ✅ Usar el handler en el listener
+  useRealtimeListener({
+    table: 'services',
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+    onData: handleRealtimeData,
     enabled: !!session?.access_token,
-    debug: false,
+    debug: true,
   });
 
   const isUserVIP = profile?.isVIP ?? false;
