@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
+import Toast from "react-native-toast-message";
 
 interface Props {
   visible: boolean;
@@ -23,14 +24,18 @@ export default function DeliveryFormModal({ visible, onClose, onSave, initialDat
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [isVIP, setIsVIP] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const resetForm = () => {
     setName("");
     setEmail("");
     setPassword("");
+    setConfirmPassword("");
     setPhone("");
     setAddress("");
     setIsVIP(false);
@@ -50,7 +55,30 @@ export default function DeliveryFormModal({ visible, onClose, onSave, initialDat
   }, [initialData, visible]);
 
   const handleSubmit = () => {
-    if (!name || (!initialData && (!email || !password))) return;
+    if (!name.trim()) {
+      Toast.show({
+        type: "error",
+        text1: "Campo obligatorio",
+        text2: "El nombre es requerido.",
+      });
+      return;
+    }
+    if (!initialData && (!email.trim() || !password.trim())) {
+      Toast.show({
+        type: "error",
+        text1: "Campos obligatorios",
+        text2: "Correo y contraseña son requeridos.",
+      });
+      return;
+    }
+    if (!initialData && password !== confirmPassword) {
+      Toast.show({
+        type: "error",
+        text1: "Contraseñas no coinciden",
+        text2: "La contraseña y la confirmación deben ser iguales.",
+      });
+      return;
+    }
     onSave({ name, email, password, phone, address, is_VIP: isVIP });
     resetForm();
     onClose();
@@ -118,14 +146,53 @@ export default function DeliveryFormModal({ visible, onClose, onSave, initialDat
                       <Ionicons name="lock-closed" size={18} color={Colors.normalText} />
                       <Text style={styles.labelText}>Contraseña</Text>
                     </View>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Mínimo 8 caracteres"
-                      placeholderTextColor={Colors.menuText}
-                      secureTextEntry
-                      value={password}
-                      onChangeText={setPassword}
-                    />
+                    <View style={styles.inputContainer}>
+                      <TextInput
+                        style={[styles.input, { flex: 1 }]}
+                        placeholder="Mínimo 8 caracteres"
+                        placeholderTextColor={Colors.menuText}
+                        secureTextEntry={!showPassword}
+                        value={password}
+                        onChangeText={setPassword}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                        style={styles.eyeIcon}
+                      >
+                        <Ionicons
+                          name={showPassword ? "eye-off" : "eye"}
+                          size={20}
+                          color={Colors.menuText}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.fieldContainer}>
+                    <View style={styles.fieldLabel}>
+                      <Ionicons name="lock-closed" size={18} color={Colors.normalText} />
+                      <Text style={styles.labelText}>Confirmar Contraseña</Text>
+                    </View>
+                    <View style={styles.inputContainer}>
+                      <TextInput
+                        style={[styles.input, { flex: 1 }]}
+                        placeholder="Repite la contraseña"
+                        placeholderTextColor={Colors.menuText}
+                        secureTextEntry={!showConfirmPassword}
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                        style={styles.eyeIcon}
+                      >
+                        <Ionicons
+                          name={showConfirmPassword ? "eye-off" : "eye"}
+                          size={20}
+                          color={Colors.menuText}
+                        />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </>
               )}
@@ -269,6 +336,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     borderWidth: 1,
     borderColor: Colors.Border,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.Background,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.Border,
+  },
+  eyeIcon: {
+    padding: 12,
   },
   inputMultiline: {
     textAlignVertical: "top",
