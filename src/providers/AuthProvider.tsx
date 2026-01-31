@@ -52,6 +52,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [isActive, setIsActive] = useState(false);
   const [profile, setProfile] = useState<User | null>(null);
   const [hasReachedLowDemandLimit, setHasReachedLowDemandLimit] = useState(false);
+  
+  // 🔐 Para evitar recargas innecesarias cuando no hay cambios
+  const [lastSessionCheckId, setLastSessionCheckId] = useState<string | null>(null);
 
   /**
    * 🔀 Redirige según el rol del usuario
@@ -150,11 +153,23 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     /**
      * 🔄 Listener:
      *  - Detecta login/logout automáticamente
-     *  - Actualiza perfil y estado
+     *  - PERO solo actualiza si la sesión cambió realmente (no cada vez que vuelves a la pantalla)
      */
     const { data: subscription } = onAuthStateChange(async (newSession) => {
       if (!isMounted) return;
 
+      // ✅ Solo actualizar si el ID del usuario cambió (login/logout real)
+      // Esto evita recargas cuando vuelves a una pantalla con la misma sesión
+      const newSessionId = newSession?.user?.id ?? null;
+      
+      if (newSessionId === lastSessionCheckId) {
+        // La sesión no cambió, no hacer nada
+        console.log("[AUTH] Listener detectó el mismo usuario, ignorando...");
+        return;
+      }
+
+      console.log(`[AUTH] Sesión cambió: ${lastSessionCheckId} → ${newSessionId}`);
+      setLastSessionCheckId(newSessionId);
       setSession(newSession);
 
       if (newSession?.user) {
@@ -195,7 +210,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       subscription?.subscription?.unsubscribe();
     };
 
-  }, []);
+  }, [lastSessionCheckId]);
 
   /**
    * 🔔 Registrar notificaciones push

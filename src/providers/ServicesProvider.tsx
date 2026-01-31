@@ -29,6 +29,9 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
   const [visibleNewOrderIds, setVisibleNewOrderIds] = useState<Set<string>>(new Set());
   const [orderTimestamps, setOrderTimestamps] = useState<Map<string, number>>(new Map());
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+  
+  // 🔐 Evitar recargas cuando vuelves a una pantalla con la misma sesión
+  const [lastLoadedSessionId, setLastLoadedSessionId] = useState<string | null>(null);
 
   // ====================
   // CARGA INICIAL
@@ -91,8 +94,22 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
   }, [session?.access_token]);
 
   useEffect(() => {
-    loadServices();
-  }, [loadServices]);
+    // ✅ Solo cargar si la sesión cambió (login/logout real)
+    // Esto evita recargas cuando vuelves a una pantalla con la misma sesión
+    const currentSessionId = session?.user?.id ?? null;
+    
+    if (currentSessionId === lastLoadedSessionId) {
+      console.log('[ServicesProvider] Misma sesión, no recargando servicios');
+      setLoading(false);
+      return;
+    }
+    
+    if (currentSessionId) {
+      console.log(`[ServicesProvider] Sesión cambió: ${lastLoadedSessionId} → ${currentSessionId}, recargando servicios`);
+      setLastLoadedSessionId(currentSessionId);
+      loadServices();
+    }
+  }, [session?.user?.id, lastLoadedSessionId, loadServices]);
 
   // ====================
   // LISTENER: ACTUALIZACIÓN FLUIDA EN REALTIME

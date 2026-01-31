@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 export default {
   expo: {
-    name: 'aliados_sistem_app',
+    name: 'Aliados Corporativo',
     slug: 'aliados_sistem_app',
     version: '1.0.0',
     orientation: 'portrait',
