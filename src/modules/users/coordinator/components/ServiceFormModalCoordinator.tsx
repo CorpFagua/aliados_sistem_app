@@ -9,6 +9,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Colors } from "@/constans/colors";
 import { Ionicons } from "@expo/vector-icons";
@@ -198,10 +200,15 @@ export default function ServiceFormModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.overlay}>
-        <View
-          style={[styles.cardWrapper, isLargeScreen && styles.cardWrapperLarge]}
+      {Platform.OS === 'ios' ? (
+        <KeyboardAvoidingView 
+          behavior="padding"
+          style={{ flex: 1 }}
         >
+          <View style={styles.overlay}>
+            <View
+              style={[styles.cardWrapper, isLargeScreen && styles.cardWrapperLarge]}
+            >
           {/* HEADER FIJO */}
           <View style={styles.header}>
             <View>
@@ -226,6 +233,8 @@ export default function ServiceFormModal({
             contentContainerStyle={styles.scrollContentContainer}
             showsVerticalScrollIndicator={true}
             scrollIndicatorInsets={{ right: 1 }}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={true}
           >
             {/* DOMICILIOS */}
             {activeTab === "domicilios" && (
@@ -328,7 +337,143 @@ export default function ServiceFormModal({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+        </View>
+        </KeyboardAvoidingView>
+      ) : (
+        <View style={styles.overlay}>
+          <View
+            style={[styles.cardWrapper, isLargeScreen && styles.cardWrapperLarge]}
+          >
+          {/* HEADER FIJO */}
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.title}>
+                {editing ? "Editar Servicio" : "Crear Servicio"}
+              </Text>
+              <Text style={styles.subtitle}>Aliados Express</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} disabled={isLoading}>
+              <Ionicons name="close" size={24} color={Colors.normalText} />
+            </TouchableOpacity>
+          </View>
+
+          {/* TABS NAVIGATION */}
+          <View style={styles.tabsContainer}>
+            <TabsNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+          </View>
+
+          {/* -------- SCROLL INTERNO -------- */}
+          <ScrollView
+            style={styles.scrollArea}
+            contentContainerStyle={styles.scrollContentContainer}
+            showsVerticalScrollIndicator={true}
+            scrollIndicatorInsets={{ right: 1 }}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={true}
+          >
+            {/* DOMICILIOS */}
+            {activeTab === "domicilios" && (
+              <DomiciliosForm
+                destination={formState.destination}
+                phone={formState.phone}
+                clientName={formState.clientName}
+                notes={formState.notes}
+                prepTime={formState.prepTime}
+                onDestinationChange={formState.setDestination}
+                onPhoneChange={formState.setPhone}
+                onClientNameChange={formState.setClientName}
+                onNotesChange={formState.setNotes}
+                onPrepTimeChange={formState.setPrepTime}
+                payment={formState.payment}
+                amount={formState.amount}
+                onPaymentChange={formState.setPayment}
+                onAmountChange={formState.setAmount}
+                storeQuery={profileStoreSearch.profileQuery}
+                selectedStore={profileStoreSearch.selectedProfileStore}
+                storeResults={profileStoreSearch.profileResults}
+                loadingStores={profileStoreSearch.loadingProfiles}
+                onStoreSearch={profileStoreSearch.handleSearchProfileStores}
+                onStoreSelect={handleProfileStoreSelect}
+                onStoreClear={() => profileStoreSearch.setSelectedProfileStore(null)}
+                showStoreSelector={role === "coordinator" || role === "super_admin"}
+              />
+            )}
+
+            {/* ALIADOS */}
+            {activeTab === "aliados" && (
+              <AliadosForm
+                pickupAddress={formState.pickupAddress}
+                destination={formState.destination}
+                phone={formState.phone}
+                clientName={formState.clientName}
+                notes={formState.notes}
+                aliadosPrice={formState.aliadosPrice}
+                aliadosPriceDeliverySrv={formState.aliadosPriceDeliverySrv}
+                onPickupAddressChange={formState.setPickupAddress}
+                onDestinationChange={formState.setDestination}
+                onPhoneChange={formState.setPhone}
+                onClientNameChange={formState.setClientName}
+                onNotesChange={formState.setNotes}
+                onAliadosPriceChange={formState.setAliadosPrice}
+                onAliadosPriceDeliverySrvChange={formState.setAliadosPriceDeliverySrv}
+                payment={formState.payment}
+                amount={formState.amount}
+                onPaymentChange={formState.setPayment}
+                onAmountChange={formState.setAmount}
+              />
+            )}
+
+            {/* COORDINADORA */}
+            {activeTab === "coordinadora" && (
+              <CoordinadoraForm
+                guideId={formState.guideId}
+                destination={formState.destination}
+                phone={formState.phone}
+                clientName={formState.clientName}
+                notes={formState.notes}
+                onGuideIdChange={formState.setGuideId}
+                onDestinationChange={formState.setDestination}
+                onPhoneChange={formState.setPhone}
+                onClientNameChange={formState.setClientName}
+                onNotesChange={formState.setNotes}
+                payment={formState.payment}
+                amount={formState.amount}
+                onPaymentChange={formState.setPayment}
+                onAmountChange={formState.setAmount}
+              />
+            )}
+          </ScrollView>
+
+          {/* FOOTER FIJO */}
+          <View style={styles.footer}>
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.button, isLoading && styles.buttonDisabled]}
+              onPress={handleSubmit}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#000" size="small" />
+              ) : (
+                <Text style={styles.buttonText}>Guardar servicio</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={onClose}
+              disabled={isLoading}
+            >
+              <Text style={styles.cancelText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        </View>
+      )}
     </Modal>
   );
 }
@@ -345,7 +490,10 @@ const styles = StyleSheet.create({
   cardWrapper: {
     width: "100%",
     maxWidth: isLargeScreen ? 550 : isMobile ? "100%" : 480,
-    maxHeight: isMobile ? Math.min(height * 0.9, 750) : Math.min(height * 0.85, 800),
+    maxHeight: Platform.OS === 'web' 
+      ? (isMobile ? Math.min(height * 0.9, 750) : Math.min(height * 0.85, 800))
+      : undefined,
+    height: Platform.OS === 'web' ? undefined : "90%",
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "#ffffff22",
@@ -395,9 +543,10 @@ const styles = StyleSheet.create({
   },
 
   scrollContentContainer: {
-    paddingHorizontal: isSmallDevice ? 14 : 18,
-    paddingVertical: isSmallDevice ? 12 : 16,
-    paddingBottom: 16,
+    paddingHorizontal: Platform.OS === 'web' ? (isSmallDevice ? 12 : 16) : 18,
+    paddingVertical: Platform.OS === 'web' ? (isSmallDevice ? 10 : 14) : 16,
+    paddingBottom: 120,
+    flexGrow: 1,
   },
 
   footer: {
