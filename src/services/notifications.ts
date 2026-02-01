@@ -1,6 +1,7 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { api, authHeaders } from "@/lib/api";
+import { registerWebPushToken } from "./webNotifications";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -14,6 +15,26 @@ Notifications.setNotificationHandler({
 
 export async function registerPushToken() {
   console.log(`\n📲 [NOTIF] Solicitando permisos de notificaciones...`);
+
+  // En web, usar Web Push API directamente
+  if (Platform.OS === "web") {
+    console.log(`🌐 [NOTIF] Detectada plataforma web, usando Web Push API...`);
+    const subscription = await registerWebPushToken();
+    
+    if (!subscription) {
+      console.warn(`⚠️  [NOTIF] No se pudo obtener subscription web`);
+      return null;
+    }
+
+    console.log(`✅ [NOTIF] Web subscription obtenida`);
+    
+    return {
+      webSubscription: subscription,
+      platform: "web",
+    };
+  }
+
+  // En plataformas nativas, usar Expo Notifications
   const { status } = await Notifications.requestPermissionsAsync();
 
   if (status !== "granted") {

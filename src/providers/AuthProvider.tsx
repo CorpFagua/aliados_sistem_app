@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import { Session } from "@supabase/supabase-js";
 import { router } from "expo-router";
+import { Platform } from "react-native";
 
 import {
   signIn,
@@ -13,6 +14,7 @@ import {
 import { fetchCurrentUser } from "@/services/profile";
 import { usePushRegistration } from "@/hooks/usePushNotifications";
 import { unregisterPushToken } from "@/services/notifications";
+import { unregisterWebPush } from "@/services/webNotifications";
 
 import { User, Role } from "@/models/user";
 import SessionLoadingOverlay from "@/components/SessionLoadingOverlay";
@@ -215,6 +217,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   /**
    * 🔔 Registrar notificaciones push
    *    → Se ejecuta SOLO cuando `session.user` cambia
+   *    → Maneja automáticamente FCM en nativo y Web Push en web
    */
   const pushNotifications = usePushRegistration(session);
 
@@ -263,31 +266,44 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     // Guardar el access_token antes de limpiarlo
     const currentAccessToken = session?.access_token;
     const currentDeviceToken = pushNotifications.getToken();
+    const currentSubscription = pushNotifications.getSubscription?.();
+    const isWeb = Platform.OS === "web";
     
     try {
-      // Eliminar solo el token del dispositivo actual (no todos)
-      if (currentAccessToken && currentDeviceToken) {
-        console.log(`📲 [AUTH] Eliminando token de notificaciones del dispositivo actual...`);
+      // En plataformas nativas (Android/iOS)
+      if (!isWeb && currentAccessToken && currentDeviceToken) {
+        console.log(`📲 [AUTH] Eliminando token FCM del dispositivo actual...`);
         console.log(`🔑 [AUTH] Access Token disponible: ${currentAccessToken.substring(0, 20)}...`);
         console.log(`📱 [AUTH] Device Token: ${currentDeviceToken.substring(0, 30)}...`);
         try {
           await unregisterPushToken(currentDeviceToken, currentAccessToken);
-          console.log(`✅ [AUTH] Token del dispositivo actual eliminado`);
+          console.log(`✅ [AUTH] Token FCM del dispositivo actual eliminado`);
           pushNotifications.clearToken();
         } catch (notifErr: any) {
-          console.warn(`⚠️  [AUTH] No se pudo eliminar el token (continuando con logout):`, notifErr.message);
-          // Continuar con el logout aunque falle la eliminación del token
-        }
-      } else {
-        if (!currentAccessToken) {
-          console.warn(`⚠️  [AUTH] No hay access_token disponible`);
-        }
-        if (!currentDeviceToken) {
-          console.warn(`⚠️  [AUTH] No hay device token disponible (notificaciones no configuradas)`);
+          console.warn(`⚠️  [AUTH] No se pudo eliminar el token FCM (continuando con logout):`, notifErr.message);
         }
       }
+
+      // En web
+      if (isWeb && currentAccessToken) {
+        console.log(`🌐 [AUTH] Eliminando subscription web push...`);
+        try {
+          await unregisterWebPush(currentAccessToken);
+          console.log(`✅ [AUTH] Subscription web push eliminada`);
+          pushNotifications.clearSubscription?.();
+        } catch (webNotifErr: any) {
+          console.warn(`⚠️  [AUTH] No se pudo eliminar web push (continuando con logout):`, webNotifErr.message);
+        }
+      }
+
+      if (!isWeb && !currentAccessToken) {
+        console.warn(`⚠️  [AUTH] No hay access_token disponible`);
+      }
+      if (!isWeb && !currentDeviceToken) {
+        console.warn(`⚠️  [AUTH] No hay device token disponible (notificaciones no configuradas)`);
+      }
     } catch (err) {
-      console.error(`❌ [AUTH] Error inesperado eliminando token de notificaciones:`, err);
+      console.error(`❌ [AUTH] Error inesperado eliminando notificaciones:`, err);
     }
 
     console.log(`🔑 [AUTH] Cerrando sesión en Supabase (scope: local)...`);
