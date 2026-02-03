@@ -25,6 +25,7 @@ export async function createService(
 // Obtener lista de servicios
 export async function fetchServices(token: string): Promise<Service[]> {
   try {
+    console.log('[FETCH_SERVICES] 📦 Solicitando lista de servicios...');
     const res = await api.get<ServiceResponse[]>("/services", {
       headers: authHeaders(token),
     });
@@ -33,7 +34,18 @@ export async function fetchServices(token: string): Promise<Service[]> {
     const raw = Array.isArray(res.data) ? res.data : (res.data as any).data;
 
     // ⚡ Transformamos DTO -> Modelo interno
-    return raw.map(toService);
+    const services = raw.map(toService);
+    
+    console.log(`[FETCH_SERVICES] ✅ Se obtuvieron ${services.length} servicios`);
+    
+    // 🔍 Log cada uno para debug
+    if (services.length > 0) {
+      services.forEach(s => {
+        console.log(`  - ${s.id}: status=${s.status}`);
+      });
+    }
+    
+    return services;
   } catch (err: any) {
     console.error("❌ Error fetching services:", err.response?.data || err.message);
     throw err;

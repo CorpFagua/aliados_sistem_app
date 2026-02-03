@@ -19,6 +19,7 @@ export interface Store {
     id: string;
     name: string;
     phone: string;
+    isActive: boolean;
   }[];
 }
 
@@ -42,6 +43,7 @@ export interface StoreResponse {
     id: string;
     name: string;
     phone: string;
+    isActive: boolean;
   }[];
 }
 
@@ -77,6 +79,7 @@ export function toStore(r: StoreResponse): Store {
       id: p.id,
       name: p.name,
       phone: p.phone,
+      isActive: p.isActive,
     })),
   };
 }

@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useState, useRef, useEffect } from "react";
+import { AppState, AppStateStatus } from "react-native";
 import {
   fetchServiceHistory,
   fetchServiceDetail,
@@ -332,6 +333,25 @@ export function useServiceHistoryOptimized(token: string | null) {
   const getScrollPosition = useCallback(() => {
     return scrollPositionRef.current;
   }, []);
+
+  // 📱 Recargar historial cuando la app vuelve del background
+  useEffect(() => {
+    if (!token) return;
+
+    const subscription = AppState.addEventListener('change', async (state: AppStateStatus) => {
+      if (state === 'active') {
+        console.log('[useServiceHistoryOptimized] 📱 App vuelve a foreground, recargando historial...');
+        try {
+          await refresh();
+          console.log('[useServiceHistoryOptimized] ✅ Historial recargado');
+        } catch (err) {
+          console.error('[useServiceHistoryOptimized] ❌ Error recargando historial:', err);
+        }
+      }
+    });
+
+    return () => subscription.remove();
+  }, [token, refresh]);
 
   // Cleanup
   useEffect(() => {

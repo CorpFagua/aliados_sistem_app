@@ -11,7 +11,7 @@ import OrderRow from "../components/OrderRow";
 import OrderDetailModal from "../components/ServiceDetailModal";
 
 export default function EnRutaScreen() {
-  const { session } = useAuth();
+  const { session, ensureValidToken } = useAuth();
   const { services, loading, refetch } = useServices();
   const { registerServices } = useUnreadMessagesContext();
   const [selectedPedido, setSelectedPedido] = useState<Service | null>(null);
@@ -78,9 +78,18 @@ export default function EnRutaScreen() {
               leftLabel="Entregado"
               leftColor={Colors.success}
               onLeftAction={async (p) => {
-                console.log("✔️ Pedido entregado:", p.id);
-                await updateServiceStatus(p.id, "entregado", session.access_token);
-                return true;
+                try {
+                  // 🔐 Verificar token antes de operación crítica
+                  await ensureValidToken();
+                  
+                  console.log("✔️ Pedido entregado:", p.id);
+                  await updateServiceStatus(p.id, "entregado", session.access_token);
+                  return true;
+                } catch (err: any) {
+                  console.error("❌ Error entregando pedido:", err);
+                  ToastAndroid.show("Error al entregar pedido", ToastAndroid.SHORT);
+                  return false;
+                }
               }}
             />
           )}

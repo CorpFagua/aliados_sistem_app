@@ -1,5 +1,6 @@
 // src/providers/ServicesProvider.tsx
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { useAuth } from './AuthProvider';
 import { fetchServices, Service, getServiceById } from '@/services/services';
 import { useRealtimeListener } from '@/hooks/useRealtimeListener';
@@ -32,6 +33,10 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
   
   // 🔐 Evitar recargas cuando vuelves a una pantalla con la misma sesión
   const [lastLoadedSessionId, setLastLoadedSessionId] = useState<string | null>(null);
+  const [lastAccessToken, setLastAccessToken] = useState<string | null>(null);
+  
+  // 🔄 Forzar refetch cuando hay error en el canal realtime
+  const [realtimeErrorCount, setRealtimeErrorCount] = useState(0);
 
   // ====================
   // CARGA INICIAL
@@ -45,7 +50,9 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
       setError(null);
+      console.log('[ServicesProvider] 📦 Iniciando loadServices...');
       const data = await fetchServices(session.access_token);
+      console.log(`[ServicesProvider] 📦 Datos recibidos: ${data.length} servicios`);
       setServices(data);
       
       // 🎯 En el primer load (sin timestamps): marcar todos como iniciales
@@ -53,9 +60,11 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
       setInitialOrderIds((prevInitialIds) => {
         // Si es el primer load (no hay iniciales previas), marcar todos
         if (prevInitialIds.size === 0) {
-          return new Set(
+          const newInitialIds = new Set(
             data.filter((s) => s.status === "disponible").map((s) => s.id)
           );
+          console.log(`[ServicesProvider] 🎯 Primera carga: ${newInitialIds.size} servicios iniciales`);
+          return newInitialIds;
         }
         // Si ya hay iniciales, mantener solo los que siguen disponibles
         const availableIds = new Set(data.filter((s) => s.status === "disponible").map((s) => s.id));
@@ -65,18 +74,26 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
             preserved.add(id);
           }
         }
+        console.log(`[ServicesProvider] 🎯 Refresh: ${preserved.size} servicios iniciales preservados`);
         return preserved;
       });
       
-      // 🎯 Limpiar timestamps de órdenes que ya no están disponibles
+      // 🎯 Actualizar timestamps: 
+      // - Mantener los existentes
+      // - NO asignar timestamps nuevos (si no tiene, ya pasó el delay)
       setOrderTimestamps((prevTimestamps) => {
         const availableIds = new Set(data.filter((s) => s.status === "disponible").map((s) => s.id));
         const newTimestamps = new Map(prevTimestamps);
         
+        // Limpiar timestamps de servicios que ya no están disponibles
         for (const [serviceId] of prevTimestamps.entries()) {
           if (!availableIds.has(serviceId)) {
             newTimestamps.delete(serviceId);
           }
+        }
+        
+        if (newTimestamps.size !== prevTimestamps.size) {
+          console.log(`[ServicesProvider] 🧹 Timestamps limpiados: ${prevTimestamps.size} → ${newTimestamps.size}`);
         }
         
         return newTimestamps;
@@ -84,8 +101,9 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
       
       setVisibleNewOrderIds(new Set());
       setIsFirstLoad(false);
+      console.log('[ServicesProvider] ✅ loadServices completado exitosamente');
     } catch (err: any) {
-      console.error('[ServicesProvider] Error cargando servicios:', err);
+      console.error('[ServicesProvider] ❌ Error cargando servicios:', err);
       setError(err.message || 'Error cargando servicios');
     } finally {
       setLoading(false);
@@ -107,6 +125,40 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
       loadServices();
     }
   }, [session?.user?.id, lastLoadedSessionId, loadServices]);
+
+  // 🔄 Detectar cuando el token se renueva y reconectar realtime
+  useEffect(() => {
+    const currentToken = session?.access_token ?? null;
+    
+    if (currentToken && lastAccessToken && currentToken !== lastAccessToken) {
+      console.log('[ServicesProvider] 🔄 Token renovado, reconectando listeners...');
+      setLastAccessToken(currentToken);
+      // El realtime listener se reconectará automáticamente porque depende de session?.access_token
+    } else if (currentToken && !lastAccessToken) {
+      console.log('[ServicesProvider] 🔐 Token inicializado');
+      setLastAccessToken(currentToken);
+    }
+  }, [session?.access_token]); // Solo depende del token, no de lastAccessToken
+
+  // 📱 Recargar servicios cuando la app vuelve del background
+  useEffect(() => {
+    if (!session?.user?.id || !session?.access_token) return;
+
+    const subscription = AppState.addEventListener('change', async (state: AppStateStatus) => {
+      if (state === 'active') {
+        console.log('[ServicesProvider] 📱 App vuelve a foreground, recargando servicios...');
+        try {
+          // Solo recargar, no resetear el token (eso causa loops)
+          await loadServices();
+          console.log('[ServicesProvider] ✅ Servicios recargados');
+        } catch (err) {
+          console.error('[ServicesProvider] ❌ Error recargando servicios:', err);
+        }
+      }
+    });
+
+    return () => subscription.remove();
+  }, [session?.user?.id, session?.access_token]); // No incluir loadServices para evitar loops
 
   // ====================
   // LISTENER: ACTUALIZACIÓN FLUIDA EN REALTIME
@@ -190,6 +242,12 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
             });
           } catch (err: any) {
             console.error('[REALTIME] ❌ Error:', err?.message || err);
+            
+            // 🔑 Detectar si el token expiró
+            if (err?.message?.includes('invalid') || err?.message?.includes('expired') || err?.message?.includes('401')) {
+              console.error('[REALTIME] 🔑 Token expirado o inválido - Se reconectará automáticamente');
+              // El AuthProvider renovará el token y esto disparará una reconexión
+            }
           }
         })();
       }
@@ -250,6 +308,18 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
     table: 'services',
     events: ['INSERT', 'UPDATE', 'DELETE'],
     onData: handleRealtimeData,
+    onChannelError: async (error) => {
+      console.log('[ServicesProvider] 🔄 Error en canal realtime detectado, haciendo refetch...');
+      // Incrementar contador para forzar refetch
+      setRealtimeErrorCount((prev) => prev + 1);
+      // También recargar servicios inmediatamente
+      try {
+        await loadServices();
+        console.log('[ServicesProvider] ✅ Refetch completado después de error del canal');
+      } catch (err) {
+        console.error('[ServicesProvider] ❌ Error en refetch:', err);
+      }
+    },
     enabled: !!session?.access_token,
     debug: true,
   });

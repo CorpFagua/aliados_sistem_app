@@ -14,7 +14,6 @@ self.addEventListener("push", function (event) {
     body: "Tienes un nuevo mensaje",
     icon: "/icon-192x192.png",
     badge: "/badge-72x72.png",
-    tag: "aliados-notification",
   };
 
   // Intentar extraer datos del payload
@@ -61,17 +60,23 @@ self.addEventListener("push", function (event) {
     icon: notificationData.icon,
   });
 
+  // ✅ CREAR TAG ÚNICO PARA CADA NOTIFICACIÓN
+  // Esto evita que se sobrescriban
+  const uniqueTag = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  console.log("[SW] 🏷️  Tag único generado:", uniqueTag);
+
   event.waitUntil(
     self.registration
       .showNotification(notificationData.title, {
         body: notificationData.body,
         icon: notificationData.icon,
         badge: notificationData.badge,
-        tag: notificationData.tag,
+        tag: uniqueTag,
         data: notificationData.data,
       })
       .then(() => {
-        console.log("[SW] ✅ Notificación mostrada exitosamente");
+        console.log("[SW] ✅ Notificación mostrada exitosamente con tag:", uniqueTag);
       })
       .catch((err) => {
         console.error("[SW] ❌ Error mostrando notificación:", err);

@@ -1,7 +1,7 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import { Session } from "@supabase/supabase-js";
 import { router } from "expo-router";
-import { Platform } from "react-native";
+import { Platform, AppState, AppStateStatus } from "react-native";
 
 import {
   signIn,
@@ -32,6 +32,7 @@ type AuthContextType = {
   isActive: boolean;
   hasReachedLowDemandLimit: boolean;
   setHasReachedLowDemandLimit: (value: boolean) => void;
+  ensureValidToken: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -45,6 +46,7 @@ const AuthContext = createContext<AuthContextType>({
   isActive: false,
   hasReachedLowDemandLimit: false,
   setHasReachedLowDemandLimit: () => {},
+  ensureValidToken: async () => {},
 });
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -165,8 +167,12 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       const newSessionId = newSession?.user?.id ?? null;
       
       if (newSessionId === lastSessionCheckId) {
-        // La sesión no cambió, no hacer nada
-        console.log("[AUTH] Listener detectó el mismo usuario, ignorando...");
+        // La sesión no cambió, pero el token podría haberse renovado
+        // Actualizar silenciosamente la sesión sin hacer recargas
+        if (newSession?.access_token !== session?.access_token) {
+          console.log("[AUTH] Token renovado, actualizando sesión...");
+          setSession(newSession);
+        }
         return;
       }
 
@@ -212,7 +218,61 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       subscription?.subscription?.unsubscribe();
     };
 
-  }, [lastSessionCheckId]);
+  }, [lastSessionCheckId, session?.access_token]);
+
+  /**
+   * 🔄 Verificar token cuando la app vuelve a foreground
+   *    → Detecta cuando el usuario abre la app
+   *    → Verifica si el token se renovó silenciosamente
+   *    → Sin recargar GUI si no es necesario
+   */
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const subscription = AppState.addEventListener('change', async (state: AppStateStatus) => {
+      if (state === 'active') {
+        console.log("[AUTH] 📱 App vuelve a foreground, verificando token...");
+        try {
+          const { data } = await getSession();
+          const currentSession = data.session;
+
+          if (currentSession?.access_token !== session.access_token) {
+            console.log("[AUTH] 🔄 Token renovado (app vuelve)");
+            setSession(currentSession);
+          }
+        } catch (err) {
+          console.error("[AUTH] ❌ Error verificando token:", err);
+        }
+      }
+    });
+
+    return () => subscription.remove();
+  }, [session?.user?.id, session?.access_token]);
+
+  /**
+   * 🔐 Función pública para verificar y renovar token antes de operaciones críticas
+   *    → Úsalo antes de: crear pedido, enviar mensaje, etc
+   *    → Lanza excepción si el token es inválido (el catch hará logout)
+   */
+  const ensureValidToken = async () => {
+    try {
+      const { data } = await getSession();
+      const currentSession = data.session;
+
+      if (!currentSession?.access_token) {
+        throw new Error("No valid session");
+      }
+
+      if (currentSession.access_token !== session?.access_token) {
+        console.log("[AUTH] 🔄 Token renovado antes de operación crítica");
+        setSession(currentSession);
+      }
+    } catch (err: any) {
+      console.error("[AUTH] ❌ Token inválido, forzando logout:", err.message);
+      await logout();
+      throw err;
+    }
+  };
 
   /**
    * 🔔 Registrar notificaciones push
@@ -335,6 +395,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         isActive,
         hasReachedLowDemandLimit,
         setHasReachedLowDemandLimit,
+        ensureValidToken,
       }}
     >
       <SessionLoadingOverlay visible={loading} />

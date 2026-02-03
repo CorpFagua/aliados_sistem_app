@@ -21,12 +21,16 @@ import {
 } from "@/services/users";
 import { User } from "@/models/user";
 import DeliveryFormModal from "../../components/DeliveryFormModal";
+import DeleteConfirmationModal from "../../components/DeleteConfirmationModal";
 
 export default function DeliveriesScreen() {
   const [deliveries, setDeliveries] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const { session, profile } = useAuth();
   const token = session?.access_token || "";
@@ -54,22 +58,25 @@ export default function DeliveriesScreen() {
   };
 
   const handleDelete = async (user: User) => {
-    Toast.show({
-      type: "info",
-      text1: "Eliminando domiciliario...",
-      text2: `"${user.name}"`,
-      position: "top",
-    });
+    setUserToDelete(user);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!userToDelete) return;
 
     try {
-      await deleteUser(user.id, token);
-      setDeliveries((prev) => prev.filter((u) => u.id !== user.id));
+      setDeleteLoading(true);
+      await deleteUser(userToDelete.id, token);
+      setDeliveries((prev) => prev.filter((u) => u.id !== userToDelete.id));
       Toast.show({
         type: "success",
         text1: "Domiciliario eliminado",
-        text2: `"${user.name}" fue eliminado correctamente.`,
+        text2: `"${userToDelete.name}" fue eliminado correctamente.`,
         position: "top",
       });
+      setShowDeleteModal(false);
+      setUserToDelete(null);
     } catch (err) {
       console.error("❌ Error eliminando domiciliario:", err);
       Toast.show({
@@ -78,6 +85,8 @@ export default function DeliveriesScreen() {
         text2: "No se pudo eliminar el domiciliario.",
         position: "top",
       });
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -289,6 +298,20 @@ export default function DeliveriesScreen() {
         onSave={handleSave}
         initialData={editingUser}
       />
+
+      {/* Modal de confirmación para eliminar */}
+      {userToDelete && (
+        <DeleteConfirmationModal
+          visible={showDeleteModal}
+          userName={userToDelete.name}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => {
+            setShowDeleteModal(false);
+            setUserToDelete(null);
+          }}
+          isLoading={deleteLoading}
+        />
+      )}
     </View>
   );
 }

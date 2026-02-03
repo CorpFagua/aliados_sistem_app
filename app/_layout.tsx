@@ -5,8 +5,8 @@ import { StatusBar } from "expo-status-bar"
 import { useColorScheme, Platform, KeyboardAvoidingView } from "react-native"
 import { SafeAreaProvider } from "react-native-safe-area-context"
 import AuthProvider from "@/providers/AuthProvider"
-import { ServicesProvider } from "@/providers/ServicesProvider" // 👈 NUEVO
-import { UnreadMessagesProvider } from "@/providers/UnreadMessagesProvider" // 👈 NUEVO
+import { ServicesProvider } from "@/providers/ServicesProvider"
+import { UnreadMessagesProvider } from "@/providers/UnreadMessagesProvider"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import Toast from "react-native-toast-message"
 import { useEffect } from "react"
@@ -19,9 +19,8 @@ LogBox.ignoreLogs([
 ]);
 
 
-function AppContent() {
+function RootLayoutContent() {
   const colorScheme = useColorScheme();
-
 
   return (
     <SafeAreaProvider>
@@ -53,7 +52,7 @@ export default function RootLayout() {
     <AuthProvider>
       <ServicesProvider>
         <UnreadMessagesProvider>
-          <AppContent />
+          <RootLayoutContent />
         </UnreadMessagesProvider>
       </ServicesProvider>
     </AuthProvider>

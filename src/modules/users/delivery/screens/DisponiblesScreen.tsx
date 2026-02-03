@@ -12,7 +12,7 @@ import OrderRow from "../components/OrderRow";
 const DELAY_FOR_NON_VIP = 10000; // 10 segundos en ms
 
 export default function DisponiblesScreen() {
-  const { session, hasReachedLowDemandLimit, setHasReachedLowDemandLimit } = useAuth();
+  const { session, hasReachedLowDemandLimit, setHasReachedLowDemandLimit, ensureValidToken } = useAuth();
   const { services, loading, refetch, initialOrderIds, visibleNewOrderIds, orderTimestamps, isUserVIP } = useServices();
   const { registerServices } = useUnreadMessagesContext();
   const [refreshing, setRefreshing] = useState(false);
@@ -37,6 +37,31 @@ export default function DisponiblesScreen() {
       .map((s) => s.id);
     registerServices(disponiblesIds);
   }, [services, registerServices]);
+
+  // 🔄 Cuando vuelve del background, recalcular qué pedidos YA cumplieron el delay
+  useEffect(() => {
+    if (isUserVIP) return;
+
+    const now = Date.now();
+    const available = services.filter((s) => s.status === "disponible");
+
+    available.forEach((service) => {
+      // Si es un pedido nuevo que está en espera
+      if (!initialOrderIds.has(service.id) && !visibleNewOrderIds.has(service.id)) {
+        // Si tiene timestamp, verificar si pasó el delay
+        const timestamp = orderTimestamps.get(service.id);
+        if (timestamp && !refetchedServiceIds.current.has(service.id)) {
+          const elapsed = now - timestamp;
+          
+          // Si YA pasó el delay, marcar como visto inmediatamente
+          if (elapsed >= DELAY_FOR_NON_VIP) {
+            console.log(`[DisponiblesScreen] ✅ Pedido ${service.id} cumplió delay, mostrando ahora (elapsed=${elapsed}ms)`);
+            refetchedServiceIds.current.add(service.id);
+          }
+        }
+      }
+    });
+  }, [services, isUserVIP, initialOrderIds, visibleNewOrderIds, orderTimestamps]);
 
   // ⏱️ Contador regresivo: actualizar cada 1s solo para verificar si pasó el delay
   useEffect(() => {
@@ -104,7 +129,17 @@ export default function DisponiblesScreen() {
 
       // Si es nuevo pero aún no pasó el delay
       const timestamp = orderTimestamps.get(service.id);
-      if (timestamp && (now - timestamp) >= DELAY_FOR_NON_VIP) {
+      
+      // 🔑 LÓGICA CORRECTA:
+      // - Si NO tiene timestamp → ya pasó el delay hace mucho → MOSTRAR
+      // - Si tiene timestamp y pasó delay → MOSTRAR
+      // - Si tiene timestamp y NO pasó delay → ESPERAR
+      if (!timestamp) {
+        // Sin timestamp = ya vio el delay completo
+        return true;
+      }
+
+      if ((now - timestamp) >= DELAY_FOR_NON_VIP) {
         return true;
       }
 
@@ -201,7 +236,10 @@ export default function DisponiblesScreen() {
               leftColor="#2563EB"
               onLeftAction={async (p) => {
                 try {
-                  // 🚫 Validar si ya alcanzó el límite de baja demanda
+                  // � Verificar token antes de operación crítica
+                  await ensureValidToken();
+                  
+                  // �🚫 Validar si ya alcanzó el límite de baja demanda
                   if (hasReachedLowDemandLimit) {
                     ToastAndroid.show(
                       "Debes finalizar los pedidos que tienes actualmente para tomar nuevamente pedidos.",
