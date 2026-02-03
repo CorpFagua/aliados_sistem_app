@@ -8,7 +8,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
@@ -16,8 +15,6 @@ import { createUser } from "@/services/users";
 import { useAuth } from "@/providers/AuthProvider";
 import { Role } from "@/models/user";
 import Toast from "react-native-toast-message";
-
-const { width } = Dimensions.get("window");
 
 interface Props {
   visible: boolean;
@@ -104,186 +101,292 @@ export default function UserFormModal({ visible, storeId,role, onClose, onSave }
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
-        <View style={styles.card}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Ionicons name="person-add-outline" size={22} color={Colors.activeMenuText} />
-              <Text style={styles.title}>Nuevo usuario</Text>
+        <View style={styles.modal}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.headerIcon}>
+                <Ionicons 
+                  name="person-add-outline" 
+                  size={32} 
+                  color={Colors.normalText} 
+                />
+              </View>
+              <Text style={styles.title}>Nuevo Usuario de Tienda</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={22} color={Colors.menuText} />
-            </TouchableOpacity>
-          </View>
 
-          <ScrollView style={{ maxHeight: 420 }}>
-            <TextInput
-              style={styles.input}
-              placeholder="Nombre completo"
-              placeholderTextColor={Colors.menuText}
-              value={form.name}
-              onChangeText={(text) => handleChange("name", text)}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Teléfono"
-              placeholderTextColor={Colors.menuText}
-              keyboardType="phone-pad"
-              value={form.phone}
-              onChangeText={(text) => handleChange("phone", text)}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Dirección"
-              placeholderTextColor={Colors.menuText}
-              value={form.address}
-              onChangeText={(text) => handleChange("address", text)}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Correo electrónico"
-              placeholderTextColor={Colors.menuText}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={form.email}
-              onChangeText={(text) => handleChange("email", text)}
-            />
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="Contraseña"
-                placeholderTextColor={Colors.menuText}
-                secureTextEntry={!showPassword}
-                value={form.password}
-                onChangeText={(text) => handleChange("password", text)}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeIcon}
-              >
-                <Ionicons
-                  name={showPassword ? "eye-off" : "eye"}
-                  size={20}
-                  color={Colors.menuText}
+            {/* Campos de Texto */}
+            <View style={styles.section}>
+              <View style={styles.fieldContainer}>
+                <View style={styles.fieldLabel}>
+                  <Ionicons name="person" size={18} color={Colors.normalText} />
+                  <Text style={styles.labelText}>Nombre Completo</Text>
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: Juan Carlos Pérez"
+                  placeholderTextColor={Colors.menuText}
+                  value={form.name}
+                  onChangeText={(text) => handleChange("name", text)}
                 />
-              </TouchableOpacity>
+              </View>
+
+              <View style={styles.fieldContainer}>
+                <View style={styles.fieldLabel}>
+                  <Ionicons name="mail" size={18} color={Colors.normalText} />
+                  <Text style={styles.labelText}>Correo Electrónico</Text>
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="ejemplo@correo.com"
+                  placeholderTextColor={Colors.menuText}
+                  value={form.email}
+                  onChangeText={(text) => handleChange("email", text)}
+                  keyboardType="email-address"
+                />
+              </View>
+
+              <View style={styles.fieldContainer}>
+                <View style={styles.fieldLabel}>
+                  <Ionicons name="lock-closed" size={18} color={Colors.normalText} />
+                  <Text style={styles.labelText}>Contraseña</Text>
+                </View>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    placeholder="Mínimo 8 caracteres"
+                    placeholderTextColor={Colors.menuText}
+                    secureTextEntry={!showPassword}
+                    value={form.password}
+                    onChangeText={(text) => handleChange("password", text)}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeIcon}
+                  >
+                    <Ionicons
+                      name={showPassword ? "eye-off" : "eye"}
+                      size={20}
+                      color={Colors.menuText}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.fieldContainer}>
+                <View style={styles.fieldLabel}>
+                  <Ionicons name="lock-closed" size={18} color={Colors.normalText} />
+                  <Text style={styles.labelText}>Confirmar Contraseña</Text>
+                </View>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    placeholder="Repite la contraseña"
+                    placeholderTextColor={Colors.menuText}
+                    secureTextEntry={!showConfirmPassword}
+                    value={form.confirmPassword}
+                    onChangeText={(text) => handleChange("confirmPassword", text)}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={styles.eyeIcon}
+                  >
+                    <Ionicons
+                      name={showConfirmPassword ? "eye-off" : "eye"}
+                      size={20}
+                      color={Colors.menuText}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.fieldContainer}>
+                <View style={styles.fieldLabel}>
+                  <Ionicons name="call" size={18} color={Colors.normalText} />
+                  <Text style={styles.labelText}>Teléfono</Text>
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="+57 312 1234567"
+                  placeholderTextColor={Colors.menuText}
+                  value={form.phone}
+                  onChangeText={(text) => handleChange("phone", text)}
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <View style={styles.fieldContainer}>
+                <View style={styles.fieldLabel}>
+                  <Ionicons name="location" size={18} color={Colors.normalText} />
+                  <Text style={styles.labelText}>Dirección</Text>
+                </View>
+                <TextInput
+                  style={[styles.input, styles.inputMultiline]}
+                  placeholder="Calle y número"
+                  placeholderTextColor={Colors.menuText}
+                  value={form.address}
+                  onChangeText={(text) => handleChange("address", text)}
+                  multiline
+                />
+              </View>
             </View>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="Confirmar contraseña"
-                placeholderTextColor={Colors.menuText}
-                secureTextEntry={!showConfirmPassword}
-                value={form.confirmPassword}
-                onChangeText={(text) => handleChange("confirmPassword", text)}
-              />
-              <TouchableOpacity
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                style={styles.eyeIcon}
+
+            {/* Botones */}
+            <View style={styles.footer}>
+              <TouchableOpacity 
+                onPress={onClose} 
+                style={[styles.btn, styles.cancelBtn]}
               >
-                <Ionicons
-                  name={showConfirmPassword ? "eye-off" : "eye"}
-                  size={20}
-                  color={Colors.menuText}
-                />
+                <Ionicons name="close" size={18} color={Colors.normalText} />
+                <Text style={[styles.btnText, { color: Colors.normalText }]}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={handleSubmit} 
+                style={[styles.btn, styles.saveBtn, loading && styles.btnDisabled]}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+                ) : (
+                  <Ionicons name="checkmark" size={18} color="#fff" />
+                )}
+                <Text style={[styles.btnText, { color: "#fff" }]}>
+                  {loading ? "Creando..." : "Guardar"}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
-
-          <TouchableOpacity
-            style={[styles.submit, loading && { opacity: 0.7 }]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitText}>Crear usuario</Text>
-            )}
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
   );
 }
 
-const MAX_CARD_WIDTH = 420;
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 12,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
   },
-  card: {
-    width: width * 0.9,
-    maxWidth: MAX_CARD_WIDTH,
-    backgroundColor: Colors.activeMenuBackground,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: Colors.Border,
+  modal: {
+    width: "100%",
+    backgroundColor: Colors.Background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 24,
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+    maxHeight: "90%",
     shadowColor: "#000",
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 10,
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 24,
+  },
+  headerIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.activeMenuBackground,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: Colors.Border,
   },
   title: {
+    fontSize: 22,
+    fontWeight: "800",
     color: Colors.normalText,
-    fontSize: 18,
-    fontWeight: "600",
-    marginLeft: 6,
+    textAlign: "center",
+    letterSpacing: 0.3,
   },
-  closeBtn: {
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderRadius: 8,
-    padding: 5,
+  section: {
+    marginBottom: 24,
+  },
+  fieldContainer: {
+    marginBottom: 16,
+  },
+  fieldLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  labelText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.normalText,
+    letterSpacing: 0.2,
   },
   input: {
-    backgroundColor: Colors.Background,
+    backgroundColor: Colors.activeMenuBackground,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     color: Colors.normalText,
-    borderRadius: 10,
-    padding: 12,
+    fontSize: 15,
     borderWidth: 1,
-    borderColor: "rgba(0,255,178,0.25)",
+    borderColor: Colors.Border,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.Background,
-    borderRadius: 10,
-    marginBottom: 10,
+    backgroundColor: Colors.activeMenuBackground,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(0,255,178,0.25)",
+    borderColor: Colors.Border,
+    marginBottom: 16,
   },
   eyeIcon: {
     padding: 12,
   },
-  submit: {
-    backgroundColor: "#00FFB2",
-    paddingVertical: 13,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 10,
-    shadowColor: "#00FFB2",
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
+  inputMultiline: {
+    textAlignVertical: "top",
+    minHeight: 80,
   },
-  submitText: {
-    color: "#000",
+  footer: {
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  btn: {
+    flex: 1,
+    flexDirection: "row",
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    fontWeight: "600",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cancelBtn: {
+    backgroundColor: Colors.activeMenuBackground,
+    borderWidth: 1,
+    borderColor: Colors.Border,
+  },
+  saveBtn: {
+    backgroundColor: "#2196f3",
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  btnText: {
     fontWeight: "700",
     fontSize: 15,
+    letterSpacing: 0.2,
   },
 });
