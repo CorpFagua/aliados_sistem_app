@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import { Session } from "@supabase/supabase-js";
 import { router } from "expo-router";
+import { Platform, AppState, AppStateStatus } from "react-native";
 
 import {
   signIn,
@@ -13,6 +14,7 @@ import {
 import { fetchCurrentUser } from "@/services/profile";
 import { usePushRegistration } from "@/hooks/usePushNotifications";
 import { unregisterPushToken } from "@/services/notifications";
+import { unregisterWebPush } from "@/services/webNotifications";
 
 import { User, Role } from "@/models/user";
 import SessionLoadingOverlay from "@/components/SessionLoadingOverlay";
@@ -30,6 +32,7 @@ type AuthContextType = {
   isActive: boolean;
   hasReachedLowDemandLimit: boolean;
   setHasReachedLowDemandLimit: (value: boolean) => void;
+  ensureValidToken: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -43,6 +46,7 @@ const AuthContext = createContext<AuthContextType>({
   isActive: false,
   hasReachedLowDemandLimit: false,
   setHasReachedLowDemandLimit: () => {},
+  ensureValidToken: async () => {},
 });
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -52,6 +56,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [isActive, setIsActive] = useState(false);
   const [profile, setProfile] = useState<User | null>(null);
   const [hasReachedLowDemandLimit, setHasReachedLowDemandLimit] = useState(false);
+  
+  // 🔐 Para evitar recargas innecesarias cuando no hay cambios
+  const [lastSessionCheckId, setLastSessionCheckId] = useState<string | null>(null);
 
   /**
    * 🔀 Redirige según el rol del usuario
@@ -150,11 +157,27 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     /**
      * 🔄 Listener:
      *  - Detecta login/logout automáticamente
-     *  - Actualiza perfil y estado
+     *  - PERO solo actualiza si la sesión cambió realmente (no cada vez que vuelves a la pantalla)
      */
     const { data: subscription } = onAuthStateChange(async (newSession) => {
       if (!isMounted) return;
 
+      // ✅ Solo actualizar si el ID del usuario cambió (login/logout real)
+      // Esto evita recargas cuando vuelves a una pantalla con la misma sesión
+      const newSessionId = newSession?.user?.id ?? null;
+      
+      if (newSessionId === lastSessionCheckId) {
+        // La sesión no cambió, pero el token podría haberse renovado
+        // Actualizar silenciosamente la sesión sin hacer recargas
+        if (newSession?.access_token !== session?.access_token) {
+          console.log("[AUTH] Token renovado, actualizando sesión...");
+          setSession(newSession);
+        }
+        return;
+      }
+
+      console.log(`[AUTH] Sesión cambió: ${lastSessionCheckId} → ${newSessionId}`);
+      setLastSessionCheckId(newSessionId);
       setSession(newSession);
 
       if (newSession?.user) {
@@ -195,11 +218,66 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       subscription?.subscription?.unsubscribe();
     };
 
-  }, []);
+  }, [lastSessionCheckId, session?.access_token]);
+
+  /**
+   * 🔄 Verificar token cuando la app vuelve a foreground
+   *    → Detecta cuando el usuario abre la app
+   *    → Verifica si el token se renovó silenciosamente
+   *    → Sin recargar GUI si no es necesario
+   */
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const subscription = AppState.addEventListener('change', async (state: AppStateStatus) => {
+      if (state === 'active') {
+        console.log("[AUTH] 📱 App vuelve a foreground, verificando token...");
+        try {
+          const { data } = await getSession();
+          const currentSession = data.session;
+
+          if (currentSession?.access_token !== session.access_token) {
+            console.log("[AUTH] 🔄 Token renovado (app vuelve)");
+            setSession(currentSession);
+          }
+        } catch (err) {
+          console.error("[AUTH] ❌ Error verificando token:", err);
+        }
+      }
+    });
+
+    return () => subscription.remove();
+  }, [session?.user?.id, session?.access_token]);
+
+  /**
+   * 🔐 Función pública para verificar y renovar token antes de operaciones críticas
+   *    → Úsalo antes de: crear pedido, enviar mensaje, etc
+   *    → Lanza excepción si el token es inválido (el catch hará logout)
+   */
+  const ensureValidToken = async () => {
+    try {
+      const { data } = await getSession();
+      const currentSession = data.session;
+
+      if (!currentSession?.access_token) {
+        throw new Error("No valid session");
+      }
+
+      if (currentSession.access_token !== session?.access_token) {
+        console.log("[AUTH] 🔄 Token renovado antes de operación crítica");
+        setSession(currentSession);
+      }
+    } catch (err: any) {
+      console.error("[AUTH] ❌ Token inválido, forzando logout:", err.message);
+      await logout();
+      throw err;
+    }
+  };
 
   /**
    * 🔔 Registrar notificaciones push
    *    → Se ejecuta SOLO cuando `session.user` cambia
+   *    → Maneja automáticamente FCM en nativo y Web Push en web
    */
   const pushNotifications = usePushRegistration(session);
 
@@ -248,31 +326,44 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     // Guardar el access_token antes de limpiarlo
     const currentAccessToken = session?.access_token;
     const currentDeviceToken = pushNotifications.getToken();
+    const currentSubscription = pushNotifications.getSubscription?.();
+    const isWeb = Platform.OS === "web";
     
     try {
-      // Eliminar solo el token del dispositivo actual (no todos)
-      if (currentAccessToken && currentDeviceToken) {
-        console.log(`📲 [AUTH] Eliminando token de notificaciones del dispositivo actual...`);
+      // En plataformas nativas (Android/iOS)
+      if (!isWeb && currentAccessToken && currentDeviceToken) {
+        console.log(`📲 [AUTH] Eliminando token FCM del dispositivo actual...`);
         console.log(`🔑 [AUTH] Access Token disponible: ${currentAccessToken.substring(0, 20)}...`);
         console.log(`📱 [AUTH] Device Token: ${currentDeviceToken.substring(0, 30)}...`);
         try {
           await unregisterPushToken(currentDeviceToken, currentAccessToken);
-          console.log(`✅ [AUTH] Token del dispositivo actual eliminado`);
+          console.log(`✅ [AUTH] Token FCM del dispositivo actual eliminado`);
           pushNotifications.clearToken();
         } catch (notifErr: any) {
-          console.warn(`⚠️  [AUTH] No se pudo eliminar el token (continuando con logout):`, notifErr.message);
-          // Continuar con el logout aunque falle la eliminación del token
-        }
-      } else {
-        if (!currentAccessToken) {
-          console.warn(`⚠️  [AUTH] No hay access_token disponible`);
-        }
-        if (!currentDeviceToken) {
-          console.warn(`⚠️  [AUTH] No hay device token disponible (notificaciones no configuradas)`);
+          console.warn(`⚠️  [AUTH] No se pudo eliminar el token FCM (continuando con logout):`, notifErr.message);
         }
       }
+
+      // En web
+      if (isWeb && currentAccessToken) {
+        console.log(`🌐 [AUTH] Eliminando subscription web push...`);
+        try {
+          await unregisterWebPush(currentAccessToken);
+          console.log(`✅ [AUTH] Subscription web push eliminada`);
+          pushNotifications.clearSubscription?.();
+        } catch (webNotifErr: any) {
+          console.warn(`⚠️  [AUTH] No se pudo eliminar web push (continuando con logout):`, webNotifErr.message);
+        }
+      }
+
+      if (!isWeb && !currentAccessToken) {
+        console.warn(`⚠️  [AUTH] No hay access_token disponible`);
+      }
+      if (!isWeb && !currentDeviceToken) {
+        console.warn(`⚠️  [AUTH] No hay device token disponible (notificaciones no configuradas)`);
+      }
     } catch (err) {
-      console.error(`❌ [AUTH] Error inesperado eliminando token de notificaciones:`, err);
+      console.error(`❌ [AUTH] Error inesperado eliminando notificaciones:`, err);
     }
 
     console.log(`🔑 [AUTH] Cerrando sesión en Supabase (scope: local)...`);
@@ -304,6 +395,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         isActive,
         hasReachedLowDemandLimit,
         setHasReachedLowDemandLimit,
+        ensureValidToken,
       }}
     >
       <SessionLoadingOverlay visible={loading} />

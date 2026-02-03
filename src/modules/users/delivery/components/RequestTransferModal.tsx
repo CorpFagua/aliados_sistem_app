@@ -119,41 +119,43 @@ export default function RequestTransferModal({
             <>
               <Text style={styles.subtitle}>Selecciona a quién solicitar:</Text>
 
-              <FlatList
-                data={deliveries}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.deliveryItem,
-                      selectedDelivery?.id === item.id && styles.selectedItem,
-                    ]}
-                    onPress={() => setSelectedDelivery(item)}
-                  >
-                    <View style={styles.itemLeft}>
-                      <Ionicons
-                        name="person-circle-outline"
-                        size={24}
-                        color={Colors.gradientStart}
-                      />
-                      <Text style={styles.itemName}>{item.name}</Text>
-                    </View>
-                    {selectedDelivery?.id === item.id && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={24}
-                        color={Colors.gradientStart}
-                      />
-                    )}
-                  </TouchableOpacity>
-                )}
-                ListEmptyComponent={
-                  <Text style={styles.emptyText}>
-                    No hay compañeros disponibles
-                  </Text>
-                }
-              />
+              <View style={styles.deliveriesContainer}>
+                <FlatList
+                  data={deliveries}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={true}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.deliveryItem,
+                        selectedDelivery?.id === item.id && styles.selectedItem,
+                      ]}
+                      onPress={() => setSelectedDelivery(item)}
+                    >
+                      <View style={styles.itemLeft}>
+                        <Ionicons
+                          name="person-circle-outline"
+                          size={24}
+                          color={Colors.gradientStart}
+                        />
+                        <Text style={styles.itemName}>{item.name}</Text>
+                      </View>
+                      {selectedDelivery?.id === item.id && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={24}
+                          color={Colors.gradientStart}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  ListEmptyComponent={
+                    <Text style={styles.emptyText}>
+                      No hay compañeros disponibles
+                    </Text>
+                  }
+                />
+              </View>
 
               {/* Actions */}
               <View style={styles.actions}>
@@ -218,6 +220,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.menuText,
     marginBottom: 12,
+  },
+  deliveriesContainer: {
+    maxHeight: 300,
+    borderRadius: 12,
+    marginBottom: 16,
   },
   center: {
     flex: 1,

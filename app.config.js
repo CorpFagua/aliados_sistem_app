@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 export default {
   expo: {
-    name: 'aliados_sistem_app',
+    name: 'Aliados Corporativo',
     slug: 'aliados_sistem_app',
     version: '1.0.0',
     orientation: 'portrait',
@@ -17,6 +17,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.wolfagua.aliados-sistem-app',
+      displayName: 'Aliados Corporativo',
     },
     android: {
       adaptiveIcon: {
@@ -26,6 +27,7 @@ export default {
       edgeToEdgeEnabled: true,
       package: 'com.wolfagua.aliados_sistem_app',
       googleServicesFile: './google-services.json',
+      displayName: 'Aliados Corporativo',
     },
     web: {
       favicon: './assets/favicon.png',

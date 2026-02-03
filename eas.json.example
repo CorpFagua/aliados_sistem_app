@@ -57,3 +57,7 @@ eas build --platform android --local
 #para generar el de web solo es este 
 
 npx expo export --platform web
+
+
+# Ver solo logs de React Native
+adb logcat | grep -i "ReactNativeJS"

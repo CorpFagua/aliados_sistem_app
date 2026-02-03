@@ -87,6 +87,8 @@ export default function StoreDetailScreen({
           : "La tienda y sus usuarios han sido desactivados. Las sesiones activas se cerraron.",
         position: "top",
       });
+      // Recargar perfiles después de cambiar estado
+      loadStore();
     } catch (err) {
       console.error("❌ Error cambiando estado de tienda:", err);
       Toast.show({
@@ -224,21 +226,47 @@ export default function StoreDetailScreen({
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={styles.userCard}
+                style={[
+                  styles.userCard,
+                  !item.isActive && styles.userCardInactive,
+                ]}
                 onPress={() => {
                   setSelectedUserId(item.id);
                   setShowUserProfile(true);
                 }}
               >
-                <Ionicons
-                  name="person-circle-outline"
-                  size={30}
-                  color={Colors.normalText}
-                />
-                <View style={{ marginLeft: 10 }}>
-                  <Text style={styles.userName}>{item.name}</Text>
-                  <Text style={styles.userPhone}>
-                    {item.phone || "Sin teléfono"}
+                <View style={styles.userCardContent}>
+                  <Ionicons
+                    name="person-circle-outline"
+                    size={30}
+                    color={item.isActive ? Colors.normalText : "#ccc"}
+                  />
+                  <View style={{ marginLeft: 10, flex: 1 }}>
+                    <Text style={[
+                      styles.userName,
+                      !item.isActive && styles.userNameInactive,
+                    ]}>
+                      {item.name}
+                    </Text>
+                    <Text style={[
+                      styles.userPhone,
+                      !item.isActive && styles.userPhoneInactive,
+                    ]}>
+                      {item.phone || "Sin teléfono"}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.statusBadge}>
+                  <View
+                    style={[
+                      styles.statusDot,
+                      {
+                        backgroundColor: item.isActive ? "#4CAF50" : "#f44336",
+                      },
+                    ]}
+                  />
+                  <Text style={styles.statusLabel}>
+                    {item.isActive ? "Activo" : "Inactivo"}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -380,6 +408,7 @@ const styles = StyleSheet.create({
   userCard: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: Colors.activeMenuBackground,
     padding: 12,
     borderRadius: 10,
@@ -387,8 +416,44 @@ const styles = StyleSheet.create({
     borderColor: Colors.Border,
     marginBottom: 8,
   },
+  userCardInactive: {
+    backgroundColor: "rgba(0, 0, 0, 0.05)",
+    borderColor: "#ccc",
+    opacity: 0.7,
+  },
+  userCardContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
   userName: { color: Colors.normalText, fontSize: 15, fontWeight: "500" },
+  userNameInactive: {
+    color: "#999",
+  },
   userPhone: { color: Colors.menuText, fontSize: 13 },
+  userPhoneInactive: {
+    color: "#bbb",
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.05)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: Colors.normalText,
+  },
   emptyText: { color: Colors.menuText, textAlign: "center", marginTop: 20 },
   center: {
     flex: 1,

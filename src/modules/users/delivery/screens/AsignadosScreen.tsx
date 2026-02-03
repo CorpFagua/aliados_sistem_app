@@ -13,7 +13,7 @@ import OrderDetailModal from "../components/ServiceDetailModal";
 import AssignZoneModal from "../components/AssignZoneModal";
 
 export default function AsignadosScreen() {
-  const { session } = useAuth();
+  const { session, ensureValidToken } = useAuth();
   const { services, loading, refetch } = useServices();
   const { registerServices } = useUnreadMessagesContext();
   const [selectedPedido, setSelectedPedido] = useState<Service | null>(null);
@@ -116,16 +116,23 @@ export default function AsignadosScreen() {
         token={session?.access_token || ""}
         onClose={() => setAssigning(null)}
         onAssigned={async (updated) => {
-          console.log("✅ Zona asignada:", updated);
+          try {
+            console.log("✅ Zona asignada:", updated);
 
-          // ✅ una vez asignada la zona, cambiamos el estado del pedido
-          await updateServiceStatus(
-            updated.id,
-            "en_ruta",
-            session?.access_token || ""
-          );
+            // 🔐 Verificar token antes de operación crítica
+            await ensureValidToken();
 
-          setAssigning(null);
+            // ✅ una vez asignada la zona, cambiamos el estado del pedido
+            await updateServiceStatus(
+              updated.id,
+              "en_ruta",
+              session?.access_token || ""
+            );
+
+            setAssigning(null);
+          } catch (err: any) {
+            console.error("❌ Error al cambiar estado a en_ruta:", err);
+          }
         }}
       />
     </View>

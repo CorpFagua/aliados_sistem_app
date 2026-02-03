@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from "react-native"
+import { Ionicons } from "@expo/vector-icons"
 import { useAuth } from "@/providers/AuthProvider"
 import Toast from 'react-native-toast-message'; // 👈 Importar Toast
 
@@ -8,6 +9,7 @@ export default function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleLogin = async () => {
     // 1. Manejo de campos vacíos
@@ -77,16 +79,29 @@ export default function LoginForm() {
           autoComplete="email"
           editable={!isLoading}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          placeholderTextColor="#888"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoComplete="password"
-          editable={!isLoading}
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Contraseña"
+            placeholderTextColor="#888"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            autoComplete="password"
+            editable={!isLoading}
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setShowPassword(!showPassword)}
+            disabled={isLoading}
+          >
+            <Ionicons
+              name={showPassword ? "eye" : "eye-off"}
+              size={24}
+              color="#888"
+            />
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
           style={styles.button}
           onPress={handleLogin}
@@ -136,6 +151,31 @@ const styles = StyleSheet.create({
   inputContainer: {
     width: "100%",
     maxWidth: 350,
+  },
+  passwordContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    position: "relative",
+    marginBottom: 16,
+  },
+  passwordInput: {
+    flex: 1,
+    height: 48,
+    borderWidth: 0,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingRight: 48,
+    backgroundColor: "#222",
+    fontSize: 16,
+    color: "#fff",
+  },
+  eyeButton: {
+    position: "absolute",
+    right: 12,
+    height: 48,
+    width: 48,
+    justifyContent: "center",
+    alignItems: "center",
   },
   input: {
     width: "100%",

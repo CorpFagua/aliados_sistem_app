@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { useAuth } from './AuthProvider';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 
@@ -103,6 +104,22 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
       setRegisteredServices([]);
     }
   }, [session]);
+
+  /**
+   * 📱 Reconectar listeners cuando la app vuelve del background
+   */
+  useEffect(() => {
+    if (!session?.access_token) return;
+
+    const subscription = AppState.addEventListener('change', async (state: AppStateStatus) => {
+      if (state === 'active') {
+        console.log('[UnreadMessagesProvider] 📱 App vuelve a foreground, reconectando listeners...');
+        // Los listeners se reconectan automáticamente porque dependen de session
+      }
+    });
+
+    return () => subscription.remove();
+  }, [session?.access_token]);
 
   return (
     <UnreadMessagesContext.Provider
