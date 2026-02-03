@@ -80,20 +80,33 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
       
       // 🎯 Actualizar timestamps: 
       // - Mantener los existentes
-      // - NO asignar timestamps nuevos (si no tiene, ya pasó el delay)
+      // - Para servicios sin timestamp: asignarles uno basado en created_at
+      //   (Si hace >10s que se creó, el delay ya pasó)
       setOrderTimestamps((prevTimestamps) => {
         const availableIds = new Set(data.filter((s) => s.status === "disponible").map((s) => s.id));
         const newTimestamps = new Map(prevTimestamps);
+        const now = Date.now();
         
-        // Limpiar timestamps de servicios que ya no están disponibles
+        // 1. Limpiar timestamps de servicios que ya no están disponibles
         for (const [serviceId] of prevTimestamps.entries()) {
           if (!availableIds.has(serviceId)) {
             newTimestamps.delete(serviceId);
           }
         }
         
+        // 2. Para servicios sin timestamp (ej: llegaron via realtime): asignarles uno basado en created_at
+        data.forEach((service) => {
+          if (service.status === "disponible" && !newTimestamps.has(service.id)) {
+            const createdAtMs = new Date(service.createdAt).getTime();
+            // Usar created_at como timestamp → si hace >10s, el delay ya pasó
+            newTimestamps.set(service.id, createdAtMs);
+            const ageMs = now - createdAtMs;
+            console.log(`[ServicesProvider] ⏰ Asignando timestamp a ${service.id} (creado hace ${ageMs}ms)`);
+          }
+        });
+        
         if (newTimestamps.size !== prevTimestamps.size) {
-          console.log(`[ServicesProvider] 🧹 Timestamps limpiados: ${prevTimestamps.size} → ${newTimestamps.size}`);
+          console.log(`[ServicesProvider] 🧹 Timestamps actualizado: ${prevTimestamps.size} → ${newTimestamps.size}`);
         }
         
         return newTimestamps;
