@@ -40,8 +40,9 @@ import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchDeliveries } from "@/services/users";
 import { fetchZones } from "@/services/zones";
-import { updateServiceData, updateServiceStatus } from "@/services/services";
+import { updateServiceData, updateServiceStatus, getServiceById } from "@/services/services";
 import { Service } from "@/models/service";
+import { FormInputField } from "./FormInputField";
 
 interface EditServiceModalProps {
   visible: boolean;
@@ -110,11 +111,21 @@ export default function EditServiceModal({
     const assignedAt = get(service, ["assignedAt", "assigned_at"]);
     const completedAt = get(service, ["completedAt", "completed_at"]);
 
+    // 🔴 Extraer typeId correctamente: puede ser string (Card) o objeto (Historial)
+    let typeIdVal = service.typeId;
+    if (!typeIdVal && service.type && typeof service.type === 'object') {
+      typeIdVal = service.type.id || service.type.type_id;
+    }
+    if (!typeIdVal) {
+      typeIdVal = service.type_id;
+    }
+
     return {
       id: service.id,
       profileStoreName: get(service, ["profileStoreName", "profile_store", "store"], null)?.name ?? get(service, ["profileStoreName", "storeName", "store"] , null),
-      typeId: get(service, ["typeId", "type", "type_id"]),
-      price: get(service, ["price", "price"]),
+      typeId: typeIdVal,
+      price: get(service, ["price"]),
+      priceDeliverySrv: get(service, ["priceDeliverySrv", "priceDelivery", "price_delivery"], 0),
       payment: get(service, ["payment", "paymentMethod", "payment_method"]),
       amount: get(service, ["amount", "totalToCollect", "total_to_collect"] , 0),
       createdAt: created ? (created instanceof Date ? created : new Date(created)) : null,
@@ -148,6 +159,13 @@ export default function EditServiceModal({
   const [zoneItems, setZoneItems] = useState<{ label: string; value: string }[]>(
     []
   );
+  const [zoneError, setZoneError] = useState<string | null>(null); // 🔴 Error de zona
+
+  // 💰 PRECIOS Y PAGO (editables)
+  const [payment, setPayment] = useState<string>("");           // Método de pago
+  const [price, setPrice] = useState<string>("");               // Precio del servicio (paquetería)
+  const [priceDeliverySrv, setPriceDeliverySrv] = useState<string>(""); // Ganancia del delivery
+  const [amount, setAmount] = useState<string>("");             // Total a recaudar (domicilios)
 
   const [notes, setNotes] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -156,11 +174,14 @@ export default function EditServiceModal({
   const [status, setStatus] = useState<string>("disponible");
 
   const [openStatus, setOpenStatus] = useState(false);
+  const [openPayment, setOpenPayment] = useState(false);
 
   // Estados UI
   const [loading, setLoading] = useState(false);
   const [loadingDeliveries, setLoadingDeliveries] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showConfirmAvailable, setShowConfirmAvailable] = useState(false);
+  const [confirmedAvailable, setConfirmedAvailable] = useState(false);
 
   // Cargar datos iniciales cuando se abre el modal
   useEffect(() => {
@@ -171,16 +192,31 @@ export default function EditServiceModal({
     }
   }, [visible, service]);
 
+  // Ejecutar performSave cuando se confirma disponible
+  useEffect(() => {
+    if (confirmedAvailable) {
+      performSave(true);
+      setConfirmedAvailable(false);
+    }
+  }, [confirmedAvailable]);
+
   const loadInitialData = async () => {
     if (!service || !session?.access_token) return;
 
     setLoading(true);
     try {
+      // 🔴 PRIMERO: Obtener el servicio completo del API
+      // Esto asegura que tenemos TODOS los campos (tipo, zona, etc)
+      const completeService = await getServiceById(service.id, session.access_token);
+      
+      // Usar el servicio completo para normalizar
+      const serviceToUse = completeService || service;
+
       // Cargar zonas
       const zones = await fetchZones(session.access_token);
 
-      // Intentar obtener branchId desde la versión normalizada
-      const branchId = svc?.branchId ?? svc?.raw?.branchId ?? svc?.raw?.branch_id ?? null;
+      // Obtener branchId desde el servicio completo
+      const branchId = serviceToUse.branchId ?? (serviceToUse as any).branch_id ?? null;
 
       const branchZones = branchId
         ? zones.filter((z) => z.branchId === branchId)
@@ -188,13 +224,19 @@ export default function EditServiceModal({
 
       setZoneItems(branchZones.map((z) => ({ label: z.name, value: z.id })));
 
-      // Setear valores iniciales desde `svc` (normalizado)
-      const destinationVal = svc?.raw?.destination ?? svc?.raw?.deliveryAddress ?? svc?.raw?.delivery_address ?? "";
-      const phoneVal = svc?.raw?.phone ?? svc?.raw?.clientPhone ?? svc?.raw?.client_phone ?? "";
-      const clientNameVal = svc?.raw?.clientName ?? svc?.raw?.client_name ?? "";
-      const notesVal = svc?.raw?.notes ?? "";
-      const statusVal = svc?.status ?? "disponible";
-      const zoneIdVal = svc?.zoneId ?? (svc?.raw?.zone && svc.raw.zone.id) ?? svc?.raw?.zone_id ?? null;
+      // Setear valores iniciales desde el servicio completo
+      const destinationVal = serviceToUse.destination ?? "";
+      const phoneVal = serviceToUse.phone ?? "";
+      const clientNameVal = serviceToUse.clientName ?? "";
+      const notesVal = serviceToUse.notes ?? "";
+      const statusVal = serviceToUse.status ?? "disponible";
+      const zoneIdVal = serviceToUse.zoneId ?? null;
+
+      // 💰 Cargar precios y pago
+      const paymentVal = serviceToUse.payment ?? "";
+      const priceVal = serviceToUse.price ?? "";
+      const priceDeliverySrvVal = serviceToUse.priceDeliverySrv ?? "";
+      const amountVal = serviceToUse.amount ?? "";
 
       setNotes(notesVal);
       setClientPhone(phoneVal);
@@ -202,10 +244,15 @@ export default function EditServiceModal({
       setDestination(destinationVal);
       setStatus(statusVal);
       setZoneId(zoneIdVal);
+      setPayment(paymentVal);
+      setPrice(priceVal ? String(priceVal) : "");
+      setPriceDeliverySrv(priceDeliverySrvVal ? String(priceDeliverySrvVal) : "");
+      setAmount(amountVal ? String(amountVal) : "");
 
-      // Si hay delivery asignado, cargarlo (puede venir en distintas formas)
-      const assignedId = svc?.assignedDelivery ?? svc?.raw?.assignedDelivery ?? svc?.raw?.assigned_delivery ?? (svc?.raw?.delivery && svc.raw.delivery.id) ?? null;
-      const assignedName = svc?.assignedDeliveryName ?? svc?.raw?.assignedDeliveryName ?? svc?.raw?.assigned_delivery_name ?? (svc?.raw?.delivery && svc.raw.delivery.name) ?? null;
+
+      // Si hay delivery asignado, cargarlo
+      const assignedId = serviceToUse.assignedDelivery ?? null;
+      const assignedName = serviceToUse.assignedDeliveryName ?? null;
 
       if (assignedId && assignedName) {
         setSelectedDelivery({ id: assignedId, name: assignedName });
@@ -231,6 +278,11 @@ export default function EditServiceModal({
     setShowDeliveryDropdown(false);
     setZoneId(null);
     setZoneItems([]);
+    setZoneError(null);
+    setPayment("");
+    setPrice("");
+    setPriceDeliverySrv("");
+    setAmount("");
     setNotes("");
     setClientPhone("");
     setClientName("");
@@ -296,7 +348,20 @@ export default function EditServiceModal({
       return;
     }
 
+    // 🔴 Si status es "disponible", mostrar confirmación
+    if (status === "disponible") {
+      setShowConfirmAvailable(true);
+      return;
+    }
+
+    await performSave(false);
+  };
+
+  const performSave = async (isAvailable: boolean) => {
+    if (!service || !session?.access_token) return;
+
     setSaving(true);
+    setZoneError(null);
 
     try {
       const token = session.access_token;
@@ -309,9 +374,42 @@ export default function EditServiceModal({
         destination: destination.trim(),
       };
 
-      // Incluir zone_id si cambió
-      if (zoneId !== (svc?.zoneId ?? svc?.raw?.zone_id ?? null)) {
-        updatePayload.zoneId = zoneId || undefined;
+      // 💰 Incluir precios y pago
+      if (payment) {
+        (updatePayload as any).payment = payment;
+      }
+      
+      // 🔴 Si es disponible, forzar valores null/0 para zona y precios
+      if (isAvailable) {
+        (updatePayload as any).price = null;
+        (updatePayload as any).priceDeliverySrv = 0;
+        (updatePayload as any).zoneId = null;
+      } else {
+        // Si no es disponible, permitir editar precios normalmente
+        // 🔴 Usar hasOwnProperty lógica: si tiene valor (incluyendo "0"), enviar
+        if (price !== "" && price !== undefined) {
+          (updatePayload as any).price = parseInt(price) || 0;
+        }
+        if (priceDeliverySrv !== "" && priceDeliverySrv !== undefined) {
+          (updatePayload as any).priceDeliverySrv = parseInt(priceDeliverySrv) || 0;
+        }
+        if (zoneId !== (svc?.zoneId ?? svc?.raw?.zone_id ?? null)) {
+          updatePayload.zoneId = zoneId || undefined;
+        }
+      }
+      
+      // 💰 Total a recaudar (amount)
+      if (amount !== "" && amount !== undefined) {
+        (updatePayload as any).amount = parseInt(amount) || 0;
+      }
+
+      // Incluir domiciliario en el payload de actualización
+      if (isAvailable) {
+        // Si es disponible, forzar assignedDeliveryId a null
+        (updatePayload as any).assignedDeliveryId = null;
+      } else if (selectedDelivery) {
+        // Si no es disponible y hay delivery seleccionado, incluirlo
+        (updatePayload as any).assignedDeliveryId = selectedDelivery.id;
       }
 
       await updateServiceData(svc?.id ?? service.id, updatePayload, token);
@@ -324,8 +422,8 @@ export default function EditServiceModal({
         (svc?.raw?.delivery && svc.raw.delivery.id) ??
         null;
 
-      // Si se guarda con estado 'disponible' el delivery debe ser null por regla
-      const newDeliveryId = status === "disponible" ? null : selectedDelivery?.id ?? currentAssignedId;
+      // Si es disponible, delivery debe ser null
+      const newDeliveryId = isAvailable ? null : (selectedDelivery?.id ?? currentAssignedId);
 
       const deliveryChanged = (selectedDelivery?.id ?? null) !== currentAssignedId;
       const statusChanged = status !== (svc?.status ?? svc?.raw?.status ?? null);
@@ -346,10 +444,14 @@ export default function EditServiceModal({
       onClose();
     } catch (err: any) {
       console.error("❌ Error guardando cambios:", err);
-      Alert.alert(
-        "Error",
-        err.response?.data?.error || "No se pudo actualizar el servicio"
-      );
+      
+      const errorMessage = err.response?.data?.error || err.message || "No se pudo actualizar el servicio";
+      
+      if (errorMessage.includes("precio configurado") || errorMessage.includes("No price")) {
+        setZoneError(errorMessage);
+      } else {
+        Alert.alert("Error", errorMessage);
+      }
     } finally {
       setSaving(false);
     }
@@ -358,7 +460,9 @@ export default function EditServiceModal({
   if (!service) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <>
+      {/* Modal principal de edición */}
+      <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
           {/* Header */}
@@ -466,6 +570,27 @@ export default function EditServiceModal({
                   zIndexInverse={1000}
                 />
 
+                {/* Método de Pago - EDITABLE */}
+                <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Método de pago</Text>
+                <DropDownPicker
+                  open={openPayment}
+                  value={payment}
+                  items={[
+                    { label: "Efectivo", value: "efectivo" },
+                    { label: "Transferencia", value: "transferencia" },
+                    { label: "Tarjeta", value: "tarjeta" },
+                  ]}
+                  setOpen={setOpenPayment}
+                  setValue={setPayment}
+                  placeholder="Seleccionar método"
+                  style={styles.dropdown}
+                  dropDownContainerStyle={styles.dropdownContainer}
+                  textStyle={styles.dropdownText}
+                  placeholderStyle={styles.dropdownPlaceholder}
+                  zIndex={2900}
+                  zIndexInverse={900}
+                />
+
                 {/* Domiciliario */}
                 <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
                   Domiciliario {status === "disponible" && "(se borrará automáticamente)"}
@@ -516,22 +641,34 @@ export default function EditServiceModal({
                   </View>
                 )}
 
-                {/* Zona */}
-                <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Zona</Text>
-                <DropDownPicker
-                  open={openZone}
-                  value={zoneId}
-                  items={zoneItems}
-                  setOpen={setOpenZone}
-                  setValue={setZoneId}
-                  placeholder="Seleccionar zona"
-                  style={styles.dropdown}
-                  dropDownContainerStyle={styles.dropdownContainer}
-                  textStyle={styles.dropdownText}
-                  placeholderStyle={styles.dropdownPlaceholder}
-                  zIndex={2000}
-                  zIndexInverse={2000}
-                />
+                {/* Zona - SOLO PARA DOMICILIOS */}
+                {svc?.typeId === "domicilio" && (
+                  <>
+                    <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Zona</Text>
+                    <DropDownPicker
+                      open={openZone}
+                      value={zoneId}
+                      items={zoneItems}
+                      setOpen={setOpenZone}
+                      setValue={setZoneId}
+                      placeholder="Seleccionar zona"
+                      style={[
+                        styles.dropdown,
+                        zoneError && { borderColor: "#FF4444", borderWidth: 2 },
+                      ]}
+                      dropDownContainerStyle={styles.dropdownContainer}
+                      textStyle={styles.dropdownText}
+                      placeholderStyle={styles.dropdownPlaceholder}
+                      zIndex={2000}
+                      zIndexInverse={2000}
+                    />
+                    {zoneError && (
+                      <Text style={styles.errorText}>
+                        {zoneError}
+                      </Text>
+                    )}
+                  </>
+                )}
 
                 {/* Dirección */}
                 <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
@@ -615,6 +752,83 @@ export default function EditServiceModal({
                     numberOfLines={3}
                   />
                 </View>
+
+                {/* 💰 PRECIOS - PAQUETERÍA ALIADOS */}
+                {svc?.typeId === "paqueteria_aliados" && (
+                  <>
+                    <View style={styles.section}>
+                      <Text style={styles.sectionTitle}>💰 Precios</Text>
+                      
+                      {/* Total a recaudar - Solo si el pago es efectivo */}
+                      {payment === "efectivo" && (
+                        <FormInputField
+                          label="💰 Total a recaudar (Cliente)"
+                          iconName="cash-outline"
+                          placeholder="10000"
+                          keyboardType="numeric"
+                          value={amount}
+                          onChange={setAmount}
+                          fieldKey="amountAliados"
+                        />
+                      )}
+
+                      {/* Precio del servicio (Tienda) - EDITABLE */}
+                      <FormInputField
+                        label="💰 Precio del servicio (Tienda)"
+                        iconName="cash-outline"
+                        placeholder="5000"
+                        keyboardType="numeric"
+                        value={price}
+                        onChange={setPrice}
+                        fieldKey="priceAliados"
+                      />
+
+                      {/* Precio para domiciliario - EDITABLE */}
+                      <FormInputField
+                        label="💰 Precio para el domiciliario (Ganancia)"
+                        iconName="cash-outline"
+                        placeholder="2000"
+                        keyboardType="numeric"
+                        value={priceDeliverySrv}
+                        onChange={setPriceDeliverySrv}
+                        fieldKey="priceDeliverySrvAliados"
+                      />
+                    </View>
+                  </>
+                )}
+
+                {/* 💰 PRECIOS - DOMICILIOS */}
+                {svc?.typeId === "domicilio" && (
+                  <>
+                    <View style={styles.section}>
+                      <Text style={styles.sectionTitle}>💰 Precios</Text>
+                      
+                      {/* Total a recaudar - Solo si el pago es efectivo */}
+                      {payment === "efectivo" && (
+                        <FormInputField
+                          label="💰 Total a recaudar (Cliente)"
+                          iconName="cash-outline"
+                          placeholder="5000"
+                          keyboardType="numeric"
+                          value={amount}
+                          onChange={setAmount}
+                          fieldKey="amountDomicilio"
+                        />
+                      )}
+
+                      {/* Precio para domiciliario - EDITABLE */}
+                      <FormInputField
+                        label="💰 Precio para el domiciliario (Ganancia)"
+                        iconName="cash-outline"
+                        placeholder="1000"
+                        keyboardType="numeric"
+                        value={priceDeliverySrv}
+                        onChange={setPriceDeliverySrv}
+                        fieldKey="priceDeliverySrvDomicilio"
+                      />
+                    </View>
+                  </>
+                )}
               </View>
 
               {/* Botones de acción */}
@@ -646,6 +860,61 @@ export default function EditServiceModal({
         </View>
       </View>
     </Modal>
+
+      {/* Modal de confirmación para disponible - RENDERIZADO DESPUÉS */}
+      <Modal visible={showConfirmAvailable} animationType="fade" transparent>
+        <View style={styles.overlay}>
+          <View style={[styles.modalContainer, { maxHeight: "auto", width: isLargeScreen ? 400 : "80%" }]}>
+            <View style={styles.confirmHeader}>
+              <Text style={styles.confirmTitle}>⚠️ Confirmar Acción</Text>
+            </View>
+            
+            <View style={styles.confirmBody}>
+              <Text style={styles.confirmText}>
+                Servicio será marcado como <Text style={{ fontWeight: "700" }}>Disponible</Text>
+              </Text>
+              <Text style={[styles.confirmText, { marginTop: 12, fontWeight: "600" }]}>
+                Se eliminará:
+              </Text>
+              <Text style={styles.confirmList}>
+                • Domiciliario asignado{"\n"}
+                • Zona{"\n"}
+                • Precio del servicio{"\n"}
+                • Precio para el domiciliario
+              </Text>
+              <Text style={[styles.confirmText, { marginTop: 16, color: Colors.menuText }]}>
+                ¿Deseas continuar?
+              </Text>
+            </View>
+
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={[styles.confirmButton, styles.cancelConfirm]}
+                onPress={() => setShowConfirmAvailable(false)}
+                disabled={saving}
+              >
+                <Text style={styles.cancelConfirmText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.confirmButton, styles.continueConfirm]}
+                onPress={() => {
+                  setShowConfirmAvailable(false);
+                  setConfirmedAvailable(true);
+                }}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={styles.continueConfirmText}>Continuar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -848,5 +1117,70 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: "#000",
+  },
+  errorText: {
+    fontSize: 12,
+    color: "#FF4444",
+    marginTop: 6,
+    fontWeight: "600",
+    marginLeft: 4,
+  },
+  // Estilos para modal de confirmación
+  confirmHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.Border,
+    backgroundColor: Colors.Background,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.normalText,
+  },
+  confirmBody: {
+    padding: 20,
+  },
+  confirmText: {
+    fontSize: 14,
+    color: Colors.normalText,
+  },
+  confirmList: {
+    fontSize: 13,
+    color: Colors.menuText,
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  confirmActions: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.Border,
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelConfirm: {
+    backgroundColor: Colors.Background,
+    borderWidth: 1,
+    borderColor: Colors.Border,
+  },
+  cancelConfirmText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.normalText,
+  },
+  continueConfirm: {
+    backgroundColor: "#FF6B6B",
+  },
+  continueConfirmText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFF",
   },
 });

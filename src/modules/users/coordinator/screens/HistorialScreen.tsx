@@ -126,13 +126,12 @@ export default function CoordinatorHistoryScreen() {
     await getServiceDetail(serviceId);
   };
 
-  const handleEditPress = async (serviceId: string) => {
-    // Obtener el detalle completo del servicio para editar
-    await getServiceDetail(serviceId);
-    // Esperar un poco para que selectedService se actualice
-    setTimeout(() => {
-      setShowEditModal(true);
-    }, 100);
+  const handleEditPress = async (service: ServiceHistorySummary) => {
+    // Mostrar el servicio del card inmediatamente
+    setEditingService(service);
+    setShowEditModal(true);
+    // Cargar el detalle en background mientras el modal ya está visible
+    await getServiceDetail(service.id);
   };
 
   const handleEditSuccess = async () => {
@@ -161,7 +160,7 @@ export default function CoordinatorHistoryScreen() {
     <CardService 
       service={item} 
       onPress={() => handleServicePress(item.id)}
-      onEdit={() => handleEditPress(item.id)}
+      onEdit={() => handleEditPress(item)}
       showEditButton={true}
     />
   );
@@ -277,9 +276,10 @@ export default function CoordinatorHistoryScreen() {
 
       <EditServiceModal
         visible={showEditModal}
-        service={selectedService}
+        service={editingService || selectedService}
         onClose={() => {
           setShowEditModal(false);
+          setEditingService(null);
           setSelectedService(null);
         }}
         onSuccess={handleEditSuccess}

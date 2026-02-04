@@ -144,8 +144,9 @@ export default function ServiceFormModal({
           client_phone: formState.phone,
           client_name: formState.clientName || null,
           payment_method: formState.payment as any,
-          price: formState.payment === "transferencia" ? null : (parseInt(formState.aliadosPrice) || 0),
+          total_to_collect: formState.payment === "transferencia" ? null : (parseInt(formState.amount) || 0),
           price_delivery_srv: formState.aliadosPriceDeliverySrv ? parseInt(formState.aliadosPriceDeliverySrv) : undefined,
+          price: parseInt(formState.aliadosPrice) || 0,
           notes: formState.notes || null,
         };
       } else {

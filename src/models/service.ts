@@ -259,5 +259,6 @@ export function toServicePayload(service: Service): ServicePayload {
     branch_id: service.branchId ?? null,
     zone_id: service.zoneId ?? null,
     profile_store_id: service.profileStoreId ?? null,  // 🟢 Agregar profile_store_id
+    assigned_delivery_user_id: (service as any).assignedDeliveryId ?? undefined, // 🟢 Agregar domiciliario
   };
 }
