@@ -469,7 +469,7 @@ export default function EditServiceModal({
               <View style={styles.header}>
             <View>
               <Text style={styles.headerTitle}>Editar Servicio</Text>
-              <Text style={styles.headerSubtitle}>ID: {(svc?.id ?? service?.id ?? "").slice(0, 8)}</Text>
+              <Text style={styles.headerSubtitle}>ID: {svc?.id ?? service?.id}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color={Colors.normalText} />

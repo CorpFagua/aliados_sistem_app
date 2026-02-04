@@ -159,6 +159,12 @@ export default function ServiceDetailModal({
               {/* ===== SECCIÓN: TIPO Y ESTADO ===== */}
               <View style={styles.quickInfoSection}>
                 <View style={styles.quickInfoRow}>
+                  <View style={styles.quickInfoItemFull}>
+                    <Text style={styles.quickLabel}>ID del Servicio</Text>
+                    <Text style={styles.quickValue}>{service.id}</Text>
+                  </View>
+                </View>
+                <View style={[styles.quickInfoRow, { borderTopWidth: 1, borderTopColor: Colors.Border }]}>
                   <View style={styles.quickInfoItem}>
                     <Text style={styles.quickLabel}>Tipo de Servicio</Text>
                     <Text style={styles.quickValue}>{service.type?.name || "Domicilio"}</Text>
@@ -614,6 +620,12 @@ const styles = StyleSheet.create({
   },
 
   quickInfoItem: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+
+  quickInfoItemFull: {
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
