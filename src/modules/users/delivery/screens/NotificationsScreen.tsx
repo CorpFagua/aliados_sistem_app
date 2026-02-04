@@ -7,14 +7,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Alert,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import Toast from "react-native-toast-message";
 import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
-import { getPendingTransfers, getAllTransfers, respondToTransfer } from "@/services/transfers";
+import { getPendingTransfers, getAllTransfers, respondToTransfer, cancelTransfer } from "@/services/transfers";
 import TransferNotificationCard from "../components/TransferNotificationCard";
 
 interface TransferNotification {
@@ -106,10 +107,18 @@ export default function NotificationsScreen() {
         "accept",
         session?.access_token || ""
       );
-      Alert.alert("Éxito", "Solicitud aceptada");
+      Toast.show({
+        type: "success",
+        text1: "✓ Éxito",
+        text2: "Solicitud aceptada",
+      });
       loadNotifications();
     } catch (err) {
-      Alert.alert("Error", "No se pudo aceptar la solicitud");
+      Toast.show({
+        type: "error",
+        text1: "❌ Error",
+        text2: "No se pudo aceptar la solicitud",
+      });
     } finally {
       setProcessingId(null);
     }
@@ -126,10 +135,48 @@ export default function NotificationsScreen() {
         session?.access_token || "",
         "No tengo disponibilidad en este momento"
       );
-      Alert.alert("Éxito", "Solicitud rechazada");
+      Toast.show({
+        type: "success",
+        text1: "✓ Éxito",
+        text2: "Solicitud rechazada",
+      });
       loadNotifications();
     } catch (err) {
-      Alert.alert("Error", "No se pudo rechazar la solicitud");
+      Toast.show({
+        type: "error",
+        text1: "❌ Error",
+        text2: "No se pudo rechazar la solicitud",
+      });
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleCancel = async (notificationId: string) => {
+    if (processingId) return; // Evitar múltiples clicks
+    
+    try {
+      setProcessingId(notificationId);
+      await cancelTransfer(
+        notificationId,
+        session?.access_token || "",
+        "Cancelada por el solicitante"
+      );
+      Toast.show({
+        type: "success",
+        text1: "✓ Éxito",
+        text2: "Solicitud cancelada",
+      });
+      loadNotifications();
+    } catch (err: any) {
+      const errorMessage = 
+        err.response?.data?.error || 
+        "No se pudo cancelar la solicitud";
+      Toast.show({
+        type: "error",
+        text1: "❌ Error",
+        text2: errorMessage,
+      });
     } finally {
       setProcessingId(null);
     }
@@ -142,6 +189,7 @@ export default function NotificationsScreen() {
       currentDeliveryId={profile.id}
       onAccept={() => handleAccept(item.id)}
       onReject={() => handleReject(item.id)}
+      onCancel={() => handleCancel(item.id)}
     />
   );
 
