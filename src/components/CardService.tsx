@@ -140,6 +140,14 @@ export default function CardService({ service, onPress, onEdit, showEditButton =
         <View style={styles.essentialInfo}>
           <Text style={styles.dateText}>{formatDate(service.createdAt)}</Text>
           <Text style={styles.deliveryText}>Por: {deliveryName}</Text>
+          {service.deliveryAddress && (
+            <View style={styles.addressRow}>
+              <MaterialIcons name="location-on" size={14} color={Colors.menuText} />
+              <Text style={styles.addressText} numberOfLines={1}>
+                {service.deliveryAddress}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Badges Footer */}
@@ -283,6 +291,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "500",
     color: Colors.normalText,
+  },
+
+  addressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    gap: 6,
+  },
+
+  addressText: {
+    fontSize: 11,
+    color: Colors.menuText,
+    fontWeight: "400",
+    flex: 1,
   },
 
   // Badges Footer
