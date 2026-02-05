@@ -58,15 +58,16 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
       // 🎯 En el primer load (sin timestamps): marcar todos como iniciales
       // En refreshes posteriores: mantener iniciales y timestamps tal como están
       setInitialOrderIds((prevInitialIds) => {
-        // Si es el primer load (no hay iniciales previas), marcar todos
-        if (prevInitialIds.size === 0) {
+        // Si es el primer load de la app (isFirstLoad = true), marcar todos los disponibles como iniciales
+        if (isFirstLoad) {
           const newInitialIds = new Set(
             data.filter((s) => s.status === "disponible").map((s) => s.id)
           );
-          console.log(`[ServicesProvider] 🎯 Primera carga: ${newInitialIds.size} servicios iniciales`);
+          console.log(`[ServicesProvider] 🎯 PRIMERA CARGA DE APP: ${newInitialIds.size} servicios iniciales`);
           return newInitialIds;
         }
-        // Si ya hay iniciales, mantener solo los que siguen disponibles
+        
+        // Si ya hay iniciales (refresh posterior), mantener solo los que siguen disponibles
         const availableIds = new Set(data.filter((s) => s.status === "disponible").map((s) => s.id));
         const preserved = new Set<string>();
         for (const id of prevInitialIds) {
@@ -74,7 +75,7 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
             preserved.add(id);
           }
         }
-        console.log(`[ServicesProvider] 🎯 Refresh: ${preserved.size} servicios iniciales preservados`);
+        console.log(`[ServicesProvider] 🎯 REFRESH: ${preserved.size} servicios iniciales preservados (previos) + nuevos con delay`);
         return preserved;
       });
       
@@ -112,7 +113,8 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
         return newTimestamps;
       });
       
-      setVisibleNewOrderIds(new Set());
+      // 🎯 NO resetear visibleNewOrderIds aquí - solo cuando el servicio se oculta
+      // Esto permite que los servicios que ya pasaron el delay sigan siendo visibles
       setIsFirstLoad(false);
       console.log('[ServicesProvider] ✅ loadServices completado exitosamente');
     } catch (err: any) {
@@ -246,9 +248,13 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
                 console.log('[REALTIME] 🔄 UPDATE');
                 return prev.map((s) => (s.id === serviceId ? updatedService : s));
               } else {
-                console.log('[REALTIME] ➕ INSERT');
+                console.log('[REALTIME] ➕ INSERT - nuevo servicio');
+                // 🎯 Asignar timestamp basado en created_at para el delay
                 if (updatedService?.status === "disponible") {
-                  setOrderTimestamps((prev) => new Map([...prev, [serviceId, Date.now()]]));
+                  const createdAtMs = new Date(updatedService.createdAt).getTime();
+                  const ageMs = Date.now() - createdAtMs;
+                  console.log(`[REALTIME] ⏰ Nuevo servicio ${serviceId}: edad=${ageMs}ms, asignando timestamp`);
+                  setOrderTimestamps((prev) => new Map([...prev, [serviceId, createdAtMs]]));
                 }
                 return [updatedService, ...prev];
               }
@@ -337,7 +343,23 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
     debug: true,
   });
 
-  const isUserVIP = profile?.isVIP ?? false;
+  // 🔐 VIP state - recalcular cuando el profile cambia
+  const [isUserVIP, setIsUserVIP] = useState(false);
+  
+  useEffect(() => {
+    const newVIPStatus = profile?.isVIP ?? false;
+    if (newVIPStatus !== isUserVIP) {
+      console.log(`[ServicesProvider] 👑 Estado VIP actualizado: ${isUserVIP} → ${newVIPStatus}`);
+      setIsUserVIP(newVIPStatus);
+      
+      // 🔄 Si cambió a VIP: mostrar todos los pedidos inmediatamente
+      // 🔄 Si cambió a NO VIP: activar delay para nuevos
+      if (newVIPStatus && visibleNewOrderIds.size > 0) {
+        console.log(`[ServicesProvider] 👑 VIP activado - limpiando timestamps para mostrar todos inmediatamente`);
+        // No necesitamos limpiar timestamps, el UI se actualizará automáticamente
+      }
+    }
+  }, [profile?.isVIP]);
 
   const value: ServicesContextType = {
     services,
