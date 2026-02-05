@@ -102,6 +102,17 @@ export default function StoreOrderCard({ pedido, onPress, showCreatedAt = false 
               </View>
             )}
 
+            {(pedido.status === "asignado" || pedido.status === "en_ruta") && (
+              <View style={styles.infoBadge}>
+                <Ionicons name="person-outline" size={13} color={Colors.menuText} />
+                <Text style={styles.infoText}>
+                  {pedido.assignedDeliveryName
+                    ? pedido.assignedDeliveryName
+                    : "Sin domiciliario"}
+                </Text>
+              </View>
+            )}
+
             {showCreatedAt && (
               <Text style={styles.createdAt}>
                 <Ionicons name="time-outline" size={12} color={Colors.menuText} />{" "}
@@ -206,6 +217,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.menuText,
     fontWeight: "500",
+  },
+  infoBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   statusBadge: {
     paddingHorizontal: isLargeScreen ? 8 : 10,

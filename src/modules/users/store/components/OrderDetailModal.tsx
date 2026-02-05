@@ -33,7 +33,10 @@ export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }
                 size={22}
                 color={Colors.gradientStart}
               />
-              <Text style={styles.modalTitle}>{pedido.store}</Text>
+              <View>
+                <Text style={styles.modalTitle}>{pedido.store}</Text>
+                <Text style={styles.modalSubtitle}>ID: {pedido.id}</Text>
+              </View>
             </View>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={Colors.normalText} />
@@ -52,6 +55,20 @@ export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }
                 {pedido.zone}
               </Text>
             </View>
+
+            {(pedido.status === "asignado" || pedido.status === "en_ruta") && (
+              <View style={styles.infoRow}>
+                <Ionicons
+                  name="person-outline"
+                  size={18}
+                  color={Colors.menuText}
+                />
+                <Text style={styles.infoText}>
+                  <Text style={styles.label}>Domiciliario: </Text>
+                  {pedido.assignedDeliveryName || "Sin asignar"}
+                </Text>
+              </View>
+            )}
 
             <View style={styles.infoRow}>
               <Ionicons
@@ -177,11 +194,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flex: 1,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "700",
     color: Colors.normalText,
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: Colors.menuText,
+    marginTop: 2,
+    fontWeight: "500",
   },
   modalBody: {
     marginBottom: 16,
