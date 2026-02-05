@@ -296,7 +296,7 @@ export default function ServiceDetailModal({
                         ? "Efectivo"
                         : service.paymentMethod === "transferencia"
                         ? "Transferencia"
-                        : "Tarjeta"}
+                        : "Datafonó"}
                     </Text>
                   </View>
 
@@ -338,15 +338,20 @@ export default function ServiceDetailModal({
                     </View>
                   </View>
 
-                  {/* Efectivo a Recoger - Solo si aplica */}
-                  {service.paymentMethod === "efectivo" && service.totalToCollect > 0 && (
+                  {/* Efectivo/Datafono a Recoger - Solo si aplica */}
+                  {(service.paymentMethod === "efectivo" || service.paymentMethod === "datafono") && service.totalToCollect > 0 && (
                     <>
                       <View style={styles.financeDivider} />
                       <View style={styles.financeRowHighlight}>
                         <View style={styles.financeRowContent}>
-                          <Text style={styles.financeRowTitleHighlight}>Efectivo a Recoger</Text>
+                          <Text style={styles.financeRowTitleHighlight}>
+                            {service.paymentMethod === "efectivo" ? "Efectivo a Recoger" : "Monto a Recoger (Datafonó)"}
+                          </Text>
                           <Text style={styles.financeRowDescHighlight}>
-                            Dinero del cliente a recoger y llevar a tienda
+                            {service.paymentMethod === "efectivo" 
+                              ? "Dinero del cliente a recoger y llevar a tienda"
+                              : "Monto del cliente a recoger (pagado con datafonó)"
+                            }
                           </Text>
                         </View>
                         <Text style={styles.financeRowAmountHighlight}>

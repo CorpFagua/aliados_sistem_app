@@ -41,7 +41,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { fetchDeliveries } from "@/services/users";
 import { fetchZones } from "@/services/zones";
 import { updateServiceData, updateServiceStatus, getServiceById } from "@/services/services";
-import { Service } from "@/models/service";
+import { Service, toServicePayload } from "@/models/service";
 import { FormInputField } from "./FormInputField";
 
 interface EditServiceModalProps {
@@ -406,7 +406,7 @@ export default function EditServiceModal({
       
       // 💰 Total a recaudar (amount) - siempre incluir si cambió
       if (amount !== "" && amount !== undefined) {
-        (updatePayload as any).amount = parseInt(amount) || 0;
+        (updatePayload as any).total_to_collect = parseInt(amount) || 0;
       }
 
       // Incluir domiciliario en el payload de actualización
@@ -417,6 +417,8 @@ export default function EditServiceModal({
         // Si no es disponible y hay delivery seleccionado, incluirlo
         (updatePayload as any).assignedDeliveryId = selectedDelivery.id;
       }
+      
+      console.log(updatePayload)
 
       await updateServiceData(svc?.id ?? service.id, updatePayload, token);
 
@@ -584,7 +586,7 @@ export default function EditServiceModal({
                   items={[
                     { label: "Efectivo", value: "efectivo" },
                     { label: "Transferencia", value: "transferencia" },
-                    { label: "Tarjeta", value: "tarjeta" },
+                    { label: "Datafonó", value: "datafono" },
                   ]}
                   setOpen={setOpenPayment}
                   setValue={setPayment}
@@ -765,8 +767,8 @@ export default function EditServiceModal({
                     <View style={styles.section}>
                       <Text style={styles.sectionTitle}>💰 Precios</Text>
                       
-                      {/* Total a recaudar - Solo si el pago es efectivo */}
-                      {payment === "efectivo" && (
+                      {/* Total a recaudar - Solo si el pago es efectivo o datafono */}
+                      {(payment === "efectivo" || payment === "datafono") && (
                         <FormInputField
                           label="💰 Total a recaudar (Cliente)"
                           iconName="cash-outline"
@@ -809,8 +811,8 @@ export default function EditServiceModal({
                     <View style={styles.section}>
                       <Text style={styles.sectionTitle}>💰 Precios</Text>
                       
-                      {/* Total a recaudar - Solo si el pago es efectivo */}
-                      {payment === "efectivo" && (
+                      {/* Total a recaudar - Solo si el pago es efectivo o datafono */}
+                      {(payment === "efectivo" || payment === "datafono") && (
                         <FormInputField
                           label="💰 Total a recaudar (Cliente)"
                           iconName="cash-outline"

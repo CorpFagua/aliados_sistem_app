@@ -9,7 +9,7 @@ export interface Service {
   phone: string;                             // client_phone
   clientName?: string | null;                // client_name
   notes?: string;
-  payment: "efectivo" | "transferencia" | "tarjeta";
+  payment: "efectivo" | "transferencia" | "datafono";
   amount: number;                            // total_to_collect
   price?: number;                            // price
   priceDeliverySrv?: number;                 // price_delivery_srv (para domiciliarios)
@@ -56,7 +56,7 @@ export interface ServicePayload {
   client_name?: string | null;              // nombre del cliente
   notes?: string;
 
-  payment_method: "efectivo" | "transferencia" | "tarjeta";
+  payment_method: "efectivo" | "transferencia" | "datafono";
 
   total_to_collect: number;
   price?: number;
@@ -109,7 +109,7 @@ export interface ServiceAdminPayload {
   client_name?: string | null;      // nombre del cliente
   notes?: string | null;
 
-  payment_method: "efectivo" | "transferencia" | "tarjeta";
+  payment_method: "efectivo" | "transferencia" | "datafono";
 
   total_to_collect?: number | null; // monto recoger (domicilio)
   price?: number | null;            // costo servicio (paquetería)

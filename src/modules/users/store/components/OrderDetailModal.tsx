@@ -90,6 +90,20 @@ export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }
               </Text>
             </View>
 
+            <View style={styles.infoRow}>
+              <Ionicons name="card-outline" size={18} color={Colors.menuText} />
+              <Text style={styles.infoText}>
+                <Text style={styles.label}>Método de pago: </Text>
+                {pedido.payment === "efectivo" 
+                  ? "Efectivo" 
+                  : pedido.payment === "transferencia" 
+                  ? "Transferencia" 
+                  : pedido.payment === "datafono"
+                  ? "Datafonó" 
+                  : pedido.payment || "No especificado"}
+              </Text>
+            </View>
+
             {pedido.pickup && (
               <View style={styles.infoRow}>
                 <Ionicons
@@ -120,7 +134,7 @@ export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text style={styles.price}>$ {pedido.price}</Text>
+            <Text style={styles.price}>$ {pedido.amount}</Text>
             <View style={styles.actionRow}>
               {pedido.status === "disponible" && (
                 <TouchableOpacity
