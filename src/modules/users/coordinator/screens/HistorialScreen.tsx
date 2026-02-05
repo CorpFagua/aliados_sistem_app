@@ -18,8 +18,10 @@ import {
   Alert,
   Dimensions,
   ListRenderItemInfo,
+  TouchableOpacity,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAuth } from "../../../../providers/AuthProvider";
 import { useServiceHistoryRealtime } from "../../../../hooks/useServiceHistoryRealtime";
 import { Colors } from "../../../../constans/colors";
@@ -222,11 +224,26 @@ export default function CoordinatorHistoryScreen() {
     <View style={styles.screenWrapper}>
       <View style={styles.contentContainer}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Historial de Servicios</Text>
-          <Text style={styles.headerSubtitle}>
-            {services.length} de {total} servicio{total !== 1 ? "s" : ""}{" "}
-            {total > services.length && "(cargando más...)"}
-          </Text>
+          <View style={styles.headerTop}>
+            <View style={styles.headerLeft}>
+              <Text style={styles.headerTitle}>Historial</Text>
+              <Text style={styles.headerSubtitle}>
+                {services.length} resultado{services.length !== 1 ? "s" : ""} de {total} servicio{total !== 1 ? "s" : ""}{" "}
+                {total > services.length && "(cargando más...)"}
+              </Text>
+            </View>
+            <TouchableOpacity 
+              onPress={handleRefresh} 
+              disabled={loading || refreshing}
+              style={styles.refreshButton}
+            >
+              <Ionicons 
+                name="reload" 
+                size={24} 
+                color={loading || refreshing ? Colors.menuText : Colors.activeMenuText}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.filtersContainer}>
@@ -236,6 +253,13 @@ export default function CoordinatorHistoryScreen() {
             onClear={handleClearFilters}
             loading={loading}
           />
+        </View>
+
+        {/* Contador de resultados */}
+        <View style={styles.resultCountContainer}>
+          <Text style={styles.resultCountText}>
+            📊 {services.length} resultado{services.length !== 1 ? "s" : ""} encontrado{services.length !== 1 ? "s" : ""}
+          </Text>
         </View>
 
         <FlatList
@@ -310,6 +334,16 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.Border,
   },
 
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  headerLeft: {
+    flex: 1,
+  },
+
   headerTitle: {
     fontSize: 24,
     fontWeight: "700",
@@ -323,11 +357,35 @@ const styles = StyleSheet.create({
     textAlign: "left",
   },
 
+  refreshButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.activeMenuBackground,
+    marginLeft: 12,
+  },
+
   filtersContainer: {
     backgroundColor: Colors.Background,
     zIndex: 100,
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+
+  resultCountContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: Colors.activeMenuBackground,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.activeMenuText,
+  },
+
+  resultCountText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.normalText,
   },
 
   loadingContainer: {

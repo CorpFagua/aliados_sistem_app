@@ -117,6 +117,16 @@ export function useServiceHistoryRealtime(token: string | null) {
         result = result.filter((s) => s.store?.id === filters.storeId);
       }
 
+      // Filtro por fechas (comparar solo la fecha, no la hora)
+      if (filters.startDate || filters.endDate) {
+        result = result.filter((s) => {
+          const serviceDate = s.createdAt?.split('T')?.[0] || '';
+          if (filters.startDate && serviceDate < filters.startDate) return false;
+          if (filters.endDate && serviceDate > filters.endDate) return false;
+          return true;
+        });
+      }
+
       // Ordenamiento
       const sortBy = filters.sortBy || "created_at";
       const sortOrder = filters.sortOrder || "desc";
@@ -274,10 +284,16 @@ export function useServiceHistoryRealtime(token: string | null) {
 
   /**
    * Suscribirse a cambios en tiempo real
+   * DESACTIVADO: Causaba pérdida de filtros y saltos en la aplicación
    */
   const subscribeToRealtimeChanges = useCallback(async () => {
     if (!token) return;
 
+    console.log("[SUBSCRIBE] Realtime desactivado para historial");
+    return;
+
+    // El siguiente código fue desactivado:
+    /*
     console.log("[SUBSCRIBE] Iniciando suscripción a cambios en tiempo real");
 
     // Suscribirse a INSERT, UPDATE, DELETE en tabla services
@@ -349,10 +365,12 @@ export function useServiceHistoryRealtime(token: string | null) {
       });
 
     subscriptionRef.current = channel;
-  }, [token, getServiceHistory, applyLocalFilters]);
+    */
+  }, [token]);
 
   /**
-   * Buscar con debounce
+   * Buscar - Completamente local, sin llamar al backend
+   * La búsqueda se aplica instantáneamente a los datos cargados
    */
   const search = useCallback(
     (searchTerm: string, newFilters?: Partial<ServiceHistoryFilters>) => {
@@ -362,21 +380,23 @@ export function useServiceHistoryRealtime(token: string | null) {
         search: searchTerm,
       };
 
+      // Cancelar debounce anterior si existe
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
 
-      setLoading(true);
+      // Aplicar búsqueda localmente de forma instantánea
+      const filtered = applyLocalFilters(cacheRef.current.allServices, {
+        ...currentFiltersRef.current,
+        ...activeFiltersRef.current,
+      });
 
-      debounceTimerRef.current = setTimeout(() => {
-        getServiceHistory({
-          ...currentFiltersRef.current,
-          ...activeFiltersRef.current,
-          offset: 0,
-        });
-      }, DEBOUNCE_DELAY);
+      setFilteredServices(filtered);
+      cacheRef.current.filteredServices = filtered;
+
+      console.log(`[SEARCH] ${filtered.length} servicios coinciden con "${searchTerm}"`);
     },
-    [getServiceHistory]
+    [applyLocalFilters]
   );
 
   /**

@@ -113,12 +113,30 @@ export default function NotificationsScreen() {
         text2: "Solicitud aceptada",
       });
       loadNotifications();
-    } catch (err) {
-      Toast.show({
-        type: "error",
-        text1: "❌ Error",
-        text2: "No se pudo aceptar la solicitud",
-      });
+    } catch (err: any) {
+      // Extraer mensaje de error específico
+      const errorMessage = 
+        err.response?.data?.error || 
+        err.message || 
+        "No se pudo aceptar la solicitud";
+
+      // Si es error de estado de servicio (400 con mensaje de estado)
+      if (
+        err.response?.status === 400 &&
+        errorMessage.includes("estado")
+      ) {
+        Toast.show({
+          type: "error",
+          text1: "⚠ Servicio No Disponible",
+          text2: errorMessage,
+        });
+      } else {
+        Toast.show({
+          type: "error",
+          text1: "❌ Error",
+          text2: errorMessage,
+        });
+      }
     } finally {
       setProcessingId(null);
     }
