@@ -108,19 +108,27 @@ export default function StoreHistoryScreen() {
         );
       }
       
+      // Aplicar paginación en el lado del cliente
+      const startIndex = (pageNum - 1) * ITEMS_PER_PAGE;
+      const paginatedServices = filteredServices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+      
       const newData = isRefresh 
-        ? filteredServices 
-        : [...currentData.items, ...filteredServices];
+        ? paginatedServices
+        : [...currentData.items, ...paginatedServices];
+      
+      // hasMore es true si hay más servicios para mostrar
+      const totalAvailable = filteredServices.length;
+      const hasMore = startIndex + ITEMS_PER_PAGE < totalAvailable;
       
       setCurrentTabData({
         items: newData,
         page: pageNum + 1,
-        hasMore: filteredServices.length === ITEMS_PER_PAGE,
+        hasMore: hasMore,
         loading: false,
         refreshing: false,
       });
       
-      console.log(`📊 [${activeTab}] Items actuales: ${newData.length}, hasMore: ${filteredServices.length === ITEMS_PER_PAGE}`);
+      console.log(`📊 [${activeTab}] Items actuales: ${newData.length}, Total disponibles: ${totalAvailable}, hasMore: ${hasMore}`);
     } catch (err: any) {
       const message = err.response?.data?.message || err.response?.data?.error || err.message || "Error al cargar servicios";
       console.error("❌ Error en loadServices:", err);
