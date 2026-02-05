@@ -19,6 +19,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Colors } from "@/constans/colors";
 import { Service } from "@/models/service";
 import { useUnreadMessagesContextOptional } from "@/providers/UnreadMessagesProvider";
+import { isPaqueteriaAliados } from "@/utils/serviceTypeUtils";
 
 /**
  * Calcula el estado (ok|alerta|critico) y la etiqueta (label) para mostrar en la tarjeta.
@@ -266,25 +267,30 @@ export default function OrderRow({
           <View style={styles.contentRow}>
             {/* Columna izquierda: información principal */}
             <View style={styles.left}>
-              {pedido.profileStoreName && (
-                <View style={styles.storeRow}>
-                  <Text style={styles.store}>{pedido.profileStoreName}</Text>
-                  {/* Badge de mensajes no leídos */}
-                  {unreadCount > 0 && (
-                    <LinearGradient
-                      colors={["#10B981", "#059669"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.unreadBadge}
-                    >
-                      <Ionicons name="chatbubble" size={10} color="#FFFFFF" />
-                      <Text style={styles.unreadText}>
-                        {unreadCount > 99 ? "99+" : unreadCount}
-                      </Text>
-                    </LinearGradient>
-                  )}
-                </View>
-              )}
+              <View style={styles.storeRow}>
+                <Text 
+                  style={[
+                    styles.store, 
+                    isPaqueteriaAliados(pedido) && styles.aliadosStore
+                  ]}
+                >
+                  {isPaqueteriaAliados(pedido) ? "Mensajería" : pedido.profileStoreName || "Sin tienda"}
+                </Text>
+                {/* Badge de mensajes no leídos */}
+                {unreadCount > 0 && (
+                  <LinearGradient
+                    colors={["#10B981", "#059669"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.unreadBadge}
+                  >
+                    <Ionicons name="chatbubble" size={10} color="#FFFFFF" />
+                    <Text style={styles.unreadText}>
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </Text>
+                  </LinearGradient>
+                )}
+              </View>
 
               <Text style={styles.destination}>
                 <Ionicons
@@ -295,14 +301,25 @@ export default function OrderRow({
                 {pedido.destination}
               </Text>
 
-              <Text style={styles.zone}>
-                <Ionicons
-                  name="map-outline"
-                  size={14}
-                  color={Colors.menuText}
-                />{" "}
-                {pedido.zoneName || pedido.zoneId || "Sin zona"}
-              </Text>
+              {isPaqueteriaAliados(pedido) ? (
+                <Text style={styles.zone}>
+                  <Ionicons
+                    name="business-outline"
+                    size={14}
+                    color={Colors.menuText}
+                  />{" "}
+                  {pedido.pickup || "Punto de recogida"}
+                </Text>
+              ) : (
+                <Text style={styles.zone}>
+                  <Ionicons
+                    name="map-outline"
+                    size={14}
+                    color={Colors.menuText}
+                  />{" "}
+                  {pedido.zoneName || pedido.zoneId || "Sin zona"}
+                </Text>
+              )}
             </View>
 
             {/* Columna derecha: ID y tiempo */}
@@ -358,6 +375,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: Colors.normalText,
+  },
+  aliadosStore: {
+    color: "#F97316",
   },
   unreadBadge: {
     flexDirection: "row",

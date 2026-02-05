@@ -68,6 +68,7 @@ export interface ServicePayload {
   branch_id?: string | null;
   zone_id?: string | null;
   profile_store_id?: string | null;  // 🟢 Nuevo campo
+  assigned_delivery_user_id?: string | null; // 🟢 ID del domiciliario
 
   expected_at?: Date | null;   // programados
   prep_time?: number | null;   // minutos

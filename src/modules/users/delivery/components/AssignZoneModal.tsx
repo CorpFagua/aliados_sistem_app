@@ -15,6 +15,7 @@ import { fetchZones } from "@/services/zones";
 import { assignZoneToService } from "@/services/services";
 import { Zone } from "@/models/zone";
 import { Service } from "@/models/service";
+import { isPaqueteriaAliados } from "@/utils/serviceTypeUtils";
 
 interface Props {
   visible: boolean;
@@ -61,7 +62,28 @@ export default function AssignZoneModal({
   }, [visible, service]);
 
   const handleSave = async () => {
-    if (!service || !zoneId) {
+    if (!service) {
+      setError("❌ Servicio no encontrado");
+      return;
+    }
+
+    // Para paquetería Aliados, no necesita zona
+    if (isPaqueteriaAliados(service)) {
+      try {
+        setSaving(true);
+        // Simplemente retornar el servicio sin asignar zona
+        onAssigned(service);
+        onClose();
+      } catch (e: any) {
+        setError("❌ Error procesando mensajería.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Para otros tipos, zona es requerida
+    if (!zoneId) {
       setError("Debes seleccionar una zona");
       return;
     }
@@ -82,7 +104,9 @@ export default function AssignZoneModal({
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <Text style={styles.title}>Asignar zona</Text>
+          <Text style={styles.title}>
+            {isPaqueteriaAliados(service) ? "Mensajería" : "Asignar zona"}
+          </Text>
 
           {loading ? (
             <ActivityIndicator size="large" color={Colors.gradientStart} />
@@ -90,25 +114,39 @@ export default function AssignZoneModal({
             <>
               {error && <Text style={styles.error}>{error}</Text>}
 
-              <DropDownPicker
-                open={open}
-                value={zoneId}
-                items={items}
-                setOpen={setOpen}
-                setValue={setZoneId}
-                setItems={setItems}
-                placeholder="Selecciona una zona..."
-                style={styles.dropdown}
-                dropDownContainerStyle={styles.dropdownContainer}
-                placeholderStyle={styles.placeholder}
-                textStyle={styles.dropdownText}
-                ArrowDownIconComponent={() => (
-                  <Ionicons name="chevron-down" size={20} color="#fff" />
-                )}
-                ArrowUpIconComponent={() => (
-                  <Ionicons name="chevron-up" size={20} color="#fff" />
-                )}
-              />
+              {isPaqueteriaAliados(service) ? (
+                <View style={styles.infoBox}>
+                  <Ionicons
+                    name="information-circle"
+                    size={24}
+                    color="#F97316"
+                    style={{ marginRight: 12 }}
+                  />
+                  <Text style={styles.infoText}>
+                    Esta mensajería será recogida sin asignación de zona específica.
+                  </Text>
+                </View>
+              ) : (
+                <DropDownPicker
+                  open={open}
+                  value={zoneId}
+                  items={items}
+                  setOpen={setOpen}
+                  setValue={setZoneId}
+                  setItems={setItems}
+                  placeholder="Selecciona una zona..."
+                  style={styles.dropdown}
+                  dropDownContainerStyle={styles.dropdownContainer}
+                  placeholderStyle={styles.placeholder}
+                  textStyle={styles.dropdownText}
+                  ArrowDownIconComponent={() => (
+                    <Ionicons name="chevron-down" size={20} color="#fff" />
+                  )}
+                  ArrowUpIconComponent={() => (
+                    <Ionicons name="chevron-up" size={20} color="#fff" />
+                  )}
+                />
+              )}
 
               <View style={styles.actions}>
                 <TouchableOpacity style={styles.cancel} onPress={onClose}>
@@ -121,7 +159,10 @@ export default function AssignZoneModal({
                   disabled={saving}
                 >
                   <LinearGradient
-                    colors={[Colors.gradientStart, Colors.gradientEnd]}
+                    colors={[
+                      isPaqueteriaAliados(service) ? "#F97316" : Colors.gradientStart,
+                      isPaqueteriaAliados(service) ? "#FB923C" : Colors.gradientEnd,
+                    ]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.save}
@@ -169,6 +210,22 @@ const styles = StyleSheet.create({
     color: "#ff4d4f",
     textAlign: "center",
     marginBottom: 10,
+  },
+  infoBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(249, 115, 22, 0.1)",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: "#F97316",
+  },
+  infoText: {
+    flex: 1,
+    color: Colors.normalText,
+    fontSize: 14,
+    lineHeight: 20,
   },
   dropdown: {
     backgroundColor: "#121212",

@@ -15,6 +15,7 @@ import { fetchZones } from "@/services/zones";
 import { assignZoneToService } from "@/services/services";
 import { Zone } from "@/models/zone";
 import { Service } from "@/models/service";
+import { isPaqueteriaAliados } from "@/utils/serviceTypeUtils";
 
 interface Props {
   visible: boolean;
@@ -61,7 +62,28 @@ export default function AssignZoneModal({
   }, [visible, service]);
 
   const handleSave = async () => {
-    if (!service || !zoneId) {
+    if (!service) {
+      setError("❌ Servicio no encontrado");
+      return;
+    }
+
+    // Para paquetería Aliados, no necesita zona
+    if (isPaqueteriaAliados(service)) {
+      try {
+        setSaving(true);
+        // Simplemente retornar el servicio sin asignar zona
+        onAssigned(service);
+        onClose();
+      } catch (e: any) {
+        setError("❌ Error procesando paquetería.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Para otros tipos, zona es requerida
+    if (!zoneId) {
       setError("Debes seleccionar una zona");
       return;
     }
@@ -82,33 +104,55 @@ export default function AssignZoneModal({
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <Text style={styles.title}>Asignar zona</Text>
+          <Text style={styles.title}>
+            {isPaqueteriaAliados(service) ? "Paquetería Aliados" : "Asignar zona"}
+          </Text>
 
           {loading ? (
             <ActivityIndicator size="large" color={Colors.gradientStart} />
           ) : (
             <>
-              {error && <Text style={styles.error}>{error}</Text>}
+              {isPaqueteriaAliados(service) ? (
+                // Mensaje especial para paquetería Aliados
+                <View style={styles.infoBox}>
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={24}
+                    color={Colors.gradientStart}
+                    style={{ marginBottom: 10 }}
+                  />
+                  <Text style={styles.infoText}>
+                    La paquetería de Aliados no requiere asignación de zona.
+                  </Text>
+                  <Text style={styles.infoSubtext}>
+                    Presiona "Continuar" para proceder.
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {error && <Text style={styles.error}>{error}</Text>}
 
-              <DropDownPicker
-                open={open}
-                value={zoneId}
-                items={items}
-                setOpen={setOpen}
-                setValue={setZoneId}
-                setItems={setItems}
-                placeholder="Selecciona una zona..."
-                style={styles.dropdown}
-                dropDownContainerStyle={styles.dropdownContainer}
-                placeholderStyle={styles.placeholder}
-                textStyle={styles.dropdownText}
-                ArrowDownIconComponent={() => (
-                  <Ionicons name="chevron-down" size={20} color="#fff" />
-                )}
-                ArrowUpIconComponent={() => (
-                  <Ionicons name="chevron-up" size={20} color="#fff" />
-                )}
-              />
+                  <DropDownPicker
+                    open={open}
+                    value={zoneId}
+                    items={items}
+                    setOpen={setOpen}
+                    setValue={setZoneId}
+                    setItems={setItems}
+                    placeholder="Selecciona una zona..."
+                    style={styles.dropdown}
+                    dropDownContainerStyle={styles.dropdownContainer}
+                    placeholderStyle={styles.placeholder}
+                    textStyle={styles.dropdownText}
+                    ArrowDownIconComponent={() => (
+                      <Ionicons name="chevron-down" size={20} color="#fff" />
+                    )}
+                    ArrowUpIconComponent={() => (
+                      <Ionicons name="chevron-up" size={20} color="#fff" />
+                    )}
+                  />
+                </>
+              )}
 
               <View style={styles.actions}>
                 <TouchableOpacity style={styles.cancel} onPress={onClose}>
@@ -129,7 +173,9 @@ export default function AssignZoneModal({
                     {saving ? (
                       <ActivityIndicator color="#fff" />
                     ) : (
-                      <Text style={styles.saveText}>Asignar</Text>
+                      <Text style={styles.saveText}>
+                        {isPaqueteriaAliados(service) ? "Continuar" : "Asignar"}
+                      </Text>
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
@@ -163,6 +209,28 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.normalText,
     marginBottom: 16,
+    textAlign: "center",
+  },
+  infoBox: {
+    backgroundColor: Colors.gradientStart + "15",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.gradientStart + "40",
+    padding: 16,
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  infoText: {
+    color: Colors.normalText,
+    fontSize: 15,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  infoSubtext: {
+    color: Colors.menuText,
+    fontSize: 13,
+    fontWeight: "500",
     textAlign: "center",
   },
   error: {

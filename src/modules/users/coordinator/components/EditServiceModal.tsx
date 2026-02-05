@@ -379,26 +379,32 @@ export default function EditServiceModal({
         (updatePayload as any).payment = payment;
       }
       
+      // Detectar si la zona cambió
+      const zoneChanged = zoneId !== (svc?.zoneId ?? svc?.raw?.zone_id ?? null);
+
       // 🔴 Si es disponible, forzar valores null/0 para zona y precios
       if (isAvailable) {
         (updatePayload as any).price = null;
         (updatePayload as any).priceDeliverySrv = 0;
         (updatePayload as any).zoneId = null;
       } else {
-        // Si no es disponible, permitir editar precios normalmente
-        // 🔴 Usar hasOwnProperty lógica: si tiene valor (incluyendo "0"), enviar
-        if (price !== "" && price !== undefined) {
-          (updatePayload as any).price = parseInt(price) || 0;
-        }
-        if (priceDeliverySrv !== "" && priceDeliverySrv !== undefined) {
-          (updatePayload as any).priceDeliverySrv = parseInt(priceDeliverySrv) || 0;
-        }
-        if (zoneId !== (svc?.zoneId ?? svc?.raw?.zone_id ?? null)) {
+        // 🟢 Si la zona cambió, NO enviar precios - dejar que el backend los calcule
+        if (zoneChanged) {
           updatePayload.zoneId = zoneId || undefined;
+          // NO incluimos price ni priceDeliverySrv - el backend los calculará
+          console.log("🔄 Zona cambió - backend calculará precios automáticamente");
+        } else {
+          // Si la zona NO cambió, permitir editar precios manualmente
+          if (price !== "" && price !== undefined) {
+            (updatePayload as any).price = parseInt(price) || 0;
+          }
+          if (priceDeliverySrv !== "" && priceDeliverySrv !== undefined) {
+            (updatePayload as any).priceDeliverySrv = parseInt(priceDeliverySrv) || 0;
+          }
         }
       }
       
-      // 💰 Total a recaudar (amount)
+      // 💰 Total a recaudar (amount) - siempre incluir si cambió
       if (amount !== "" && amount !== undefined) {
         (updatePayload as any).amount = parseInt(amount) || 0;
       }
