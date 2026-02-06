@@ -118,12 +118,12 @@ export default function DisponiblesScreen() {
       const timestamp = orderTimestamps.get(service.id);
       
       // 🔑 LÓGICA CORRECTA:
-      // - Si NO tiene timestamp → ya pasó el delay hace mucho → MOSTRAR
+      // - Si NO tiene timestamp → probablemente aún no se asignó localmente → NO MOSTRAR
       // - Si tiene timestamp y pasó delay → MOSTRAR
       // - Si tiene timestamp y NO pasó delay → ESPERAR
       if (!timestamp) {
-        // Sin timestamp = ya vio el delay completo
-        return true;
+        // Sin timestamp = aún esperando que se asigne el timestamp, ocultar
+        return false;
       }
 
       const elapsed = now - timestamp;

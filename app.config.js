@@ -14,10 +14,6 @@ export default {
       resizeMode: 'contain',
       backgroundColor: '#ffffff',
     },
-    notification: {
-      icon: './assets/notification-icon.png',
-      color: '#0066cc', // Azul
-    },
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.wolfagua.aliados-sistem-app',
@@ -27,16 +23,18 @@ export default {
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#ffffff',
+
       },
       edgeToEdgeEnabled: true,
       package: 'com.wolfagua.aliados_sistem_app',
       googleServicesFile: './google-services.json',
       displayName: 'Aliados Corporativo',
       softwareKeyboardLayoutMode: 'pan',
+
       notification: {
-        icon: './assets/notification-icon.png',
-        color: '#0066cc',
-      },
+          icon: "./assets/notification-icon.png", // Ruta al ícono de notificación
+          color: "#FF0000", // Color de fondo de la notificación
+        },
     },
     web: {
       favicon: './assets/favicon.png',
@@ -56,12 +54,7 @@ export default {
       ],
       'expo-router',
     ],
-    /*
-      📱 CONFIGURACIÓN DE ICONOS DE NOTIFICACIÓN:
-      - Icono pequeño (barra): notification-icon.png (monocromático se usa en app.config.js)
-      - Icono grande (tarjeta): notification-large.png (colorido, se envía desde backend)
-      - El backend en push.service.ts envía ambos en cada notificación FCM
-    */
+
     extra: {
       router: {},
       eas: {
