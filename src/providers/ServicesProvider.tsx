@@ -272,10 +272,15 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
 
       console.log('[REALTIME] 🔐 shouldKeep:', shouldKeep, { role: userRole });
 
-      // Si NO es suyo, ELIMINAR de la lista inmediatamente
+      // Si NO es suyo:
+      // - En DELETE: eliminar
+      // - En INSERT: ignorar (no agregar)
+      // - En UPDATE: no modificar la lista (evitar fluctuaciones/no contar)
       if (!shouldKeep) {
-        console.log('[REALTIME] ❌ NO ES SUYO - Eliminando del GUI');
-        setServices((prev) => prev.filter((s) => s.id !== serviceId));
+        if (eventType === 'DELETE') {
+          setServices((prev) => prev.filter((s) => s.id !== serviceId));
+        }
+        // Para INSERT/UPDATE no hacemos nada cuando no corresponde al usuario
         return;
       }
 

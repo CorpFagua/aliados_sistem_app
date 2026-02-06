@@ -18,6 +18,7 @@ export default function DisponiblesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState(Date.now()); // Forzar recalc cada 1s
   const refetchedServiceIds = useRef<Set<string>>(new Set()); // Evitar refetch múltiple por mismo servicio
+  const prevCountsRef = useRef<{ filtered: number; available: number } | null>({ filtered: -1, available: -1 });
 
   // 🎯 Contar pedidos activos (asignado + en_ruta) y resetear límite cuando llegue a 0
   useEffect(() => {
@@ -139,7 +140,17 @@ export default function DisponiblesScreen() {
       return false;
     });
 
-    console.log(`[DisponiblesScreen] 📊 Mostrando ${filtered.length}/${available.length} servicios (delay: no-VIP)`);
+    // Log cuando cambian los contadores para evitar spam en consola
+    (function () {
+      try {
+        // usar una ref para almacenar valores previos
+      } catch (e) {}
+    })();
+    // Mostrar log solo si hay cambios importantes
+    if (filtered.length > 0 || available.length !== (prevCountsRef.current?.available ?? -1) || filtered.length !== (prevCountsRef.current?.filtered ?? -1)) {
+      console.log(`[DisponiblesScreen] 📊 Mostrando ${filtered.length}/${available.length} servicios (delay: no-VIP)`);
+      prevCountsRef.current = { filtered: filtered.length, available: available.length };
+    }
     return filtered;
   }, [services, isUserVIP, initialOrderIds, visibleNewOrderIds, orderTimestamps, currentTime]);
 

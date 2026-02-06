@@ -406,7 +406,7 @@ export default function EditServiceModal({
       
       // 💰 Total a recaudar (amount) - siempre incluir si cambió
       if (amount !== "" && amount !== undefined) {
-        (updatePayload as any).total_to_collect = parseInt(amount) || 0;
+        (updatePayload as any).amount = parseInt(amount) || 0;
       }
 
       // Incluir domiciliario en el payload de actualización
