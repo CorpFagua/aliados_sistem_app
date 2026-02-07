@@ -10,6 +10,12 @@ import {
   TextInput,
 } from "react-native";
 import { Colors } from "@/constans/colors";
+import {
+  getTodayLocalFormat,
+  addDays,
+  formatDateLocal,
+  formatDateShort,
+} from "@/utils/dateTime";
 
 interface DateRangeSelectorProps {
   startDate: string;
@@ -27,29 +33,36 @@ export default function AnalyticsDateRangeSelector({
   const [tempEnd, setTempEnd] = useState(endDate);
 
   const handleToday = () => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayLocalFormat();
     onDateRangeChange(today, today);
     setShowModal(false);
   };
 
   const handleLast7Days = () => {
-    const end = new Date();
-    const start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const today = new Date();
+    const sevenDaysAgo = addDays(today, -6); // -6 porque incluye hoy
     onDateRangeChange(
-      start.toISOString().split("T")[0],
-      end.toISOString().split("T")[0]
+      formatDateToYYYYMMDD(sevenDaysAgo),
+      formatDateToYYYYMMDD(today)
     );
     setShowModal(false);
   };
 
   const handleLast30Days = () => {
-    const end = new Date();
-    const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const today = new Date();
+    const thirtyDaysAgo = addDays(today, -29); // -29 porque incluye hoy
     onDateRangeChange(
-      start.toISOString().split("T")[0],
-      end.toISOString().split("T")[0]
+      formatDateToYYYYMMDD(thirtyDaysAgo),
+      formatDateToYYYYMMDD(today)
     );
     setShowModal(false);
+  };
+
+  const formatDateToYYYYMMDD = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const handleCustom = () => {
@@ -58,11 +71,7 @@ export default function AnalyticsDateRangeSelector({
   };
 
   const formatDate = (date: string) => {
-    return new Date(date + "T00:00:00").toLocaleDateString("es-CO", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return formatDateLocal(date);
   };
 
   return (

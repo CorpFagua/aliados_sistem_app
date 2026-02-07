@@ -14,15 +14,12 @@ import DeliveryPersonList from "../components/DeliveryPersonList";
 import StoreList from "../components/StoreList";
 import ProfitSummary from "../components/ProfitSummary";
 import AnalyticsDetailedTable from "../components/AnalyticsDetailedTable";
+import { getTodayLocalFormat } from "@/utils/dateTime";
 
 export default function AnalyticsScreen() {
   const { data, loading, error, fetchData } = useAnalytics();
-  const [startDate, setStartDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-  const [endDate, setEndDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [startDate, setStartDate] = useState(getTodayLocalFormat());
+  const [endDate, setEndDate] = useState(getTodayLocalFormat());
 
   // Cargar datos iniciales
   useEffect(() => {

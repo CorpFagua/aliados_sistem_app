@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Colors } from "@/constans/colors";
 import { DetailedService } from "@/services/analytics";
+import { formatDateTime, getTodayLocalFormat } from "@/utils/dateTime";
 
 interface AnalyticsDetailedTableProps {
   services: DetailedService[];
@@ -49,7 +50,7 @@ export default function AnalyticsDetailedTable({
         svc.price.toString(),
         svc.priceDeliverySrv.toString(),
         svc.status,
-        svc.completedAt ? new Date(svc.completedAt).toLocaleDateString() : "-",
+        svc.completedAt ? formatDateTime(svc.completedAt) : "-",
       ]);
 
       const csvContent = [
@@ -65,7 +66,7 @@ export default function AnalyticsDetailedTable({
         const element = document.createElement("a");
         const file = new Blob([csvContent], { type: "text/csv" });
         element.href = URL.createObjectURL(file);
-        element.download = `analytics-${new Date().toISOString().split("T")[0]}.csv`;
+        element.download = `analytics-${getTodayLocalFormat()}.csv`;
         document.body.appendChild(element);
         element.click();
         document.body.removeChild(element);
