@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Colors } from "@/constans/colors";
 import { DetailedService } from "@/services/analytics";
-import { formatDateTime, getTodayLocalFormat } from "@/utils/dateTime";
+import { formatDateTime, getTodayLocalFormat, parseBackendDateTimeToLocal } from "@/utils/dateTime";
 
 interface AnalyticsDetailedTableProps {
   services: DetailedService[];
@@ -22,12 +22,15 @@ export default function AnalyticsDetailedTable({
   services,
   onDownload,
 }: AnalyticsDetailedTableProps) {
+
+
   const handleDownload = async () => {
     if (!onDownload) return;
 
     try {
       // Crear CSV
       const headers = [
+        "Fecha Creado",
         "Tienda",
         "Admin Tienda",
         "Tipo Servicio",
@@ -40,18 +43,23 @@ export default function AnalyticsDetailedTable({
         "Fecha Completado",
       ];
 
-      const rows = services.map((svc) => [
-        svc.storeName,
-        svc.storeAdmin,
-        svc.serviceType || "domicilio",
-        svc.deliveryName,
-        svc.deliveryPhone || "-",
-        svc.zoneName,
-        svc.price.toString(),
-        svc.priceDeliverySrv.toString(),
-        svc.status,
-        svc.completedAt ? formatDateTime(svc.completedAt) : "-",
-      ]);
+      const rows = services.map((svc) => {
+        const completedFormatted = svc.completedAt ? parseBackendDateTimeToLocal(svc.completedAt) : "-";
+        console.log(`[ANALYTICS-TABLE] Service ${svc.serviceId}: using createdAt="${svc.createdAt}" -> formatted="${completedFormatted}"`);
+        return [
+          svc.createdAt ? parseBackendDateTimeToLocal(svc.createdAt) : "-",
+          svc.storeName,
+          svc.storeAdmin,
+          svc.serviceType || "domicilio",
+          svc.deliveryName,
+          svc.deliveryPhone || "-",
+          svc.zoneName,
+          svc.price.toString(),
+          svc.priceDeliverySrv.toString(),
+          svc.status,
+          completedFormatted,
+        ];
+      });
 
       const csvContent = [
         headers.join(","),
@@ -114,6 +122,9 @@ export default function AnalyticsDetailedTable({
         <View style={styles.table}>
           {/* Headers */}
           <View style={styles.tableRow}>
+            <Text style={[styles.tableCell, styles.tableHeader, { width: 140 }]}>
+              Fecha Creado
+            </Text>
             <Text style={[styles.tableCell, styles.tableHeader, { width: 100 }]}>
               Tienda
             </Text>
@@ -135,11 +146,17 @@ export default function AnalyticsDetailedTable({
             <Text style={[styles.tableCell, styles.tableHeader, { width: 70 }]}>
               Estado
             </Text>
+            <Text style={[styles.tableCell, styles.tableHeader, { width: 140 }]}>
+              Fecha Completado
+            </Text>
           </View>
 
           {/* Rows */}
           {services.map((svc, idx) => (
             <View key={svc.serviceId} style={[styles.tableRow, idx % 2 && styles.tableRowAlt]}>
+              <Text style={[styles.tableCell, { width: 140 }]}>
+                {svc.createdAt ? parseBackendDateTimeToLocal(svc.createdAt) : "-"}
+              </Text>
               <Text style={[styles.tableCell, { width: 100 }]} numberOfLines={1}>
                 {svc.storeName}
               </Text>
@@ -160,6 +177,9 @@ export default function AnalyticsDetailedTable({
               </Text>
               <Text style={[styles.tableCell, { width: 70 }]} numberOfLines={1}>
                 {svc.status}
+              </Text>
+              <Text style={[styles.tableCell, { width: 140 }]}>
+                {svc.completedAt ? parseBackendDateTimeToLocal(svc.completedAt) : "-"}
               </Text>
             </View>
           ))}

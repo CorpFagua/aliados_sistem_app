@@ -46,6 +46,7 @@ export interface DetailedService {
   price: number;
   priceDeliverySrv: number;
   status: string;
+  createdAt?: string;
   completedAt?: string;
   notes?: string;
 }
