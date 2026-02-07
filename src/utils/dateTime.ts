@@ -239,3 +239,73 @@ export function getRelativeDateLabel(dateStr: string): string {
     return formatDateLocal(dateStr);
   }
 }
+
+// ============================================================
+// 🎯 PUNTO CENTRAL DE PARSEO - CONVIERTE UTC DEL BACKEND A LOCAL
+// ============================================================
+// Usar estas funciones para parsear respuestas del backend
+// Si necesitas cambiar cómo se convierten las fechas, SOLO edita aquí
+
+/**
+ * Convertir fecha UTC ISO 8601 a formato local YYYY-MM-DD
+ * PUNTO CENTRAL: Usar siempre esta función para parsear fechas del backend
+ * 
+ * Ejemplo: "2026-02-07T04:30:00Z" (UTC) → "2026-02-06" (Colombia local)
+ * 
+ * @param utcIso - Fecha ISO 8601 UTC (ej: "2026-02-07T04:30:00Z")
+ * @returns Fecha en formato YYYY-MM-DD en zona local Colombia
+ */
+export function parseBackendDateToLocal(utcIso: string): string {
+  if (!utcIso) return '';
+  
+  const utcDate = new Date(utcIso);
+  const COLOMBIA_OFFSET_MS = -5 * 60 * 60 * 1000; // UTC-5
+  const localDate = new Date(utcDate.getTime() + COLOMBIA_OFFSET_MS);
+  
+  const year = localDate.getUTCFullYear();
+  const month = String(localDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(localDate.getUTCDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Convertir fecha UTC ISO 8601 a hora local HH:MM:SS
+ * PUNTO CENTRAL: Usar siempre esta función para parsear horas del backend
+ * 
+ * Ejemplo: "2026-02-07T04:30:00Z" (UTC) → "23:30:00" (Colombia local)
+ * 
+ * @param utcIso - Fecha ISO 8601 UTC
+ * @returns Hora en formato HH:MM:SS en zona local Colombia
+ */
+export function parseBackendTimeToLocal(utcIso: string): string {
+  if (!utcIso) return '';
+  
+  const utcDate = new Date(utcIso);
+  const COLOMBIA_OFFSET_MS = -5 * 60 * 60 * 1000; // UTC-5
+  const localDate = new Date(utcDate.getTime() + COLOMBIA_OFFSET_MS);
+  
+  const hours = String(localDate.getUTCHours()).padStart(2, '0');
+  const minutes = String(localDate.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(localDate.getUTCSeconds()).padStart(2, '0');
+  
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+/**
+ * Convertir fecha UTC ISO 8601 a formato local completo YYYY-MM-DD HH:MM:SS
+ * PUNTO CENTRAL: Usar siempre esta función para parsear fechas+horas del backend
+ * 
+ * Ejemplo: "2026-02-07T04:30:00Z" (UTC) → "2026-02-06 23:30:00" (Colombia local)
+ * 
+ * @param utcIso - Fecha ISO 8601 UTC
+ * @returns Fecha y hora en formato YYYY-MM-DD HH:MM:SS en zona local Colombia
+ */
+export function parseBackendDateTimeToLocal(utcIso: string): string {
+  if (!utcIso) return '';
+  
+  const date = parseBackendDateToLocal(utcIso);
+  const time = parseBackendTimeToLocal(utcIso);
+  
+  return `${date} ${time}`;
+}

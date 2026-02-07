@@ -20,6 +20,7 @@ import { Colors } from "../constans/colors";
 import { ServiceHistoryFilters } from "../hooks/useServiceHistory";
 import { useAuth } from "../providers/AuthProvider";
 import { fetchDeliveries } from "../services/users";
+import { formatDateToYYYYMMDD, getTodayLocalFormat } from "../utils/dateTime";
 
 interface HistoryFiltersProps {
   onFiltersChange: (filters: Partial<ServiceHistoryFilters>) => void;
@@ -63,7 +64,11 @@ export default function HistoryFilters({
   const [startDate, setStartDate] = useState<string | undefined>();
   const [endDate, setEndDate] = useState<string | undefined>();
   const [showCalendar, setShowCalendar] = useState<null | { field: "start" | "end" }>(null);
-  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    // Inicializar con la fecha actual local del dispositivo
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
   const [showDeliveryMenu, setShowDeliveryMenu] = useState(false);
   const [deliveryQuery, setDeliveryQuery] = useState("");
   const [deliveries, setDeliveries] = useState<any[]>([]);
@@ -147,7 +152,8 @@ export default function HistoryFilters({
 
   const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
   const daysInMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  const formatISO = (d: Date) => d.toISOString().slice(0, 10);
+  // Usar la zona horaria local del dispositivo en lugar de UTC
+  const formatISO = (d: Date) => formatDateToYYYYMMDD(d);
 
   const onPickDate = useCallback(
     (d: Date) => {
@@ -197,8 +203,16 @@ export default function HistoryFilters({
       return { minMonth, maxMonth };
     } else if (showCalendar?.field === "end") {
       // Cuando seleccionamos fin, limitamos desde startDate hasta 1 año adelante
-      const minMonth = startDate ? new Date(startDate) : new Date(new Date().getFullYear() - 1, new Date().getMonth(), 1);
+      // Si hay startDate, parsear correctamente usando zona local
       const today = new Date();
+      let minMonth: Date;
+      if (startDate) {
+        // Parsear la fecha YYYY-MM-DD en zona local
+        const [year, month, day] = startDate.split('-').map(Number);
+        minMonth = new Date(year, month - 1, 1);
+      } else {
+        minMonth = new Date(today.getFullYear() - 1, today.getMonth(), 1);
+      }
       const maxMonth = new Date(today.getFullYear() + 1, today.getMonth(), 1);
       return { minMonth, maxMonth };
     }
@@ -263,6 +277,8 @@ export default function HistoryFilters({
     setSelectedDeliveryName(undefined);
     setDeliveryQuery("");
     setDeliveries([]);
+    // Resetear calendario a vista actual
+    setCalendarMonth(new Date());
 
     onFiltersChange({
       search: "",
