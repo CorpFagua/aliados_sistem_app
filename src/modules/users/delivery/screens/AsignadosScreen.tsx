@@ -8,6 +8,7 @@ import { updateServiceStatus } from "@/services/services";
 import { useServices } from "@/providers/ServicesProvider";
 import { useUnreadMessagesContext } from "@/providers/UnreadMessagesProvider";
 import { Service } from "@/models/service";
+import { isPaqueteriaAliados } from "@/utils/serviceTypeUtils";
 import OrderRow from "../components/OrderRow";
 import OrderDetailModal from "../components/ServiceDetailModal";
 import AssignZoneModal from "../components/AssignZoneModal";
@@ -78,9 +79,9 @@ export default function AsignadosScreen() {
               pedido={item}
               onPress={() => setSelectedPedido(item)}
               leftEnabled
-              leftLabel="Recogiendo"
-              leftColor="#2563EB"
-              // 📌 Ahora solo abre el modal
+              leftLabel={isPaqueteriaAliados(item) ? "Recoger" : "Recogiendo"}
+              leftColor={isPaqueteriaAliados(item) ? "#F97316" : "#2563EB"}
+              // 📌 Abre el modal de asignación
               onLeftAction={() => {
                 setAssigning(item);
               }}

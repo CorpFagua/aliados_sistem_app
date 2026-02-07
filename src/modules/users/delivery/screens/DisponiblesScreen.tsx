@@ -1,6 +1,6 @@
 // src/modules/users/delivery/screens/DisponiblesScreen.tsx
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import { StyleSheet, FlatList, View, Text, ActivityIndicator, RefreshControl, ToastAndroid, ScrollView } from "react-native";
+import { StyleSheet, FlatList, View, Text, ActivityIndicator, RefreshControl, ToastAndroid, ScrollView, AppState, AppStateStatus } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
@@ -16,7 +16,9 @@ export default function DisponiblesScreen() {
   const { services, loading, refetch, initialOrderIds, visibleNewOrderIds, orderTimestamps, isUserVIP } = useServices();
   const { registerServices } = useUnreadMessagesContext();
   const [refreshing, setRefreshing] = useState(false);
+  const [currentTime, setCurrentTime] = useState(Date.now()); // Forzar recalc cada 1s
   const refetchedServiceIds = useRef<Set<string>>(new Set()); // Evitar refetch múltiple por mismo servicio
+  const prevCountsRef = useRef<{ filtered: number; available: number } | null>({ filtered: -1, available: -1 });
 
   // 🎯 Contar pedidos activos (asignado + en_ruta) y resetear límite cuando llegue a 0
   useEffect(() => {
@@ -63,39 +65,30 @@ export default function DisponiblesScreen() {
     });
   }, [services, isUserVIP, initialOrderIds, visibleNewOrderIds, orderTimestamps]);
 
-  // ⏱️ Contador regresivo: actualizar cada 1s solo para verificar si pasó el delay
+  // ⏱️ Contador regresivo: actualizar cada 1s para recalcular qué servicios mostrar
   useEffect(() => {
     if (isUserVIP) return;
 
     const interval = setInterval(() => {
-      const available = services.filter((s) => s.status === "disponible");
-      let shouldRefetch = false;
-
-      available.forEach((service) => {
-        // Solo para pedidos nuevos que aún no son visibles
-        if (!initialOrderIds.has(service.id) && !visibleNewOrderIds.has(service.id)) {
-          const timestamp = orderTimestamps.get(service.id);
-          if (timestamp && !refetchedServiceIds.current.has(service.id)) {
-            const elapsed = Date.now() - timestamp;
-            const remaining = Math.max(0, DELAY_FOR_NON_VIP - elapsed);
-
-            // Si pasó el delay, marcar para refetch (solo una vez por servicio)
-            if (remaining === 0) {
-              refetchedServiceIds.current.add(service.id);
-              shouldRefetch = true;
-            }
-          }
-        }
-      });
-
-      // Hacer refetch una sola vez si algo cumplió el delay
-      if (shouldRefetch) {
-        refetch();
-      }
+      // 🎯 Actualizar currentTime para forzar recalc del useMemo
+      setCurrentTime(Date.now());
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [services, isUserVIP, initialOrderIds, visibleNewOrderIds, orderTimestamps, refetch]);
+  }, [isUserVIP]);
+
+  // 📱 Cuando vuelve del background, actualizar currentTime para que aparezcan servicios que cumplieron delay
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'active') {
+        console.log('[DisponiblesScreen] 📱 App vuelve a foreground - actualizando currentTime');
+        // 🎯 Actualizar currentTime inmediatamente para que se recalcule el delay
+        setCurrentTime(Date.now());
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   // 🎯 Filtrar servicios disponibles con lógica de delay
   const pedidosVisibles = useMemo(() => {
@@ -111,48 +104,62 @@ export default function DisponiblesScreen() {
 
     if (isUserVIP) {
       // VIP: ver todos los pedidos inmediatamente
+      console.log(`[DisponiblesScreen] 👑 VIP - mostrando ${available.length} servicios sin delay`);
       return available;
     }
 
     // No-VIP: solo mostrar iniciales + nuevos que pasaron el delay
-    const now = Date.now();
-    return available.filter((service) => {
+    const now = currentTime; // 🎯 Usar currentTime que se actualiza cada 1s
+    const filtered = available.filter((service) => {
       // Mostrar si fue uno de los iniciales
       if (initialOrderIds.has(service.id)) {
         return true;
       }
 
-      // Si es nuevo y ya lo tenemos visible
-      if (visibleNewOrderIds.has(service.id)) {
-        return true;
-      }
-
-      // Si es nuevo pero aún no pasó el delay
       const timestamp = orderTimestamps.get(service.id);
       
       // 🔑 LÓGICA CORRECTA:
-      // - Si NO tiene timestamp → ya pasó el delay hace mucho → MOSTRAR
+      // - Si NO tiene timestamp → probablemente aún no se asignó localmente → NO MOSTRAR
       // - Si tiene timestamp y pasó delay → MOSTRAR
       // - Si tiene timestamp y NO pasó delay → ESPERAR
       if (!timestamp) {
-        // Sin timestamp = ya vio el delay completo
-        return true;
+        // Sin timestamp = aún esperando que se asigne el timestamp, ocultar
+        return false;
       }
 
-      if ((now - timestamp) >= DELAY_FOR_NON_VIP) {
+      const elapsed = now - timestamp;
+      if (elapsed >= DELAY_FOR_NON_VIP) {
+        // Pasó el delay - MOSTRAR
+        if (!refetchedServiceIds.current.has(service.id)) {
+          console.log(`[DisponiblesScreen] ⏱️ Servicio ${service.id} lista para mostrar (elapsed: ${elapsed}ms >= 10000ms)`);
+          refetchedServiceIds.current.add(service.id);
+        }
         return true;
       }
 
       return false;
     });
-  }, [services, isUserVIP, initialOrderIds, visibleNewOrderIds, orderTimestamps]);
+
+    // Log cuando cambian los contadores para evitar spam en consola
+    (function () {
+      try {
+        // usar una ref para almacenar valores previos
+      } catch (e) {}
+    })();
+    // Mostrar log solo si hay cambios importantes
+    if (filtered.length > 0 || available.length !== (prevCountsRef.current?.available ?? -1) || filtered.length !== (prevCountsRef.current?.filtered ?? -1)) {
+      console.log(`[DisponiblesScreen] 📊 Mostrando ${filtered.length}/${available.length} servicios (delay: no-VIP)`);
+      prevCountsRef.current = { filtered: filtered.length, available: available.length };
+    }
+    return filtered;
+  }, [services, isUserVIP, initialOrderIds, visibleNewOrderIds, orderTimestamps, currentTime]);
 
   // 🎯 Calcular servicios en espera para el toast
   const pedidosEnEspera = useMemo(() => {
     if (isUserVIP) return [];
     
     const available = services.filter((s) => s.status === "disponible");
-    const now = Date.now();
+    const now = currentTime; // 🎯 Usar currentTime para sincronizar
     
     return available.filter((service) => {
       // No incluir iniciales
@@ -163,33 +170,39 @@ export default function DisponiblesScreen() {
       const timestamp = orderTimestamps.get(service.id);
       return timestamp && (now - timestamp) < DELAY_FOR_NON_VIP;
     });
-  }, [services, isUserVIP, initialOrderIds, visibleNewOrderIds, orderTimestamps]);
+  }, [services, isUserVIP, initialOrderIds, visibleNewOrderIds, orderTimestamps, currentTime]);
 
   // 🔄 Pull-to-refresh
   const onRefresh = async () => {
     setRefreshing(true);
     try {
+      console.log('[DisponiblesScreen] 🔄 Pull-to-refresh iniciado');
       await refetch();
       
       // 📢 Mostrar toast si hay servicios en espera
       if (!isUserVIP && pedidosEnEspera.length > 0) {
+        console.log(`[DisponiblesScreen] 🔄 Refetch completado - hay ${pedidosEnEspera.length} servicios en espera`);
+        
         // Calcular el tiempo faltante del servicio más próximo
-        const now = Date.now();
         let tiempoMinimo = DELAY_FOR_NON_VIP;
         
         pedidosEnEspera.forEach((service) => {
           const timestamp = orderTimestamps.get(service.id);
           if (timestamp) {
-            const elapsed = Date.now() - timestamp;
+            const elapsed = currentTime - timestamp;
             const remaining = Math.max(0, DELAY_FOR_NON_VIP - elapsed);
             tiempoMinimo = Math.min(tiempoMinimo, remaining);
           }
         });
         
         const segundos = Math.ceil(tiempoMinimo / 1000);
-        const mensaje = `Cargando... ${segundos}s restantes`;
+        const mensaje = `${pedidosEnEspera.length} servicio(s) esperando... ${segundos}s`;
         
+        console.log(`[DisponiblesScreen] 📢 Toast: "${mensaje}"`);
         ToastAndroid.show(mensaje, ToastAndroid.LONG);
+      } else if (!isUserVIP && pedidosVisibles.length === 0) {
+        // Si no hay servicios en espera ni visibles, mostrar mensaje
+        ToastAndroid.show('No hay servicios disponibles', ToastAndroid.SHORT);
       }
     } finally {
       setRefreshing(false);

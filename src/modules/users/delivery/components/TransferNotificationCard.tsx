@@ -24,6 +24,7 @@ interface Props {
   currentDeliveryId: string;
   onAccept?: () => void;
   onReject?: () => void;
+  onCancel?: () => void;
   isProcessing?: boolean;
 }
 
@@ -33,6 +34,7 @@ export default function TransferNotificationCard({
   onAccept,
   isProcessing = false,
   onReject,
+  onCancel,
 }: Props) {
   const isReceived = notification.to_delivery_id === currentDeliveryId;
   const isSent = notification.from_delivery_id === currentDeliveryId;
@@ -118,7 +120,7 @@ export default function TransferNotificationCard({
         </View>
       </View>
 
-      {/* Acciones (solo si es recibida y pendiente) */}
+      {/* Acciones (recibidas: aceptar/rechazar, enviadas: cancelar) */}
       {isReceived && isPending && (
         <View style={styles.cardActions}>
           <TouchableOpacity
@@ -155,6 +157,24 @@ export default function TransferNotificationCard({
             )}
           </TouchableOpacity>
         </View>
+      )}
+
+      {/* Botón Cancelar (solo solicitudes enviadas pendientes) */}
+      {isSent && isPending && (
+        <TouchableOpacity
+          style={[styles.cancelBtn, isProcessing && styles.buttonDisabled]}
+          onPress={onCancel}
+          disabled={isProcessing}
+        >
+          {isProcessing ? (
+            <ActivityIndicator size="small" color="#FF9800" />
+          ) : (
+            <>
+              <Ionicons name="trash-outline" size={18} color="#FF9800" />
+              <Text style={styles.cancelText}>Cancelar Solicitud</Text>
+            </>
+          )}
+        </TouchableOpacity>
       )}
 
       {/* Timestamp */}
@@ -268,6 +288,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#fff",
+  },
+  cancelBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#FF9800",
+    marginBottom: 12,
+  },
+  cancelText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#FF9800",
   },
   buttonDisabled: {
     opacity: 0.5,

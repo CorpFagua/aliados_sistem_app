@@ -20,7 +20,7 @@ import CancelServiceModal from "../../../../components/CancelServiceModal";
 import EditServiceModal from "./EditServiceModal";
 import { Service } from "@/models/service";
 import ChatModal from "@/components/ChatModal";
-import { getServiceType } from "@/utils/serviceTypeUtils";
+import { getServiceType, isPaqueteriaAliados, isAnyPackage } from "@/utils/serviceTypeUtils";
 
 interface Props {
   visible: boolean;
@@ -95,8 +95,49 @@ export default function OrderDetailModal({
 
   // --- Renderiza el botón principal según estado ---
   const renderActionButton = () => {
-    if (serviceType === "paqueteria") {
-      // Paquetería tiene flujo diferente
+    // Para paquetería Aliados: mismo flujo que domicilios (3 pasos)
+    if (isPaqueteriaAliados(pedido)) {
+      if (pedido.status === "disponible") {
+        return (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: "#F97316" }]}
+            onPress={() => setShowAssignModal(true)}
+          >
+            <Ionicons name="person-add-outline" size={18} color="#000" />
+            <Text style={styles.actionText}>Asignar</Text>
+          </TouchableOpacity>
+        );
+      }
+
+      if (pedido.status === "asignado") {
+        return (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: "#F97316" }]}
+            onPress={() => setShowZoneModal(true)}
+          >
+            <Ionicons name="checkmark-circle-outline" size={18} color="#000" />
+            <Text style={styles.actionText}>Confirmar recogida</Text>
+          </TouchableOpacity>
+        );
+      }
+
+      if (pedido.status === "en_ruta") {
+        return (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: "#4CAF50" }]}
+            onPress={handleMarkDelivered}
+          >
+            <Ionicons name="checkmark-done-outline" size={18} color="#000" />
+            <Text style={styles.actionText}>Entregado</Text>
+          </TouchableOpacity>
+        );
+      }
+
+      return null;
+    }
+
+    // Para paquetería coordinadora: flujo con zona
+    if (isAnyPackage(pedido) && !isPaqueteriaAliados(pedido)) {
       if (pedido.status === "disponible") {
         return (
           <TouchableOpacity
@@ -163,10 +204,10 @@ export default function OrderDetailModal({
     return null;
   };
 
-  // 🟢 Mostrar botón de transferencia si está asignado o en ruta
+  // 🟢 Mostrar botón de transferencia si está asignado o en ruta (solo para domicilios)
   const renderTransferButton = () => {
     if (
-      serviceType !== "paqueteria" &&
+      !isAnyPackage(pedido) &&
       (pedido.status === "asignado" || pedido.status === "en_ruta")
     ) {
       return (

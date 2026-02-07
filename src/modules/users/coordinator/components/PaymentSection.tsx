@@ -17,7 +17,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({
   amount,
   onAmountChange,
 }) => {
-  const paymentMethods = ["efectivo", "transferencia"];
+  const paymentMethods = ["efectivo", "transferencia", "datafono"];
 
   return (
     <>
@@ -44,7 +44,7 @@ export const PaymentSection: React.FC<PaymentSectionProps> = ({
         ))}
       </View>
 
-      {payment === "efectivo" ? (
+      {(payment === "efectivo" || payment === "datafono") ? (
         <FormInputField
           label="Monto a recolectar"
           iconName="cash-outline"

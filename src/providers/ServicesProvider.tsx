@@ -1,12 +1,17 @@
 // src/providers/ServicesProvider.tsx
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthProvider';
 import { fetchServices, Service, getServiceById } from '@/services/services';
 import { useRealtimeListener } from '@/hooks/useRealtimeListener';
 import { toService, ServiceResponse } from '@/models/service';
 
 const DELAY_FOR_NON_VIP = 10000; // 10 segundos en ms
+
+// Clave para storage de timestamps
+const TIMESTAMPS_STORAGE_KEY = 'order_timestamps';
+// (no persistimos initialOrderIds entre sesiones)
 
 interface ServicesContextType {
   services: Service[];
@@ -39,6 +44,33 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
   const [realtimeErrorCount, setRealtimeErrorCount] = useState(0);
 
   // ====================
+  // FUNCIONES PARA PERSISTENCIA DE TIMESTAMPS
+  // ====================
+  const saveTimestampsToStorage = useCallback(async (timestamps: Map<string, number>) => {
+    try {
+      const serialized = JSON.stringify(Array.from(timestamps.entries()));
+      await AsyncStorage.setItem(TIMESTAMPS_STORAGE_KEY, serialized);
+    } catch (err) {
+      console.error('[ServicesProvider] ❌ Error guardando timestamps:', err);
+    }
+  }, []);
+
+  const loadTimestampsFromStorage = useCallback(async (): Promise<Map<string, number>> => {
+    try {
+      const data = await AsyncStorage.getItem(TIMESTAMPS_STORAGE_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        return new Map(parsed);
+      }
+    } catch (err) {
+      console.error('[ServicesProvider] ❌ Error cargando timestamps:', err);
+    }
+    return new Map();
+  }, []);
+
+  // initialOrderIds no se persisten entre sesiones para evitar mostrar inmediatamente items nuevos al recargar
+
+  // ====================
   // CARGA INICIAL
   // ====================
   const loadServices = useCallback(async () => {
@@ -51,30 +83,44 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       setError(null);
       console.log('[ServicesProvider] 📦 Iniciando loadServices...');
+      
+      // 🎯 Cargar timestamps previos desde storage
+      const prevTimestamps = await loadTimestampsFromStorage();
+      console.log(`[ServicesProvider] 📦 Timestamps previos cargados: ${prevTimestamps.size}`);
+
       const data = await fetchServices(session.access_token);
       console.log(`[ServicesProvider] 📦 Datos recibidos: ${data.length} servicios`);
       setServices(data);
       
-      // 🎯 En el primer load (sin timestamps): marcar todos como iniciales
-      // En refreshes posteriores: mantener iniciales y timestamps tal como están
-      setInitialOrderIds((prevInitialIds) => {
-        // Si es el primer load (no hay iniciales previas), marcar todos
-        if (prevInitialIds.size === 0) {
-          const newInitialIds = new Set(
-            data.filter((s) => s.status === "disponible").map((s) => s.id)
-          );
-          console.log(`[ServicesProvider] 🎯 Primera carga: ${newInitialIds.size} servicios iniciales`);
+      // 🎯 Inicializar timestamps con los previos cargados
+      setOrderTimestamps(prevTimestamps);
+      // 🎯 En el primer load de la sesión: marcar como "iniciales" solo los pedidos que
+      // ya cumplen el delay (age >= DELAY_FOR_NON_VIP). Los demás se consideran nuevos
+      // y recibirán timestamp (basado en created_at) para respetar el delay incluso tras recarga.
+      setInitialOrderIds((current) => {
+        if (isFirstLoad) {
+          const now = Date.now();
+          const newInitialIds = new Set<string>();
+          data.forEach((s) => {
+            if (s.status === 'disponible') {
+              const createdAtMs = new Date(s.createdAt).getTime();
+              const age = now - createdAtMs;
+              if (age >= DELAY_FOR_NON_VIP) {
+                newInitialIds.add(s.id);
+              }
+            }
+          });
+          console.log(`[ServicesProvider] 🎯 PRIMERA CARGA DE SESIÓN: ${newInitialIds.size} servicios marcados como iniciales (age>=${DELAY_FOR_NON_VIP}ms)`);
           return newInitialIds;
         }
-        // Si ya hay iniciales, mantener solo los que siguen disponibles
-        const availableIds = new Set(data.filter((s) => s.status === "disponible").map((s) => s.id));
+
+        // En refresh posterior dentro de la misma sesión, mantener solo los que sigan disponibles
+        const availableIds = new Set(data.filter((s) => s.status === 'disponible').map((s) => s.id));
         const preserved = new Set<string>();
-        for (const id of prevInitialIds) {
-          if (availableIds.has(id)) {
-            preserved.add(id);
-          }
+        for (const id of current) {
+          if (availableIds.has(id)) preserved.add(id);
         }
-        console.log(`[ServicesProvider] 🎯 Refresh: ${preserved.size} servicios iniciales preservados`);
+        console.log(`[ServicesProvider] 🎯 REFRESH: preservados ${preserved.size} initialOrderIds`);
         return preserved;
       });
       
@@ -112,7 +158,8 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
         return newTimestamps;
       });
       
-      setVisibleNewOrderIds(new Set());
+      // 🎯 NO resetear visibleNewOrderIds aquí - solo cuando el servicio se oculta
+      // Esto permite que los servicios que ya pasaron el delay sigan siendo visibles
       setIsFirstLoad(false);
       console.log('[ServicesProvider] ✅ loadServices completado exitosamente');
     } catch (err: any) {
@@ -121,7 +168,7 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [session?.access_token]);
+  }, [session?.access_token, loadTimestampsFromStorage]);
 
   useEffect(() => {
     // ✅ Solo cargar si la sesión cambió (login/logout real)
@@ -225,10 +272,15 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
 
       console.log('[REALTIME] 🔐 shouldKeep:', shouldKeep, { role: userRole });
 
-      // Si NO es suyo, ELIMINAR de la lista inmediatamente
+      // Si NO es suyo:
+      // - En DELETE: eliminar
+      // - En INSERT: ignorar (no agregar)
+      // - En UPDATE: no modificar la lista (evitar fluctuaciones/no contar)
       if (!shouldKeep) {
-        console.log('[REALTIME] ❌ NO ES SUYO - Eliminando del GUI');
-        setServices((prev) => prev.filter((s) => s.id !== serviceId));
+        if (eventType === 'DELETE') {
+          setServices((prev) => prev.filter((s) => s.id !== serviceId));
+        }
+        // Para INSERT/UPDATE no hacemos nada cuando no corresponde al usuario
         return;
       }
 
@@ -246,9 +298,13 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
                 console.log('[REALTIME] 🔄 UPDATE');
                 return prev.map((s) => (s.id === serviceId ? updatedService : s));
               } else {
-                console.log('[REALTIME] ➕ INSERT');
+                console.log('[REALTIME] ➕ INSERT - nuevo servicio');
+                // 🎯 Asignar timestamp basado en created_at para el delay
                 if (updatedService?.status === "disponible") {
-                  setOrderTimestamps((prev) => new Map([...prev, [serviceId, Date.now()]]));
+                  const createdAtMs = new Date(updatedService.createdAt).getTime();
+                  const ageMs = Date.now() - createdAtMs;
+                  console.log(`[REALTIME] ⏰ Nuevo servicio ${serviceId}: edad=${ageMs}ms, asignando timestamp`);
+                  setOrderTimestamps((prev) => new Map([...prev, [serviceId, createdAtMs]]));
                 }
                 return [updatedService, ...prev];
               }
@@ -337,7 +393,29 @@ export function ServicesProvider({ children }: { children: React.ReactNode }) {
     debug: true,
   });
 
-  const isUserVIP = profile?.isVIP ?? false;
+  // 🔐 VIP state - recalcular cuando el profile cambia
+  const [isUserVIP, setIsUserVIP] = useState(false);
+  
+  useEffect(() => {
+    const newVIPStatus = profile?.isVIP ?? false;
+    if (newVIPStatus !== isUserVIP) {
+      console.log(`[ServicesProvider] 👑 Estado VIP actualizado: ${isUserVIP} → ${newVIPStatus}`);
+      setIsUserVIP(newVIPStatus);
+      
+      // 🔄 Si cambió a VIP: limpiar timestamps para mostrar todos inmediatamente
+      if (newVIPStatus) {
+        console.log(`[ServicesProvider] 👑 VIP activado - limpiando timestamps`);
+        setOrderTimestamps(new Map());
+        // Limpiar initial ids porque VIP ve todo
+        setInitialOrderIds(new Set());
+      }
+    }
+  }, [profile?.isVIP]);
+
+  // 🎯 Guardar timestamps en storage cuando cambien
+  useEffect(() => {
+    saveTimestampsToStorage(orderTimestamps);
+  }, [orderTimestamps, saveTimestampsToStorage]);
 
   const value: ServicesContextType = {
     services,

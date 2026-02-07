@@ -199,7 +199,7 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
 
             <Text style={styles.label}>Método de pago</Text>
             <View style={styles.paymentRow}>
-              {["efectivo", "transferencia"].map((method) => (
+              {["efectivo", "transferencia", "datafono"].map((method) => (
                 <TouchableOpacity
                   key={method}
                   style={[styles.paymentOption, payment === method && styles.paymentOptionActive]}
@@ -213,7 +213,7 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
               ))}
             </View>
 
-            {payment === "efectivo" && (
+            {(payment === "efectivo" || payment === "datafono") && (
               <>
                 <Text style={styles.label}>Monto a recolectar</Text>
                 <TextInput
@@ -335,7 +335,7 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
 
               <Text style={styles.label}>Método de pago</Text>
               <View style={styles.paymentRow}>
-                {["efectivo", "transferencia"].map((method) => (
+                {["efectivo", "transferencia", "datafono"].map((method) => (
                   <TouchableOpacity
                     key={method}
                     style={[styles.paymentOption, payment === method && styles.paymentOptionActive]}
@@ -349,7 +349,7 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
                 ))}
               </View>
 
-              {payment === "efectivo" && (
+              {(payment === "efectivo" || payment === "datafono") && (
                 <>
                   <Text style={styles.label}>Monto a recolectar</Text>
                   <TextInput

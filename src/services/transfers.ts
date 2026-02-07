@@ -132,6 +132,45 @@ export async function respondToTransfer(
 }
 
 /**
+ * ❌ CANCELAR SOLICITUD DE TRANSFERENCIA
+ * El delivery que solicitó la transferencia puede cancelarla si está pendiente
+ * 
+ * @param transferRequestId - ID de la solicitud a cancelar
+ * @param token - Token de autenticación
+ * @param reason - Razón de la cancelación (opcional)
+ * @returns Respuesta con detalles de la cancelación
+ */
+export async function cancelTransfer(
+  transferRequestId: string,
+  token: string,
+  reason?: string
+): Promise<any> {
+  try {
+    const payload = {
+      reason: reason || undefined,
+    };
+
+    const res = await api.delete(
+      `/transfers/${transferRequestId}/cancel`,
+      {
+        headers: authHeaders(token),
+        data: payload,
+      }
+    );
+
+    if (!res.data.ok) {
+      throw new Error(res.data.error || "Error cancelando solicitud");
+    }
+
+    console.log("✅ Solicitud cancelada exitosamente:", res.data);
+    return res.data;
+  } catch (err: any) {
+    console.error("❌ Error cancelando solicitud:", err.response?.data || err.message);
+    throw err;
+  }
+}
+
+/**
  * 📋 OBTENER SOLICITUDES PENDIENTES
  * El delivery ve sus solicitudes de transferencia pendientes
  * 

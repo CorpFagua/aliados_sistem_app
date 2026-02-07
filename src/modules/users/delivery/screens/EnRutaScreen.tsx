@@ -7,6 +7,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { updateServiceStatus } from "@/services/services";
 import { useServices } from "@/providers/ServicesProvider";
 import { useUnreadMessagesContext } from "@/providers/UnreadMessagesProvider";
+import { Service } from "@/models/service";
 import OrderRow from "../components/OrderRow";
 import OrderDetailModal from "../components/ServiceDetailModal";
 

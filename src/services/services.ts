@@ -38,12 +38,7 @@ export async function fetchServices(token: string): Promise<Service[]> {
     
     console.log(`[FETCH_SERVICES] ✅ Se obtuvieron ${services.length} servicios`);
     
-    // 🔍 Log cada uno para debug
-    if (services.length > 0) {
-      services.forEach(s => {
-        console.log(`  - ${s.id}: status=${s.status}`);
-      });
-    }
+    // 🔍 (debug logs removed to reduce noise)
     
     return services;
   } catch (err: any) {
@@ -188,6 +183,21 @@ export async function updateServiceData(
     const cleanedPayload = Object.fromEntries(
       Object.entries(payload).filter(([_, v]) => v !== undefined)
     );
+    // Asegurar compatibilidad: si el frontend envía `amount`, mapearlo
+    // explícitamente a `total_to_collect` para el backend.
+    if ((cleanedPayload as any).amount !== undefined && (cleanedPayload as any).total_to_collect === undefined) {
+      (cleanedPayload as any).total_to_collect = (cleanedPayload as any).amount;
+      delete (cleanedPayload as any).amount;
+    }
+
+    // Si el método de pago es transferencia, por defecto no hay monto a recaudar
+    if ((cleanedPayload as any).payment_method === 'transferencia') {
+      (cleanedPayload as any).total_to_collect = 0;
+      // asegurarnos de no enviar `amount` por si quedó
+      delete (cleanedPayload as any).amount;
+    }
+
+    console.log("🚀 [FRONT] Enviando cleanedPayload al backend:", cleanedPayload);
 
     const res = await api.patch<{ ok: boolean; data: ServiceResponse }>(
       `/services/${serviceId}`,

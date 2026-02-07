@@ -9,7 +9,7 @@ export interface Service {
   phone: string;                             // client_phone
   clientName?: string | null;                // client_name
   notes?: string;
-  payment: "efectivo" | "transferencia" | "tarjeta";
+  payment: "efectivo" | "transferencia" | "datafono";
   amount: number;                            // total_to_collect
   price?: number;                            // price
   priceDeliverySrv?: number;                 // price_delivery_srv (para domiciliarios)
@@ -56,7 +56,7 @@ export interface ServicePayload {
   client_name?: string | null;              // nombre del cliente
   notes?: string;
 
-  payment_method: "efectivo" | "transferencia" | "tarjeta";
+  payment_method: "efectivo" | "transferencia" | "datafono";
 
   total_to_collect: number;
   price?: number;
@@ -68,6 +68,7 @@ export interface ServicePayload {
   branch_id?: string | null;
   zone_id?: string | null;
   profile_store_id?: string | null;  // 🟢 Nuevo campo
+  assigned_delivery_user_id?: string | null; // 🟢 ID del domiciliario
 
   expected_at?: Date | null;   // programados
   prep_time?: number | null;   // minutos
@@ -108,7 +109,7 @@ export interface ServiceAdminPayload {
   client_name?: string | null;      // nombre del cliente
   notes?: string | null;
 
-  payment_method: "efectivo" | "transferencia" | "tarjeta";
+  payment_method: "efectivo" | "transferencia" | "datafono";
 
   total_to_collect?: number | null; // monto recoger (domicilio)
   price?: number | null;            // costo servicio (paquetería)
@@ -259,5 +260,6 @@ export function toServicePayload(service: Service): ServicePayload {
     branch_id: service.branchId ?? null,
     zone_id: service.zoneId ?? null,
     profile_store_id: service.profileStoreId ?? null,  // 🟢 Agregar profile_store_id
+    assigned_delivery_user_id: (service as any).assignedDeliveryId ?? undefined, // 🟢 Agregar domiciliario
   };
 }

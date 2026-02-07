@@ -159,6 +159,12 @@ export default function ServiceDetailModal({
               {/* ===== SECCIÓN: TIPO Y ESTADO ===== */}
               <View style={styles.quickInfoSection}>
                 <View style={styles.quickInfoRow}>
+                  <View style={styles.quickInfoItemFull}>
+                    <Text style={styles.quickLabel}>ID del Servicio</Text>
+                    <Text style={styles.quickValue}>{service.id}</Text>
+                  </View>
+                </View>
+                <View style={[styles.quickInfoRow, { borderTopWidth: 1, borderTopColor: Colors.Border }]}>
                   <View style={styles.quickInfoItem}>
                     <Text style={styles.quickLabel}>Tipo de Servicio</Text>
                     <Text style={styles.quickValue}>{service.type?.name || "Domicilio"}</Text>
@@ -290,7 +296,7 @@ export default function ServiceDetailModal({
                         ? "Efectivo"
                         : service.paymentMethod === "transferencia"
                         ? "Transferencia"
-                        : "Tarjeta"}
+                        : "Datafonó"}
                     </Text>
                   </View>
 
@@ -332,15 +338,20 @@ export default function ServiceDetailModal({
                     </View>
                   </View>
 
-                  {/* Efectivo a Recoger - Solo si aplica */}
-                  {service.paymentMethod === "efectivo" && service.totalToCollect > 0 && (
+                  {/* Efectivo/Datafono a Recoger - Solo si aplica */}
+                  {(service.paymentMethod === "efectivo" || service.paymentMethod === "datafono") && service.totalToCollect > 0 && (
                     <>
                       <View style={styles.financeDivider} />
                       <View style={styles.financeRowHighlight}>
                         <View style={styles.financeRowContent}>
-                          <Text style={styles.financeRowTitleHighlight}>Efectivo a Recoger</Text>
+                          <Text style={styles.financeRowTitleHighlight}>
+                            {service.paymentMethod === "efectivo" ? "Efectivo a Recoger" : "Monto a Recoger (Datafonó)"}
+                          </Text>
                           <Text style={styles.financeRowDescHighlight}>
-                            Dinero del cliente a recoger y llevar a tienda
+                            {service.paymentMethod === "efectivo" 
+                              ? "Dinero del cliente a recoger y llevar a tienda"
+                              : "Monto del cliente a recoger (pagado con datafonó)"
+                            }
                           </Text>
                         </View>
                         <Text style={styles.financeRowAmountHighlight}>
@@ -614,6 +625,12 @@ const styles = StyleSheet.create({
   },
 
   quickInfoItem: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+
+  quickInfoItemFull: {
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,

@@ -23,17 +23,38 @@ export default {
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#ffffff',
+
       },
       edgeToEdgeEnabled: true,
       package: 'com.wolfagua.aliados_sistem_app',
       googleServicesFile: './google-services.json',
       displayName: 'Aliados Corporativo',
+      softwareKeyboardLayoutMode: 'pan',
+
+      notification: {
+          icon: "./assets/notification-icon.png", // Ruta al ícono de notificación
+          color: "#FF0000", // Color de fondo de la notificación
+        },
     },
     web: {
       favicon: './assets/favicon.png',
+      notification: {
+        icon: './assets/notification-icon.png',
+        vapidPublicKey: 'BN3Gwkzlpb0gd7BgU74KggK3TIamiUUuF27Gvd4puhbgVWbk3cNigcZR7CxF9kELP4IvCqHVElXx3P2tw5btiYs',
+      },
     },
     scheme: 'aliados_sistem_app',
-    plugins: ['expo-router'],
+    plugins: [
+      [
+        'expo-notifications',
+        {
+          icon: './assets/notification-icon.png',
+          color: '#e81a1a',
+        },
+      ],
+      'expo-router',
+    ],
+
     extra: {
       router: {},
       eas: {

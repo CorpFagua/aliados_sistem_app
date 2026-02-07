@@ -18,6 +18,7 @@ import { Service } from "@/models/service";
 import { useAuth } from "@/providers/AuthProvider";
 import ChatModal from "@/components/ChatModal";
 import RequestTransferModal from "./RequestTransferModal";
+import { isPaqueteriaAliados } from "@/utils/serviceTypeUtils";
 
 // ⏱ función para calcular tiempos
 function calcularEstadoTiempo(createdAt: Date, prepTime: number) {
@@ -212,13 +213,13 @@ export default function OrderDetailModal({
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
               <Ionicons
-                name="storefront-outline"
+                name={isPaqueteriaAliados(pedido) ? "cube-outline" : "storefront-outline"}
                 size={22}
-                color={Colors.gradientStart}
+                color={isPaqueteriaAliados(pedido) ? "#F97316" : Colors.gradientStart}
               />
               <View>
-                <Text style={styles.modalTitle}>
-                  {pedido.profileStoreName || "Sin tienda"}
+                <Text style={[styles.modalTitle, isPaqueteriaAliados(pedido) && styles.aliadosTitle]}>
+                  {isPaqueteriaAliados(pedido) ? "Mensajería" : pedido.profileStoreName || "Sin tienda"}
                 </Text>
                 <Text style={styles.serviceId}>#{pedido.id.slice(-4)}</Text>
               </View>
@@ -233,13 +234,15 @@ export default function OrderDetailModal({
             style={styles.modalBody}
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.infoRow}>
-              <Ionicons name="map-outline" size={18} color={Colors.menuText} />
-              <Text style={styles.infoText}>
-                <Text style={styles.label}>Zona: </Text>
-                {pedido.zoneName || pedido.zoneId || "Sin zona"}
-              </Text>
-            </View>
+            {!isPaqueteriaAliados(pedido) && (
+              <View style={styles.infoRow}>
+                <Ionicons name="map-outline" size={18} color={Colors.menuText} />
+                <Text style={styles.infoText}>
+                  <Text style={styles.label}>Zona: </Text>
+                  {pedido.zoneName || pedido.zoneId || "Sin zona"}
+                </Text>
+              </View>
+            )}
 
             <View style={styles.infoRow}>
               <Ionicons
@@ -422,6 +425,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: Colors.normalText,
+  },
+  aliadosTitle: {
+    color: "#F97316",
   },
   serviceId: {
     fontSize: 12,

@@ -8,9 +8,10 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  Alert,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import Toast from "react-native-toast-message";
 import { Colors } from "@/constans/colors";
 import { useAuth } from "@/providers/AuthProvider";
 import { requestTransfer } from "@/services/transfers";
@@ -64,7 +65,11 @@ export default function RequestTransferModal({
       console.log("✅ Deliveries cargados:", deliveryList);
     } catch (err) {
       console.error("❌ Error loading deliveries:", err);
-      Alert.alert("Error", "No se pudieron cargar los compañeros");
+      Toast.show({
+        type: "error",
+        text1: "❌ Error",
+        text2: "No se pudieron cargar los compañeros",
+      });
     } finally {
       setLoading(false);
     }
@@ -72,7 +77,11 @@ export default function RequestTransferModal({
 
   const handleRequest = async () => {
     if (!selectedDelivery) {
-      Alert.alert("Error", "Selecciona un compañero");
+      Toast.show({
+        type: "info",
+        text1: "⚠ Selección requerida",
+        text2: "Selecciona un compañero",
+      });
       return;
     }
 
@@ -85,14 +94,41 @@ export default function RequestTransferModal({
         reason || undefined
       );
 
-      Alert.alert("Éxito", `Solicitud enviada a ${selectedDelivery.name}`);
+      // Éxito: mostrar toast
+      Toast.show({
+        type: "success",
+        text1: "✓ Éxito",
+        text2: `Solicitud enviada a ${selectedDelivery.name}`,
+      });
+
       setSelectedDelivery(null);
       setReason("");
       onClose();
       onSuccess?.();
     } catch (err: any) {
       console.error("Error requesting transfer:", err);
-      Alert.alert("Error", "No se pudo enviar la solicitud");
+      
+      // Extraer mensaje de error del backend
+      const errorMessage = 
+        err.response?.data?.error || 
+        err.message || 
+        "No se pudo enviar la solicitud";
+
+      // Si es error de solicitud pendiente (409), mostrar toast con más detalles
+      if (err.response?.status === 409) {
+        Toast.show({
+          type: "error",
+          text1: "⚠ Solicitud Pendiente",
+          text2: errorMessage,
+        });
+      } else {
+        // Otros errores: Toast también
+        Toast.show({
+          type: "error",
+          text1: "❌ Error",
+          text2: errorMessage,
+        });
+      }
     } finally {
       setLoading(false);
     }

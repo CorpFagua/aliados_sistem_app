@@ -15,6 +15,7 @@ import {
   ServiceHistoryDetail,
   ServiceHistoryFilters,
 } from "../services/serviceHistory";
+import { parseBackendDateToLocal } from "../utils/dateTime";
 
 interface CachedData {
   allServices: ServiceHistorySummary[];
@@ -67,6 +68,7 @@ export function useServiceHistoryRealtime(token: string | null) {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const activeFiltersRef = useRef<Partial<ServiceHistoryFilters>>({});
   const subscriptionRef = useRef<any>(null);
+  const lastFiltersRef = useRef<Partial<ServiceHistoryFilters>>({});
 
   // === FUNCIONES DE FILTRADO LOCAL ===
 
@@ -115,6 +117,17 @@ export function useServiceHistoryRealtime(token: string | null) {
       // Filtro por tienda
       if (filters.storeId) {
         result = result.filter((s) => s.store?.id === filters.storeId);
+      }
+
+      // Filtro por fechas - PUNTO CENTRAL: parseBackendDateToLocal
+      // Backend devuelve UTC, convertimos a zona local para filtrar
+      if (filters.startDate || filters.endDate) {
+        result = result.filter((s) => {
+          const serviceDate = parseBackendDateToLocal(s.createdAt);
+          if (filters.startDate && serviceDate < filters.startDate) return false;
+          if (filters.endDate && serviceDate > filters.endDate) return false;
+          return true;
+        });
       }
 
       // Ordenamiento
@@ -213,16 +226,34 @@ export function useServiceHistoryRealtime(token: string | null) {
     async (filters: ServiceHistoryFilters, appendMode: boolean = false) => {
       currentFiltersRef.current = filters;
 
+      // Detectar si han cambiado los filtros de fecha
+      const dateFiltersChanged =
+        filters.startDate !== lastFiltersRef.current.startDate ||
+        filters.endDate !== lastFiltersRef.current.endDate;
+
+      // Guardar filtros actuales
+      lastFiltersRef.current = { ...filters };
+
       // Verificar caché
       const cacheValid =
         cacheRef.current.lastFetch &&
         Date.now() - cacheRef.current.lastFetch < CACHE_DURATION &&
-        cacheRef.current.allServices.length > 0;
+        cacheRef.current.allServices.length > 0 &&
+        !dateFiltersChanged; // ← Invalidar caché si cambiaron las fechas
+
+      console.log("[CACHE] dateFiltersChanged:", dateFiltersChanged, "cacheValid:", cacheValid);
 
       // Cargar del backend si:
       // 1. No hay caché válido, O
-      // 2. Hay búsqueda (siempre actualizar)
-      if (!cacheValid || filters.search) {
+      // 2. Hay búsqueda (siempre actualizar), O
+      // 3. Cambiaron los filtros de fecha
+      if (!cacheValid || filters.search || dateFiltersChanged) {
+        // Si cambiaron las fechas, resetear el estado de carga completa
+        if (dateFiltersChanged) {
+          cacheRef.current.hasLoadedAll = false;
+          cacheRef.current.allServices = []; // Limpiar caché anterior
+          console.log("[CACHE] Limpiando caché porque cambiaron las fechas");
+        }
         const loaded = await loadFromBackend(filters, appendMode);
         if (!loaded) return;
       }
@@ -274,10 +305,16 @@ export function useServiceHistoryRealtime(token: string | null) {
 
   /**
    * Suscribirse a cambios en tiempo real
+   * DESACTIVADO: Causaba pérdida de filtros y saltos en la aplicación
    */
   const subscribeToRealtimeChanges = useCallback(async () => {
     if (!token) return;
 
+    console.log("[SUBSCRIBE] Realtime desactivado para historial");
+    return;
+
+    // El siguiente código fue desactivado:
+    /*
     console.log("[SUBSCRIBE] Iniciando suscripción a cambios en tiempo real");
 
     // Suscribirse a INSERT, UPDATE, DELETE en tabla services
@@ -349,10 +386,12 @@ export function useServiceHistoryRealtime(token: string | null) {
       });
 
     subscriptionRef.current = channel;
-  }, [token, getServiceHistory, applyLocalFilters]);
+    */
+  }, [token]);
 
   /**
-   * Buscar con debounce
+   * Buscar - Completamente local, sin llamar al backend
+   * La búsqueda se aplica instantáneamente a los datos cargados
    */
   const search = useCallback(
     (searchTerm: string, newFilters?: Partial<ServiceHistoryFilters>) => {
@@ -362,35 +401,12 @@ export function useServiceHistoryRealtime(token: string | null) {
         search: searchTerm,
       };
 
+      // Cancelar debounce anterior si existe
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
 
-      setLoading(true);
-
-      debounceTimerRef.current = setTimeout(() => {
-        getServiceHistory({
-          ...currentFiltersRef.current,
-          ...activeFiltersRef.current,
-          offset: 0,
-        });
-      }, DEBOUNCE_DELAY);
-    },
-    [getServiceHistory]
-  );
-
-  /**
-   * Cambiar filtros (sin búsqueda, local instantáneamente)
-   */
-  const applyFilters = useCallback(
-    (newFilters: Partial<ServiceHistoryFilters>) => {
-      activeFiltersRef.current = {
-        ...activeFiltersRef.current,
-        ...newFilters,
-        offset: 0,
-      };
-
-      // Aplicar localmente sin esperar al backend
+      // Aplicar búsqueda localmente de forma instantánea
       const filtered = applyLocalFilters(cacheRef.current.allServices, {
         ...currentFiltersRef.current,
         ...activeFiltersRef.current,
@@ -399,9 +415,47 @@ export function useServiceHistoryRealtime(token: string | null) {
       setFilteredServices(filtered);
       cacheRef.current.filteredServices = filtered;
 
-      console.log(`[FILTER] ${filtered.length} servicios después de filtros locales`);
+      console.log(`[SEARCH] ${filtered.length} servicios coinciden con "${searchTerm}"`);
     },
     [applyLocalFilters]
+  );
+
+  /**
+   * Cambiar filtros (sin búsqueda, local instantáneamente)
+   */
+  const applyFilters = useCallback(
+    async (newFilters: Partial<ServiceHistoryFilters>) => {
+      activeFiltersRef.current = {
+        ...activeFiltersRef.current,
+        ...newFilters,
+        offset: 0,
+      };
+
+      const mergedFilters = {
+        ...currentFiltersRef.current,
+        ...activeFiltersRef.current,
+      };
+
+      // Si cambiaron las fechas, necesito recargar del backend
+      const dateFiltersChanged =
+        newFilters.startDate !== lastFiltersRef.current.startDate ||
+        newFilters.endDate !== lastFiltersRef.current.endDate;
+
+      if (dateFiltersChanged) {
+        console.log("[FILTER] Fechas cambiadas - recargando del backend");
+        // Limpiar caché y recargar del backend
+        cacheRef.current.allServices = [];
+        cacheRef.current.hasLoadedAll = false;
+        await getServiceHistory(mergedFilters);
+      } else {
+        // Solo filtrar localmente si no cambiaron las fechas
+        const filtered = applyLocalFilters(cacheRef.current.allServices, mergedFilters);
+        setFilteredServices(filtered);
+        cacheRef.current.filteredServices = filtered;
+        console.log(`[FILTER] ${filtered.length} servicios después de filtros locales`);
+      }
+    },
+    [applyLocalFilters, getServiceHistory]
   );
 
   /**

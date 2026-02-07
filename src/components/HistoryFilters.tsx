@@ -20,6 +20,7 @@ import { Colors } from "../constans/colors";
 import { ServiceHistoryFilters } from "../hooks/useServiceHistory";
 import { useAuth } from "../providers/AuthProvider";
 import { fetchDeliveries } from "../services/users";
+import { formatDateToYYYYMMDD, getTodayLocalFormat } from "../utils/dateTime";
 
 interface HistoryFiltersProps {
   onFiltersChange: (filters: Partial<ServiceHistoryFilters>) => void;
@@ -63,7 +64,11 @@ export default function HistoryFilters({
   const [startDate, setStartDate] = useState<string | undefined>();
   const [endDate, setEndDate] = useState<string | undefined>();
   const [showCalendar, setShowCalendar] = useState<null | { field: "start" | "end" }>(null);
-  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    // Inicializar con la fecha actual local del dispositivo
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
   const [showDeliveryMenu, setShowDeliveryMenu] = useState(false);
   const [deliveryQuery, setDeliveryQuery] = useState("");
   const [deliveries, setDeliveries] = useState<any[]>([]);
@@ -147,7 +152,8 @@ export default function HistoryFilters({
 
   const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
   const daysInMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  const formatISO = (d: Date) => d.toISOString().slice(0, 10);
+  // Usar la zona horaria local del dispositivo en lugar de UTC
+  const formatISO = (d: Date) => formatDateToYYYYMMDD(d);
 
   const onPickDate = useCallback(
     (d: Date) => {
@@ -172,6 +178,46 @@ export default function HistoryFilters({
     },
     [startDate, endDate]
   );
+
+  const isInRange = useCallback(
+    (iso: string) => {
+      if (!startDate || !endDate) return false;
+      // Incluye ambos días de inicio y fin
+      return iso >= startDate && iso <= endDate;
+    },
+    [startDate, endDate]
+  );
+
+  /**
+   * Calcula los límites de navegación del calendario
+   * Si estamos seleccionando inicio: muestra todo
+   * Si estamos seleccionando fin: solo muestra hasta el mes del endDate
+   * Si tiene ambas: muestra solo dentro del rango
+   */
+  const getCalendarLimits = useCallback(() => {
+    if (showCalendar?.field === "start") {
+      // Cuando seleccionamos inicio, limitamos a 1 año antes/después
+      const today = new Date();
+      const minMonth = new Date(today.getFullYear() - 1, today.getMonth(), 1);
+      const maxMonth = new Date(today.getFullYear() + 1, today.getMonth(), 1);
+      return { minMonth, maxMonth };
+    } else if (showCalendar?.field === "end") {
+      // Cuando seleccionamos fin, limitamos desde startDate hasta 1 año adelante
+      // Si hay startDate, parsear correctamente usando zona local
+      const today = new Date();
+      let minMonth: Date;
+      if (startDate) {
+        // Parsear la fecha YYYY-MM-DD en zona local
+        const [year, month, day] = startDate.split('-').map(Number);
+        minMonth = new Date(year, month - 1, 1);
+      } else {
+        minMonth = new Date(today.getFullYear() - 1, today.getMonth(), 1);
+      }
+      const maxMonth = new Date(today.getFullYear() + 1, today.getMonth(), 1);
+      return { minMonth, maxMonth };
+    }
+    return null;
+  }, [showCalendar?.field, startDate]);
 
   const loadDeliveries = useCallback(
     async (q?: string) => {
@@ -231,6 +277,8 @@ export default function HistoryFilters({
     setSelectedDeliveryName(undefined);
     setDeliveryQuery("");
     setDeliveries([]);
+    // Resetear calendario a vista actual
+    setCalendarMonth(new Date());
 
     onFiltersChange({
       search: "",
@@ -269,11 +317,11 @@ export default function HistoryFilters({
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar tienda, cliente, teléfono..."
+          placeholder="ID, tienda, cliente, teléfono o dirección..."
           placeholderTextColor={Colors.menuText}
           value={searchText}
           onChangeText={handleSearchChange}
-          editable={true}
+          editable={!loading}
           autoCorrect={false}
           autoCapitalize="none"
         />
@@ -286,6 +334,12 @@ export default function HistoryFilters({
 
       {/* Filtros en fila compacta */}
       <View style={styles.filtersRow}>
+        {hasActiveFilters && (
+          <View style={styles.activeFilterIndicator}>
+            <Ionicons name="filter" size={14} color="white" />
+            <Text style={styles.activeFilterText}>Filtros activos</Text>
+          </View>
+        )}
         {/* Tipo */}
         <View style={styles.filterDropdown}>
           <TouchableOpacity
@@ -418,7 +472,13 @@ export default function HistoryFilters({
             disabled={loading}
           >
             <Text style={styles.filterBtnText}>
-              {startDate || endDate ? "Fechas" : "Fecha"}
+              {startDate && endDate 
+                ? `${startDate} a ${endDate}` 
+                : startDate 
+                ? `Desde ${startDate}`
+                : endDate
+                ? `Hasta ${endDate}`
+                : "Fecha"}
             </Text>
             {showDateMenu && <Text style={styles.dropIcon}>▲</Text>}
             {!showDateMenu && <Text style={styles.dropIcon}>▼</Text>}
@@ -503,12 +563,64 @@ export default function HistoryFilters({
           <View style={[styles.modalCalendar, { width: '92%', maxWidth: 420 }]}> 
             <View style={{ marginBottom: 8 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <TouchableOpacity onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}>
-                  <Ionicons name="chevron-back" size={22} color={Colors.menuText} />
+                <TouchableOpacity 
+                  onPress={() => {
+                    const limits = getCalendarLimits();
+                    const prevMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+                    if (limits && prevMonth >= limits.minMonth) {
+                      setCalendarMonth(prevMonth);
+                    } else if (!limits && prevMonth >= new Date(new Date().getFullYear() - 1, new Date().getMonth(), 1)) {
+                      setCalendarMonth(prevMonth);
+                    }
+                  }}
+                  disabled={(() => {
+                    const limits = getCalendarLimits();
+                    const prevMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+                    if (limits) return prevMonth < limits.minMonth;
+                    return prevMonth < new Date(new Date().getFullYear() - 1, new Date().getMonth(), 1);
+                  })()}
+                >
+                  <Ionicons 
+                    name="chevron-back" 
+                    size={22} 
+                    color={(() => {
+                      const limits = getCalendarLimits();
+                      const prevMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+                      if (limits && prevMonth < limits.minMonth) return "#ccc";
+                      if (!limits && prevMonth < new Date(new Date().getFullYear() - 1, new Date().getMonth(), 1)) return "#ccc";
+                      return Colors.menuText;
+                    })()} 
+                  />
                 </TouchableOpacity>
                 <Text style={{ color: Colors.normalText, fontWeight: 'bold' }}>{calendarMonth.toLocaleString(undefined, { month: 'long', year: 'numeric' })}</Text>
-                <TouchableOpacity onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}>
-                  <Ionicons name="chevron-forward" size={22} color={Colors.menuText} />
+                <TouchableOpacity 
+                  onPress={() => {
+                    const limits = getCalendarLimits();
+                    const nextMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+                    if (limits && nextMonth <= limits.maxMonth) {
+                      setCalendarMonth(nextMonth);
+                    } else if (!limits && nextMonth <= new Date(new Date().getFullYear() + 1, new Date().getMonth(), 1)) {
+                      setCalendarMonth(nextMonth);
+                    }
+                  }}
+                  disabled={(() => {
+                    const limits = getCalendarLimits();
+                    const nextMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+                    if (limits) return nextMonth > limits.maxMonth;
+                    return nextMonth > new Date(new Date().getFullYear() + 1, new Date().getMonth(), 1);
+                  })()}
+                >
+                  <Ionicons 
+                    name="chevron-forward" 
+                    size={22} 
+                    color={(() => {
+                      const limits = getCalendarLimits();
+                      const nextMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+                      if (limits && nextMonth > limits.maxMonth) return "#ccc";
+                      if (!limits && nextMonth > new Date(new Date().getFullYear() + 1, new Date().getMonth(), 1)) return "#ccc";
+                      return Colors.menuText;
+                    })()} 
+                  />
                 </TouchableOpacity>
               </View>
 
@@ -525,6 +637,20 @@ export default function HistoryFilters({
 
               <View style={{ marginTop: 8 }}>
                 <Text style={{ color: Colors.menuText, fontSize: 12 }}>Seleccionando: {showCalendar?.field === 'start' ? 'Desde' : 'Hasta'}</Text>
+              </View>
+              
+              {/* Status actual del rango */}
+              <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.Border }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View>
+                    <Text style={{ color: Colors.menuText, fontSize: 11 }}>Inicio:</Text>
+                    <Text style={{ color: Colors.activeMenuText, fontSize: 13, fontWeight: '700' }}>{startDate || 'No seleccionado'}</Text>
+                  </View>
+                  <View>
+                    <Text style={{ color: Colors.menuText, fontSize: 11 }}>Fin:</Text>
+                    <Text style={{ color: Colors.success, fontSize: 13, fontWeight: '700' }}>{endDate || 'No seleccionado'}</Text>
+                  </View>
+                </View>
               </View>
             </View>
 
@@ -546,7 +672,7 @@ export default function HistoryFilters({
                   const iso = formatISO(cur);
                   const isStart = iso === startDate;
                   const isEnd = iso === endDate;
-                  const inRange = isBetween(iso);
+                  const inRange = isInRange(iso);
 
                   const dayStyle: any = { width: 36, height: 36, margin: 2, borderRadius: 6, justifyContent: 'center', alignItems: 'center' };
                   const textStyle: any = { color: Colors.menuText };
@@ -565,12 +691,37 @@ export default function HistoryFilters({
               })()}
             </View>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
-              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setShowCalendar(null)}>
-                <Text style={styles.cancelButtonText}>Cerrar</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16, gap: 8 }}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => setShowCalendar(null)}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={() => { if (showCalendar?.field === 'start') { setStartDate(undefined); onFiltersChange({ startDate: undefined, offset: 0 }); } else { setEndDate(undefined); onFiltersChange({ endDate: undefined, offset: 0 }); } setShowCalendar(null); }}>
-                <Text style={styles.confirmButtonText}>Limpiar</Text>
+              
+              {(showCalendar?.field === 'start' ? startDate : endDate) && (
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.confirmButton]} 
+                  onPress={() => { 
+                    if (showCalendar?.field === 'start') { 
+                      setStartDate(undefined); 
+                      onFiltersChange({ startDate: undefined, offset: 0 }); 
+                    } else { 
+                      setEndDate(undefined); 
+                      onFiltersChange({ endDate: undefined, offset: 0 }); 
+                    } 
+                    setShowCalendar(null); 
+                  }}
+                >
+                  <Text style={styles.confirmButtonText}>Limpiar fecha</Text>
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]} 
+                onPress={() => setShowCalendar(null)}
+              >
+                <Text style={styles.confirmButtonText}>Aplicar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -628,6 +779,22 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: "center",
     flexWrap: "wrap",
+  },
+
+  activeFilterIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#FFA500",
+    borderRadius: 6,
+    gap: 6,
+  },
+
+  activeFilterText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "white",
   },
 
   filterDropdown: {

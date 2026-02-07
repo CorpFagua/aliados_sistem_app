@@ -10,7 +10,7 @@ import { api, authHeaders } from "../lib/api";
 
 export type ServiceStatus = 'disponible' | 'asignado' | 'en_ruta' | 'entregado' | 'cancelado' | 'eliminado'| 'pago' | 'pagado' | 'paid';
 export type ServiceType = 'domicilio' | 'paqueteria_aliados' | 'paqueteria_coordinadora';
-export type PaymentMethod = 'efectivo' | 'transferencia' | 'tarjeta';
+export type PaymentMethod = 'efectivo' | 'transferencia' | 'datafono';
 
 export interface StoreInfo {
   id: string;
