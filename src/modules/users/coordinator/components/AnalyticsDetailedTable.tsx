@@ -30,6 +30,7 @@ export default function AnalyticsDetailedTable({
     try {
       // Crear CSV
       const headers = [
+        "ID Servicio",
         "Fecha Creado",
         "Tienda",
         "Admin Tienda",
@@ -47,6 +48,7 @@ export default function AnalyticsDetailedTable({
         const completedFormatted = svc.completedAt ? parseBackendDateTimeToLocal(svc.completedAt) : "-";
         console.log(`[ANALYTICS-TABLE] Service ${svc.serviceId}: using createdAt="${svc.createdAt}" -> formatted="${completedFormatted}"`);
         return [
+          svc.serviceId,
           svc.createdAt ? parseBackendDateTimeToLocal(svc.createdAt) : "-",
           svc.storeName,
           svc.storeAdmin,
@@ -122,6 +124,9 @@ export default function AnalyticsDetailedTable({
         <View style={styles.table}>
           {/* Headers */}
           <View style={styles.tableRow}>
+            <Text style={[styles.tableCell, styles.tableHeader, { width: 120 }]}>
+              ID Servicio
+            </Text>
             <Text style={[styles.tableCell, styles.tableHeader, { width: 140 }]}>
               Fecha Creado
             </Text>
@@ -153,8 +158,9 @@ export default function AnalyticsDetailedTable({
 
           {/* Rows */}
           {services.map((svc, idx) => (
-            <View key={svc.serviceId} style={[styles.tableRow, idx % 2 && styles.tableRowAlt]}>
-              <Text style={[styles.tableCell, { width: 140 }]}>
+            <View key={svc.serviceId} style={[styles.tableRow, idx % 2 && styles.tableRowAlt]}>              <Text style={[styles.tableCell, { width: 120 }]} numberOfLines={1}>
+                {svc.serviceId}
+              </Text>              <Text style={[styles.tableCell, { width: 140 }]}>
                 {svc.createdAt ? parseBackendDateTimeToLocal(svc.createdAt) : "-"}
               </Text>
               <Text style={[styles.tableCell, { width: 100 }]} numberOfLines={1}>
