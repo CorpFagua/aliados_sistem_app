@@ -150,6 +150,27 @@ export default function CardService({ service, onPress, onEdit, showEditButton =
           )}
         </View>
 
+        {/* Precios - Precio de Servicio + Domiciliario */}
+        <View style={styles.pricesContainer}>
+          <View style={styles.priceBox}>
+            <View style={styles.priceHeader}>
+              <MaterialIcons name="local-offer" size={12} color={Colors.menuText} style={{marginRight: 4}} />
+              <Text style={styles.priceLabel}>Servicio</Text>
+            </View>
+            <Text style={styles.priceValue}>{formatCurrency(service.price ?? 0)}</Text>
+          </View>
+
+          <View style={styles.priceDivider} />
+
+          <View style={styles.priceBox}>
+            <View style={styles.priceHeader}>
+              <MaterialIcons name="two-wheeler" size={12} color={Colors.success} style={{marginRight: 4}} />
+              <Text style={styles.priceLabel}>Domiciliario</Text>
+            </View>
+            <Text style={[styles.priceValue, {color: Colors.success}]}>{formatCurrency(service.priceDelivery ?? 0)}</Text>
+          </View>
+        </View>
+
         {/* Badges Footer */}
         <View style={styles.badgesRow}>
           <View style={styles.typeBadge}>
@@ -305,6 +326,46 @@ const styles = StyleSheet.create({
     color: Colors.menuText,
     fontWeight: "400",
     flex: 1,
+  },
+
+  // Precios - Sección de Servicios y Domiciliario
+  pricesContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(244, 197, 66, 0.08)",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+
+  priceBox: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  priceHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+
+  priceLabel: {
+    fontSize: 10,
+    color: Colors.menuText,
+    fontWeight: "600",
+  },
+
+  priceValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: Colors.activeMenuText,
+  },
+
+  priceDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: Colors.Border,
+    marginHorizontal: 8,
   },
 
   // Badges Footer
