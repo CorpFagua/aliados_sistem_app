@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, FlatList, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, FlatList, RefreshControl, ScrollView } from "react-native";
 import { Colors } from "../../../../constans/colors";
 import { useAuth } from "../../../../providers/AuthProvider";
 import { fetchDeliveryServices, updateServiceData } from "../../../../services/services";
@@ -636,85 +636,92 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
       {/* Modal de duplicados - MEJORADO */}
       <Modal visible={showDuplicateModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modal, { maxWidth: 420 }]}>
-            {/* Header */}
-            <View style={styles.duplicateModalHeader}>
-              <View style={styles.duplicateIconContainer}>
-                <Ionicons name="warning" size={32} color="#FF9800" />
+          <View style={[styles.modal, styles.scrollableModal, { maxWidth: 420 }]}>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 16 }}
+              showsVerticalScrollIndicator={true}
+              scrollIndicatorInsets={{ right: 1 }}
+            >
+              {/* Header */}
+              <View style={styles.duplicateModalHeader}>
+                <View style={styles.duplicateIconContainer}>
+                  <Ionicons name="warning" size={32} color="#FF9800" />
+                </View>
+                <Text style={styles.duplicateModalTitle}>Viajes Duplicados</Text>
               </View>
-              <Text style={styles.duplicateModalTitle}>Viajes Duplicados</Text>
-            </View>
 
-            {/* Info Box */}
-            <View style={styles.duplicateInfoBox}>
-              {duplicateServicesInfo?.isPending && (
-                <View style={{ marginBottom: 12 }}>
-                  <Text style={styles.duplicateModalSubtitle}>
-                    ⏳ {duplicateServicesInfo?.duplicateServiceIds.length || 0} viaje(s) está(n) en una solicitud de pago pendiente de aprobación
-                  </Text>
-                </View>
-              )}
-              {duplicateServicesInfo?.isPaid && (
-                <View style={{ marginBottom: 12 }}>
-                  <Text style={styles.duplicateModalSubtitle}>
-                    ✓ {duplicateServicesInfo?.duplicateServiceIds.length || 0} viaje(s) ya ha(n) sido pagado(s)
-                  </Text>
-                </View>
-              )}
-              {!duplicateServicesInfo?.isPending && !duplicateServicesInfo?.isPaid && (
-                <View style={{ marginBottom: 12 }}>
-                  <Text style={styles.duplicateModalSubtitle}>
-                    {duplicateServicesInfo?.duplicateServiceIds.length || 0} viaje(s) ya está(n) en otra factura de domiciliario
-                  </Text>
-                </View>
-              )}
-            </View>
+              {/* Info Box */}
+              <View style={styles.duplicateInfoBox}>
+                {duplicateServicesInfo?.isPending && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={styles.duplicateModalSubtitle}>
+                      ⏳ {duplicateServicesInfo?.duplicateServiceIds.length || 0} viaje(s) está(n) en una solicitud de pago pendiente de aprobación
+                    </Text>
+                  </View>
+                )}
+                {duplicateServicesInfo?.isPaid && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={styles.duplicateModalSubtitle}>
+                      ✓ {duplicateServicesInfo?.duplicateServiceIds.length || 0} viaje(s) ya ha(n) sido pagado(s)
+                    </Text>
+                  </View>
+                )}
+                {!duplicateServicesInfo?.isPending && !duplicateServicesInfo?.isPaid && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={styles.duplicateModalSubtitle}>
+                      {duplicateServicesInfo?.duplicateServiceIds.length || 0} viaje(s) ya está(n) en otra factura de domiciliario
+                    </Text>
+                  </View>
+                )}
+              </View>
 
-            {/* Lista de servicios duplicados */}
-            {duplicateServicesInfo && duplicateServicesInfo.duplicateDetails && duplicateServicesInfo.duplicateDetails.length > 0 && (
-              <View style={styles.duplicateServicesList}>
-                {duplicateServicesInfo.duplicateDetails.map((detail: any, idx: number) => (
-                  <View key={idx} style={styles.duplicateServiceItemContainer}>
-                    <View style={styles.duplicateServiceItemLeft}>
-                      <Ionicons name="alert-circle" size={18} color="#FF9800" />
-                      <View style={{ marginLeft: 12, flex: 1 }}>
-                        <Text style={styles.duplicateServiceName}>{detail.name}</Text>
-                        <Text style={styles.duplicateServiceDetail}>
-                          Estado: {detail.status}
-                        </Text>
-                        <Text style={styles.duplicateServiceAmount}>
-                          {formatCurrency(detail.amount)}
-                        </Text>
+              {/* Lista de servicios duplicados */}
+              {duplicateServicesInfo && duplicateServicesInfo.duplicateDetails && duplicateServicesInfo.duplicateDetails.length > 0 && (
+                <View style={styles.duplicateServicesList}>
+                  {duplicateServicesInfo.duplicateDetails.map((detail: any, idx: number) => (
+                    <View key={idx} style={styles.duplicateServiceItemContainer}>
+                      <View style={styles.duplicateServiceItemLeft}>
+                        <Ionicons name="alert-circle" size={18} color="#FF9800" />
+                        <View style={{ marginLeft: 12, flex: 1 }}>
+                          <Text style={styles.duplicateServiceName}>{detail.name}</Text>
+                          <Text style={styles.duplicateServiceDetail}>
+                            Estado: {detail.status}
+                          </Text>
+                          <Text style={styles.duplicateServiceAmount}>
+                            {formatCurrency(detail.amount)}
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))}
-              </View>
-            )}
+                  ))}
+                </View>
+              )}
 
-            {/* Explicación */}
-            <View style={styles.duplicateWarningBox}>
-              <Ionicons name="information-circle" size={20} color={Colors.activeMenuText} />
-              <Text style={styles.duplicateWarningText}>
-                {duplicateServicesInfo?.isPending
-                  ? 'Deselecciona estos viajes para continuar. O espera a que se apruebe la solicitud pendiente.'
-                  : duplicateServicesInfo?.isPaid
-                  ? 'Estos viajes ya fueron pagados y no se pueden cobrar nuevamente.'
-                  : 'Deselecciona estos viajes para continuar con el pago.'}
-              </Text>
-            </View>
+              {/* Explicación */}
+              <View style={styles.duplicateWarningBox}>
+                <Ionicons name="information-circle" size={20} color={Colors.activeMenuText} />
+                <Text style={styles.duplicateWarningText}>
+                  {duplicateServicesInfo?.isPending
+                    ? 'Deselecciona estos viajes para continuar. O espera a que se apruebe la solicitud pendiente.'
+                    : duplicateServicesInfo?.isPaid
+                    ? 'Estos viajes ya fueron pagados y no se pueden cobrar nuevamente.'
+                    : 'Deselecciona estos viajes para continuar con el pago.'}
+                </Text>
+              </View>
+            </ScrollView>
 
             {/* Botones */}
-            <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
+            <View style={{ flexDirection: "row", gap: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }}>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]} 
+                style={[styles.modalButton, styles.cancelButton, { flex: 1 }]} 
                 onPress={() => setShowDuplicateModal(false)}
               >
                 <Text style={styles.cancelButtonText}>Descartar</Text>
               </TouchableOpacity>
               {duplicateServicesInfo?.isPending && (
                 <TouchableOpacity 
-                  style={[styles.modalButton, styles.confirmButton]} 
+                  style={[styles.modalButton, styles.confirmButton, { flex: 1 }]} 
                   onPress={() => {
                     // Deseleccionar los duplicados
                     const newSelection = selectedIds.filter(
@@ -971,6 +978,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     width: "90%",
+  },
+  scrollableModal: {
+    maxHeight: '85%',
+    display: 'flex',
+    flexDirection: 'column',
   },
   modalTitle: {
     fontSize: 18,
