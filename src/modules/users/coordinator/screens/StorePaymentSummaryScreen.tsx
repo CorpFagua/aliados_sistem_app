@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, FlatList, TouchableOpacity, RefreshControl, Modal, TextInput, Alert, Animated } from 'react-native';
 import { useAuth } from '../../../../providers/AuthProvider';
-import { fetchServices, updateServiceData } from '../../../../services/services';
+import { fetchServices, updateServiceData, fetchStoreServices } from '../../../../services/services';
 import { formatCurrency } from '../../../../services/payments';
 import { Colors } from '../../../../constans/colors';
 import { Ionicons } from '@expo/vector-icons';
@@ -148,16 +148,15 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     if (!session?.access_token || !storeId) return;
     setLoadingUnpaid(true);
     try{
-      console.log(`\n🛒 [STORE-PAYMENT] Cargando servicios en estado entregado para tienda: ${storeId}`);
+      console.log(`\n🛒 [STORE-PAYMENT] Cargando servicios para cobrar de tienda: ${storeId}`);
       
-      const all = await fetchServices(session.access_token);
-      const sUnpaid = all.filter((s)=> {
-        const belongs = (s.storeId === storeId || s.profileStoreId === storeId);
-        const status = (s.status || '').toString().toLowerCase();
-        const isDelivered = status === 'entregado';
-        return belongs && isDelivered;
-      });
-      console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios en estado entregado encontrados`);
+      // 🔄 Usar el nuevo endpoint /services/store/:storeId
+      // Esto trae SOLO los servicios en estado "entregado" de la tienda
+      const sUnpaid = await fetchStoreServices(session.access_token, storeId);
+      
+      console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios en estado entregado obtenidos del backend`);
+      console.log(`📈 ✅ Filtrado en el server - No hay descarte local`);
+      
       setUnpaid(sUnpaid);
       setLoadedTabs(prev => ({ ...prev, due: true }));
     }catch(e){
@@ -232,16 +231,10 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     try{
       console.log(`\n🛒 [STORE-PAYMENT] Cargando todos los datos de tienda: ${storeId}`);
       
-      // Cargar servicios
+      // Cargar servicios usando el nuevo endpoint optimizado
       console.log('📦 [STORE-PAYMENT] Cargando servicios en estado entregado...');
-      const all = await fetchServices(session.access_token);
-      const sUnpaid = all.filter((s)=> {
-        const belongs = (s.storeId === storeId || s.profileStoreId === storeId);
-        const status = (s.status || '').toString().toLowerCase();
-        const isDelivered = status === 'entregado';
-        return belongs && isDelivered;
-      });
-      console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios en estado entregado encontrados`);
+      const sUnpaid = await fetchStoreServices(session.access_token, storeId);
+      console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios en estado entregado obtenidos`);
       setUnpaid(sUnpaid);
       setLoadingUnpaid(false);
 
