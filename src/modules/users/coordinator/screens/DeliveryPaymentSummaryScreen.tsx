@@ -7,6 +7,7 @@ import { formatCurrency } from "../../../../services/payments";
 import { TextInput, TouchableOpacity, Modal, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { usePayments } from "../../../../hooks/usePayments";
+import ServiceDetailModal from "../../../../components/ServiceDetailModal";
 
 
 export default function DeliveryPaymentSummaryScreen({ delivery }) {
@@ -44,6 +45,9 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
   } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [selectedService, setSelectedService] = useState<any | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [serviceLoading, setServiceLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -80,9 +84,15 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
   };
 
   const renderService = ({ item }) => (
-    <View style={styles.serviceCardRow}>
+    <TouchableOpacity 
+      style={styles.serviceCardRow}
+      onPress={() => handleOpenServiceDetail(item)}
+      activeOpacity={0.7}
+    >
       <TouchableOpacity
-        onPress={() => {
+        style={{marginRight: 12}}
+        onPress={(e) => {
+          e.stopPropagation();
           if (selectedIds.includes(item.id)) {
             setSelectedIds(selectedIds.filter((id) => id !== item.id));
           } else {
@@ -94,15 +104,48 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
           name={selectedIds.includes(item.id) ? "checkmark-circle" : "ellipse-outline"}
           size={22}
           color={selectedIds.includes(item.id) ? Colors.activeMenuText : Colors.menuText}
-          style={{ marginRight: 12 }}
         />
       </TouchableOpacity>
       <View style={{ flex: 1 }}>
-        <Text style={styles.serviceTitle}>Viaje #{item.id.slice(-4)}</Text>
-        <Text style={styles.serviceDetail}>Estado: {item.status}</Text>
-        <Text style={styles.serviceDetail}>Valor: {formatCurrency(item.priceDeliverySrv || 0)}</Text>
+        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8}}>
+          <Text style={styles.serviceTitle}>#{String(item.id).slice(-6)}</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <Ionicons name="calendar" size={13} color={Colors.activeMenuText} style={{marginRight: 4}} />
+            <Text style={styles.serviceDate}>{formatDateColombia(item.createdAt)}</Text>
+          </View>
+        </View>
+        
+        <View style={{marginBottom: 8}}>
+          <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
+            <Ionicons name="location" size={13} color={Colors.menuText} style={{marginRight: 6}} />
+            <Text style={[styles.serviceDetail, {flex: 1}]} numberOfLines={1}>{item.zoneName || 'Zona sin asignar'}</Text>
+          </View>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <Ionicons name="pin" size={13} color={Colors.menuText} style={{marginRight: 6}} />
+            <Text style={[styles.serviceDetail, {flex: 1}]} numberOfLines={1}>{item.destination || 'Sin dirección'}</Text>
+          </View>
+        </View>
+
+        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 8, backgroundColor: 'rgba(244,197,66,0.08)', borderRadius: 6}}>
+          <View style={{flex: 1}}>
+            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
+              <Ionicons name="pricetag" size={12} color={Colors.menuText} style={{marginRight: 4}} />
+              <Text style={{fontSize: 10, color: Colors.menuText}}>Precio</Text>
+            </View>
+            <Text style={{fontSize: 14, fontWeight: '700', color: Colors.activeMenuText}}>{formatCurrency(item.price ?? item.amount ?? 0)}</Text>
+          </View>
+          <View style={{width: 1, height: 30, backgroundColor: Colors.Border, marginHorizontal: 12}} />
+          <View style={{flex: 1}}>
+            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
+              <Ionicons name="bicycle" size={12} color={Colors.success} style={{marginRight: 4}} />
+              <Text style={{fontSize: 10, color: Colors.menuText}}>Domiciliario</Text>
+            </View>
+            <Text style={{fontSize: 14, fontWeight: '700', color: Colors.success}}>{formatCurrency(item.priceDeliverySrv ?? 0)}</Text>
+          </View>
+        </View>
       </View>
-    </View>
+      <Ionicons name="chevron-forward" size={20} color={Colors.menuText} style={{marginLeft: 8}} />
+    </TouchableOpacity>
   );
 
   const renderSnapshot = ({ item }) => (
@@ -184,17 +227,92 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
     });
   };
 
+  // Desseleccionar todo cuando cambian los filtros de fecha
+  useEffect(() => {
+    setSelectedIds([]);
+    setSelectAll(false);
+  }, [startDate, endDate]);
+
   const totalSelectedAmount = () => {
     const list = unpaid.filter((s) => selectedIds.includes(s.id));
     return list.reduce((sum, s) => sum + (s.priceDeliverySrv || 0), 0);
   };
+
+  // Función para formatear fecha UTC a hora local Colombia
+  const formatDateColombia = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('es-CO', { 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Función para abrir el modal con los detalles del servicio
+  const handleOpenServiceDetail = (service: any) => {
+    // Asegurar que price_delivery_srv existe, si no usar 0
+    const priceDelivery = service.priceDeliverySrv || service.price_delivery_srv || 0;
+    
+    // Adaptar servicio a formato de ServiceDetailModal
+    const adaptedService = {
+      ...service,
+      id: service.id,
+      deliveryAddress: service.destination || 'Sin dirección',
+      pickupAddress: service.pickup || null,
+      clientName: service.clientName || 'Cliente desconocido',
+      clientPhone: service.phone || 'Sin teléfono',
+      priceDelivery: priceDelivery,
+      price: service.price || 0,
+      paymentMethod: service.payment || 'efectivo',
+      totalToCollect: service.amount || 0,
+      isPaid: service.isPaid || false,
+      status: service.status || 'disponible',
+      type: { name: service.typeId || 'Domicilio' },
+      zone: { name: service.zoneName || 'Sin zona', id: service.zoneId || null },
+      profileStore: { name: service.profileStoreName || 'Sucursal', id: service.profileStoreId || null },
+      store: { name: service.storeName || 'Tienda', type: service.storeType },
+      delivery: service.assignedDelivery ? { 
+        name: service.assignedDeliveryName || 'Sin nombre', 
+        id: service.assignedDelivery,
+        phone: service.deliveryPhone || null 
+      } : null,
+      timeline: [],
+      timeAnalysis: {
+        totalTime: 0,
+        performanceScore: 0,
+        timeToRoute: 0,
+        timeToDelivery: 0,
+        averageTimeToRouteInZone: 0,
+        averageTimeToDeliveryInZone: 0,
+        comparisonToZoneAverage: { timeToRoutePercent: 0, timeToDeliveryPercent: 0 }
+      },
+    };
+    
+    console.log('📋 [DETAIL-MODAL] Service adapted:', { 
+      id: adaptedService.id,
+      priceDelivery: adaptedService.priceDelivery,
+      price: adaptedService.price,
+      zone: adaptedService.zone.name 
+    });
+    
+    setSelectedService(adaptedService);
+    setShowDetailModal(true);
+  };
+
+  const getFilteredServices = () => applyDateFilter(unpaid);
 
   const handleSelectAll = () => {
     if (selectAll) {
       setSelectedIds([]);
       setSelectAll(false);
     } else {
-      setSelectedIds(unpaid.map((s) => s.id));
+      const filteredServices = getFilteredServices();
+      setSelectedIds(filteredServices.map((s) => s.id));
       setSelectAll(true);
     }
   };
@@ -414,41 +532,92 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
             </View>
 
             {/* Weekday labels */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-              {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((w) => (
-                <Text key={w} style={{ width: 36, textAlign: 'center', color: Colors.menuText, fontWeight: '600' }}>{w}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((w) => (
+                <View key={w} style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ color: Colors.activeMenuText, fontWeight: '700', fontSize: 11 }}>{w}</Text>
+                </View>
               ))}
             </View>
 
             {/* Days grid */}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 }}>
               {(() => {
                 const first = startOfMonth(calendarMonth);
-                const lead = first.getDay(); // 0 (Sun) - 6
+                const startDay = first.getDay();
                 const total = daysInMonth(calendarMonth);
-                const nodes = [] as any[];
-                for (let i = 0; i < lead; i++) nodes.push(<View key={'e' + i} style={{ width: 36, height: 36, margin: 2 }} />);
-                for (let d = 1; d <= total; d++) {
-                  const cur = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), d);
-                  const iso = formatISO(cur);
-                  const isStart = iso === startDate;
-                  const isEnd = iso === endDate;
-                  const inRange = isBetween(iso);
-
-                  const dayStyle: any = { width: 36, height: 36, margin: 2, borderRadius: 6, justifyContent: 'center', alignItems: 'center' };
-                  const textStyle: any = { color: Colors.menuText };
-
-                  if (isStart) { dayStyle.backgroundColor = Colors.activeMenuText; textStyle.color = Colors.Background; }
-                  else if (isEnd) { dayStyle.backgroundColor = Colors.success; textStyle.color = Colors.Background; }
-                  else if (inRange) { dayStyle.backgroundColor = Colors.gradientStart; textStyle.color = Colors.Background; }
-
-                  nodes.push(
-                    <TouchableOpacity key={iso} onPress={() => onPickDate(cur)} style={dayStyle}>
-                      <Text style={textStyle}>{d}</Text>
-                    </TouchableOpacity>
-                  );
+                const cellSize = 48;
+                const containerWidth = 420 - 32;
+                const cellWidth = containerWidth / 7;
+                
+                const weeks = [];
+                let currentWeek = [];
+                
+                // Agregar días vacíos al inicio
+                for (let i = 0; i < startDay; i++) {
+                  currentWeek.push(null);
                 }
-                return nodes;
+                
+                // Agregar días del mes
+                for (let d = 1; d <= total; d++) {
+                  if (currentWeek.length === 7) {
+                    weeks.push([...currentWeek]);
+                    currentWeek = [];
+                  }
+                  currentWeek.push(d);
+                }
+                
+                // Completar última semana
+                while (currentWeek.length < 7) {
+                  currentWeek.push(null);
+                }
+                if (currentWeek.length > 0) {
+                  weeks.push(currentWeek);
+                }
+                
+                return weeks.map((week, weekIdx) => (
+                  <View key={`week-${weekIdx}`} style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', marginBottom: 4 }}>
+                    {week.map((d, dayIdx) => {
+                      if (!d) {
+                        return <View key={`empty-${dayIdx}`} style={{ flex: 1, height: cellSize, marginHorizontal: 2 }} />;
+                      }
+                      
+                      const cur = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), d);
+                      const iso = formatISO(cur);
+                      const isStart = iso === startDate;
+                      const isEnd = iso === endDate;
+                      const inRange = isBetween(iso);
+
+                      const dayStyle: any = { 
+                        flex: 1,
+                        height: cellSize, 
+                        marginHorizontal: 2,
+                        borderRadius: 8, 
+                        justifyContent: 'center', 
+                        alignItems: 'center',
+                        backgroundColor: 'transparent'
+                      };
+                      const textStyle: any = { color: Colors.normalText, fontWeight: '600', fontSize: 14 };
+
+                      if (isStart) { 
+                        dayStyle.backgroundColor = Colors.activeMenuText; 
+                        textStyle.color = Colors.Background; 
+                      } else if (isEnd) { 
+                        dayStyle.backgroundColor = Colors.activeMenuText; 
+                        textStyle.color = Colors.Background; 
+                      } else if (inRange) { 
+                        dayStyle.backgroundColor = 'rgba(244, 197, 66, 0.2)'; 
+                        textStyle.color = Colors.activeMenuText;
+                      }
+
+                      return (
+                        <TouchableOpacity key={iso} onPress={() => onPickDate(cur)} style={dayStyle}>
+                          <Text style={textStyle}>{d}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ));
               })()}
             </View>
 
@@ -639,6 +808,17 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
           </View>
         </View>
       </Modal>
+
+      {/* Modal de detalles del servicio */}
+      <ServiceDetailModal
+        visible={showDetailModal}
+        service={selectedService}
+        loading={serviceLoading}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedService(null);
+        }}
+      />
     </View>
   );
 }
@@ -676,6 +856,11 @@ const styles = StyleSheet.create({
   serviceDetail: {
     fontSize: 13,
     color: Colors.menuText,
+  },
+  serviceDate: {
+    fontSize: 11,
+    color: Colors.activeMenuText,
+    fontWeight: '600',
   },
   emptyText: {
     color: Colors.menuText,
