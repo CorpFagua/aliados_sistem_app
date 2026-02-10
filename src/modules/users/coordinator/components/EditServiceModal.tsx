@@ -161,7 +161,16 @@ export default function EditServiceModal({
   );
   const [zoneError, setZoneError] = useState<string | null>(null); // 🔴 Error de zona
 
-  // 💰 PRECIOS Y PAGO (editables)
+  // � Estados para errores de validación en cada campo
+  const [fieldErrors, setFieldErrors] = useState<{
+    destination?: string;
+    clientPhone?: string;
+    clientName?: string;
+    zone?: string;
+    payment?: string;
+  }>({});
+
+  // �💰 PRECIOS Y PAGO (editables)
   const [payment, setPayment] = useState<string>("");           // Método de pago
   const [price, setPrice] = useState<string>("");               // Precio del servicio (paquetería)
   const [priceDeliverySrv, setPriceDeliverySrv] = useState<string>(""); // Ganancia del delivery
@@ -204,6 +213,7 @@ export default function EditServiceModal({
     if (!service || !session?.access_token) return;
 
     setLoading(true);
+    setFieldErrors({}); // 🔴 Limpiar errores previos
     try {
       // 🔴 PRIMERO: Obtener el servicio completo del API
       // Esto asegura que tenemos TODOS los campos (tipo, zona, etc)
@@ -288,6 +298,7 @@ export default function EditServiceModal({
     setClientName("");
     setDestination("");
     setStatus("disponible");
+    setFieldErrors({}); // 🔴 Limpiar errores de validación
   };
 
   // Búsqueda de deliveries
@@ -333,18 +344,55 @@ export default function EditServiceModal({
     setShowDeliveryDropdown(false);
   };
 
+  // 🔴 Función robusta de validación
+  const validateForm = () => {
+    const errors: typeof fieldErrors = {};
+    const missingFields: string[] = [];
+
+    // Validar dirección
+    if (!destination.trim()) {
+      errors.destination = "Requerido";
+      missingFields.push("• Dirección de destino");
+    }
+
+    // Validar teléfono
+    if (!clientPhone.trim()) {
+      errors.clientPhone = "Requerido";
+      missingFields.push("• Teléfono del cliente");
+    }
+
+    // Validar zona para domicilios (solo si NO es disponible)
+    if (svc?.typeId === "domicilio" && status !== "disponible" && !zoneId) {
+      errors.zone = "Requerido";
+      missingFields.push("• Zona (obligatoria para domicilios)");
+    }
+
+    // Validar método de pago (si es paquetería, es recomendado)
+    if (svc?.typeId === "paqueteria_aliados" && !payment) {
+      missingFields.push("⚠️ Método de pago (recomendado)");
+    }
+
+    setFieldErrors(errors);
+    return { isValid: missingFields.length === 0, missingFields };
+  };
+
   // Guardar cambios
   const handleSave = async () => {
     if (!service || !session?.access_token) return;
 
-    // Validaciones básicas
-    if (!destination.trim()) {
-      Alert.alert("Error", "La dirección de destino es obligatoria");
-      return;
-    }
+    // 🔴 Validar TODOS los campos
+    const { isValid, missingFields } = validateForm();
 
-    if (!clientPhone.trim()) {
-      Alert.alert("Error", "El teléfono del cliente es obligatorio");
+    if (!isValid) {
+      const errorMessage = missingFields.length === 1
+        ? `Falta llenar: ${missingFields[0]}`
+        : `Faltan los siguientes campos:\n\n${missingFields.join("\n")}`;
+
+      Alert.alert(
+        "⚠️ Campos Incompletos",
+        errorMessage,
+        [{ text: "Entendido", onPress: () => console.log("User acknowledged validation") }]
+      );
       return;
     }
 
@@ -652,17 +700,24 @@ export default function EditServiceModal({
                 {/* Zona - SOLO PARA DOMICILIOS */}
                 {svc?.typeId === "domicilio" && (
                   <>
-                    <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Zona</Text>
+                    <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
+                      Zona {status !== "disponible" && <Text style={{ color: "#FF4444" }}>*</Text>} {fieldErrors.zone && <Text style={{ color: "#FF4444" }}>({fieldErrors.zone})</Text>}
+                    </Text>
                     <DropDownPicker
                       open={openZone}
                       value={zoneId}
                       items={zoneItems}
                       setOpen={setOpenZone}
-                      setValue={setZoneId}
+                      setValue={(value: any) => {
+                        setZoneId(value);
+                        if (fieldErrors.zone) {
+                          setFieldErrors({ ...fieldErrors, zone: undefined });
+                        }
+                      }}
                       placeholder="Seleccionar zona"
                       style={[
                         styles.dropdown,
-                        zoneError && { borderColor: "#FF4444", borderWidth: 2 },
+                        (zoneError || fieldErrors.zone) && { borderColor: "#FF4444", borderWidth: 2 },
                       ]}
                       dropDownContainerStyle={styles.dropdownContainer}
                       textStyle={styles.dropdownText}
@@ -670,9 +725,9 @@ export default function EditServiceModal({
                       zIndex={2000}
                       zIndexInverse={2000}
                     />
-                    {zoneError && (
+                    {(zoneError || fieldErrors.zone) && (
                       <Text style={styles.errorText}>
-                        {zoneError}
+                        {zoneError || "❌ Zona es obligatoria para domicilios"}
                       </Text>
                     )}
                   </>
@@ -680,13 +735,16 @@ export default function EditServiceModal({
 
                 {/* Dirección */}
                 <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
-                  Dirección de destino *
+                  Dirección de destino * {fieldErrors.destination && <Text style={{ color: "#FF4444" }}>({fieldErrors.destination})</Text>}
                 </Text>
-                <View style={styles.inputContainer}>
+                <View style={[
+                  styles.inputContainer,
+                  fieldErrors.destination && { borderColor: "#FF4444", borderWidth: 2, backgroundColor: "rgba(255,68,68,0.05)" }
+                ]}>
                   <Ionicons
                     name="location-outline"
                     size={20}
-                    color={Colors.menuText}
+                    color={fieldErrors.destination ? "#FF4444" : Colors.menuText}
                     style={styles.inputIcon}
                   />
                   <TextInput
@@ -694,19 +752,27 @@ export default function EditServiceModal({
                     placeholder="Ej: Cra 10 #20-30"
                     placeholderTextColor={Colors.menuText}
                     value={destination}
-                    onChangeText={setDestination}
+                    onChangeText={(text) => {
+                      setDestination(text);
+                      if (fieldErrors.destination) {
+                        setFieldErrors({ ...fieldErrors, destination: undefined });
+                      }
+                    }}
                   />
                 </View>
 
                 {/* Teléfono */}
                 <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
-                  Teléfono del cliente *
+                  Teléfono del cliente * {fieldErrors.clientPhone && <Text style={{ color: "#FF4444" }}>({fieldErrors.clientPhone})</Text>}
                 </Text>
-                <View style={styles.inputContainer}>
+                <View style={[
+                  styles.inputContainer,
+                  fieldErrors.clientPhone && { borderColor: "#FF4444", borderWidth: 2, backgroundColor: "rgba(255,68,68,0.05)" }
+                ]}>
                   <Ionicons
                     name="call-outline"
                     size={20}
-                    color={Colors.menuText}
+                    color={fieldErrors.clientPhone ? "#FF4444" : Colors.menuText}
                     style={styles.inputIcon}
                   />
                   <TextInput
@@ -714,7 +780,12 @@ export default function EditServiceModal({
                     placeholder="3001234567"
                     placeholderTextColor={Colors.menuText}
                     value={clientPhone}
-                    onChangeText={setClientPhone}
+                    onChangeText={(text) => {
+                      setClientPhone(text);
+                      if (fieldErrors.clientPhone) {
+                        setFieldErrors({ ...fieldErrors, clientPhone: undefined });
+                      }
+                    }}
                     keyboardType="phone-pad"
                   />
                 </View>
