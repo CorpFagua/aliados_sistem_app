@@ -1221,7 +1221,7 @@ export function useServicesDetail(token: string | null) {
   );
 
   const downloadServicesExcel = useCallback(
-    async (serviceIds: string[], filename?: string) => {
+    async (serviceIds: string[], filename?: string, excelType?: 'coordinator' | 'store' | 'delivery') => {
       if (!token) {
         setError("No hay sesión activa");
         return;
@@ -1237,10 +1237,11 @@ export function useServicesDetail(token: string | null) {
 
       try {
         const idsString = serviceIds.join(',');
-        console.log(`📥 [HOOK] Descargando Excel de ${serviceIds.length} servicios`);
+        const typeParam = excelType ? `&excelType=${excelType}` : '';
+        console.log(`📥 [HOOK] Descargando Excel de ${serviceIds.length} servicios (tipo: ${excelType || 'coordinator'})`);
         
         const response = await api.get(
-          `/services/detail/excel?ids=${idsString}`,
+          `/services/detail/excel?ids=${idsString}${typeParam}`,
           { 
             headers,
             responseType: 'blob'

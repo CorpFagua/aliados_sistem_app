@@ -90,6 +90,12 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   const [showSendEmailModal, setShowSendEmailModal] = useState(false);
   const [emailModalSnapshot, setEmailModalSnapshot] = useState<Snapshot | null>(null);
 
+  // Estados para descarga de Excel
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadModalServiceIds, setDownloadModalServiceIds] = useState<string[]>([]);
+  const [downloadModalFilename, setDownloadModalFilename] = useState('');
+  const [downloadingExcel, setDownloadingExcel] = useState(false);
+
   // Estados para notificaciones
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const notificationOpacity = React.useRef(new Animated.Value(0)).current;
@@ -216,11 +222,24 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       return;
     }
 
+    setDownloadModalServiceIds(serviceIds);
+    setDownloadModalFilename(`servicios-tienda-${Date.now()}.xlsx`);
+    setShowDownloadModal(true);
+  };
+
+  const handleDownloadWithFormat = async (excelType: 'coordinator' | 'store') => {
+    if (downloadModalServiceIds.length === 0) return;
+
+    setDownloadingExcel(true);
     try {
-      await downloadServicesExcel(serviceIds, `servicios-tienda-${Date.now()}.xlsx`);
+      await downloadServicesExcel(downloadModalServiceIds, downloadModalFilename, excelType);
+      showNotification('success', `Excel descargado en formato ${excelType === 'store' ? 'Tienda' : 'Completo'}`);
+      setShowDownloadModal(false);
     } catch (err: any) {
-      Alert.alert('Error', 'Error al descargar Excel');
+      showNotification('error', 'Error al descargar Excel');
       console.error(err);
+    } finally {
+      setDownloadingExcel(false);
     }
   };
 
@@ -1707,6 +1726,71 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
         </View>
       </Modal>
 
+      {/* Modal de descarga de Excel */}
+      <Modal visible={showDownloadModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, styles.downloadModal]}>
+            <View style={styles.modalHeaderDownload}>
+              <Ionicons name="download" size={24} color={Colors.activeMenuText} />
+              <Text style={styles.modalTitle}>Descargar Excel</Text>
+            </View>
+            
+            <View style={styles.downloadInfoBox}>
+              <Ionicons name="information-circle" size={18} color="#2196F3" style={{marginRight: 10}} />
+              <Text style={{color: Colors.normalText, fontSize: 13, lineHeight: 18, flex: 1}}>
+                Selecciona el formato en el que deseas descargar los servicios. El formato "Tienda" incluye solo los campos principales.
+              </Text>
+            </View>
+
+            <View style={styles.downloadOptionsContainer}>
+              <TouchableOpacity 
+                style={[styles.downloadOptionButton, styles.downloadOptionComlete, {flex: 1}]}
+                onPress={() => handleDownloadWithFormat('coordinator')}
+                disabled={downloadingExcel}
+                activeOpacity={0.7}
+              >
+                <View style={styles.downloadOptionIconContainer}>
+                  <Ionicons name="document-text" size={28} color="#FF9800" />
+                </View>
+                <View style={{flex: 1}}>
+                  <Text style={styles.downloadOptionTitle}>Completo</Text>
+                  <Text style={styles.downloadOptionSubtitle}>24 columnas con IDs</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#FF9800" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.downloadOptionButton, styles.downloadOptionStore, {flex: 1}]}
+                onPress={() => handleDownloadWithFormat('store')}
+                disabled={downloadingExcel}
+                activeOpacity={0.7}
+              >
+                <View style={styles.downloadOptionIconContainer}>
+                  <Ionicons name="storefront" size={28} color="#4CAF50" />
+                </View>
+                <View style={{flex: 1}}>
+                  <Text style={styles.downloadOptionTitle}>Como Tienda</Text>
+                  <Text style={styles.downloadOptionSubtitle}>13 columnas simplificadas</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#4CAF50" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={() => setShowDownloadModal(false)}
+              disabled={downloadingExcel}
+            >
+              {downloadingExcel ? (
+                <ActivityIndicator color={Colors.normalText} size="small" />
+              ) : (
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Modal de detalles del servicio */}
       <ServiceDetailModal
         visible={showDetailModal}
@@ -2354,5 +2438,63 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  downloadModal: {
+    maxHeight: '75%',
+  },
+  modalHeaderDownload: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(244, 197, 66, 0.1)',
+  },
+  downloadInfoBox: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(33, 150, 243, 0.08)',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 18,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+  },
+  downloadOptionsContainer: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  downloadOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  downloadOptionIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  downloadOptionComlete: {
+    backgroundColor: 'rgba(255, 152, 0, 0.08)',
+    borderColor: 'rgba(255, 152, 0, 0.2)',
+  },
+  downloadOptionStore: {
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+    borderColor: 'rgba(76, 175, 80, 0.2)',
+  },
+  downloadOptionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.normalText,
+    marginBottom: 2,
+  },
+  downloadOptionSubtitle: {
+    fontSize: 12,
+    color: Colors.menuText,
   },
 });
