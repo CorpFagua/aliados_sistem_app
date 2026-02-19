@@ -44,6 +44,7 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
     snapshotId: string;
     servicesCount: number;
     totalAmount: number;
+    type?: 'immediate' | 'request';
   } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -446,18 +447,7 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
       const snapshot = snapshotResult.data;
       console.log(`✅ Snapshot creado: ${snapshot.id}`);
 
-      // Paso 2: Crear solicitud de pago
-      console.log('📤 Paso 2: Creando solicitud de pago...');
-      const request = await createPaymentRequest({ snapshot_id: snapshot.id });
-      
-      if (!request) {
-        console.error('❌ Error creando solicitud de pago');
-        Alert.alert('⚠️ Error', 'No se pudo crear la solicitud de pago');
-        setProcessing(false);
-        return;
-      }
-      
-      console.log(`✅ Solicitud creada: ${request.id}`);
+
       
       // ✅ ÉXITO
       console.log(`\n✅ === SOLICITUD DE PREFACTURA CREADA ===`);
@@ -471,7 +461,8 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
       setSuccessData({
         snapshotId: snapshot.id,
         servicesCount: processedCount,
-        totalAmount: snapshot.total_earned || 0,
+        totalAmount: snapshot.total_amount || 0,
+        type: 'request',
       });
       setShowSuccessModal(true);
       
@@ -542,6 +533,7 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
         snapshotId: result.snapshot.id,
         servicesCount: selectedIds.length,
         totalAmount: result.snapshot.total_amount,
+        type: 'immediate',
       });
       setShowSuccessModal(true);
       
@@ -1041,17 +1033,21 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
             </View>
 
             {/* Título */}
-            <Text style={styles.successTitle}>¡Pago Realizado!</Text>
+            <Text style={styles.successTitle}>
+              {successData?.type === 'request' ? '¡Solicitud Creada!' : '¡Pago Realizado!'}
+            </Text>
 
             {/* Información del pago */}
             {successData && (
               <View style={styles.successDetailsBox}>
                 <View style={styles.successDetailRow}>
-                  <Text style={styles.successDetailLabel}>Factura #</Text>
+                  <Text style={styles.successDetailLabel}>
+                    {successData.type === 'request' ? 'Prefactura #' : 'Factura #'}
+                  </Text>
                   <Text style={styles.successDetailValue}>{successData.snapshotId.slice(-8)}</Text>
                 </View>
                 <View style={[styles.successDetailRow, { marginTop: 12 }]}>
-                  <Text style={styles.successDetailLabel}>Viajes pagados</Text>
+                  <Text style={styles.successDetailLabel}>Viajes</Text>
                   <Text style={styles.successDetailValue}>{successData.servicesCount}</Text>
                 </View>
                 <View style={[styles.successDetailRow, { marginTop: 12 }]}>
@@ -1063,7 +1059,9 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
 
             {/* Mensaje */}
             <Text style={styles.successMessage}>
-              El pago ha sido procesado correctamente. Los viajes están marcados como pagados.
+              {successData?.type === 'request'
+                ? 'La solicitud de prefactura ha sido creada exitosamente. Los viajes seleccionados quedaran pendientes para pago hasta que el admin lo apruebe'
+                : 'El pago ha sido procesado correctamente. Los viajes están marcados como pagados.'}
             </Text>
 
             {/* Botón de cierre */}
