@@ -134,11 +134,11 @@ export function usePayments(token: string | null) {
         { headers }
       );
       
-      console.log("📊 [HOOK] Respuesta raw:", JSON.stringify(response.data, null, 2));
+      //console.log("📊 [HOOK] Respuesta raw:", JSON.stringify(response.data, null, 2));
       
       // Extraer data si viene envuelto en { ok: true, data: {...} }
       const data = response.data?.data || response.data;
-      console.log("📊 [HOOK] Data extraída del hook:", JSON.stringify(data, null, 2));
+      //console.log("📊 [HOOK] Data extraída del hook:", JSON.stringify(data, null, 2));
       
       // Validar que tenga las propiedades necesarias
       if (!data || typeof data !== 'object') {
@@ -191,10 +191,7 @@ export function usePayments(token: string | null) {
    */
   const createPaymentRequest = useCallback(
     async (data: CreatePaymentRequestDTO): Promise<DeliveryPaymentRequest | null> => {
-      console.log('\n🟦 [HOOK] === createPaymentRequest ===');
-      console.log(`📌 Data: ${JSON.stringify(data)}`);
-      console.log(`🔐 Token: ${token ? '✅ disponible' : '❌ NO disponible'}`);
-
+  
       if (!token) {
         console.error('❌ [HOOK] No hay sesión activa');
         setError("No hay sesión activa");
@@ -205,9 +202,6 @@ export function usePayments(token: string | null) {
       setError(null);
 
       try {
-        console.log('\n📤 [HOOK] Enviando POST a /payments/requests');
-        console.log(`📋 Body: ${JSON.stringify(data)}`);
-        console.log(`🔐 Headers: ${JSON.stringify(headers, null, 2)}`);
 
         const response = await api.post<any>(
           "/payments/requests",
