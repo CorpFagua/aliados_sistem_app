@@ -4,9 +4,9 @@ import { api, authHeaders } from "../lib/api";
 // ================================================================
 //  TIPOS DE RESULTADO (Sin Excepciones)
 // ================================================================
-export interface ApiResult<T> {
+export interface ApiResult<T = any> {
   success: boolean;
-  data?: T;
+  data?: T | any;  // Permite T o any (para casos como duplicados)
   restricted?: boolean;
   reason?: string;
   message?: string;
@@ -420,12 +420,15 @@ export function usePayments(token: string | null) {
   }, [token, headers]);
 
   /**
-   * Crear snapshot a partir de servicios (utilizado por domiciliarios)
+   * Crear snapshot a partir de servicios (utilizado por domiciliarios y coordinadores)
    * ⚠️ IMPORTANTE: NO lanza excepciones. Retorna ApiResult<PaymentSnapshot>
+   * @param services_ids IDs de servicios
+   * @param delivery_id ID del delivery (opcional, para coordinadores)
    */
   const createSnapshotFromServices = useCallback(
-    async (services_ids: string[]): Promise<ApiResult<PaymentSnapshot>> => {
+    async (services_ids: string[], delivery_id?: string): Promise<ApiResult<PaymentSnapshot>> => {
       console.log('\n🟦 [HOOK] createSnapshotFromServices: iniciando...');
+      console.log(`📋 delivery_id: ${delivery_id || 'no proporcionado'}`);
 
       if (!token) {
         console.log('❌ No hay sesión activa');
@@ -441,9 +444,13 @@ export function usePayments(token: string | null) {
 
       try {
         console.log(`📤 [HOOK] POST /payments/snapshots/from-services`);
+        const payload: any = { services_ids };
+        if (delivery_id) {
+          payload.delivery_id = delivery_id;
+        }
         const response = await api.post<any>(
           "/payments/snapshots/from-services",
-          { services_ids },
+          payload,
           { headers }
         );
 
@@ -483,6 +490,23 @@ export function usePayments(token: string | null) {
         console.log(`   Status: ${status}`);
         console.log(`   Code: ${errorCode}`);
         console.log(`   Message: ${errorMessage}`);
+        
+        // 🔍 Caso especial: 409 Conflict (duplicados)
+        if (status === 409 && errorData?.allowed === false) {
+          console.warn(`⚠️ [HOOK] Conflicto de duplicados detectado`);
+          return {
+            success: false,
+            restricted: true,
+            reason: errorData?.reason,
+            message: errorData?.message,
+            data: {
+              duplicateServiceIds: errorData?.duplicateServiceIds,
+              duplicateSnapshotStatus: errorData?.duplicateSnapshotStatus,
+              isPending: errorData?.isPending,
+              isPaid: errorData?.isPaid
+            }
+          };
+        }
         
         setError(errorMessage);
         

@@ -12,7 +12,7 @@ import ServiceDetailModal from "../../../../components/ServiceDetailModal";
 
 export default function DeliveryPaymentSummaryScreen({ delivery }) {
   const { session } = useAuth();
-  const { coordinatorPayServices, getDeliveryPaymentSnapshots } = usePayments(session?.access_token || null);
+  const { coordinatorPayServices, getDeliveryPaymentSnapshots, createSnapshotFromServices, createPaymentRequest } = usePayments(session?.access_token || null);
   const { downloadServicesExcel } = useServicesDetail(session?.access_token || null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -24,6 +24,7 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<"immediate" | "request" | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "transferencia" | "cheque" | "otro">("efectivo");
   const [reference, setReference] = useState("");
   const [showCalendar, setShowCalendar] = useState<null | { field: "start" | "end" }>(null);
@@ -378,6 +379,115 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
     }
   };
 
+  const handleCreatePaymentRequest = async () => {
+    if (!session?.access_token) return Alert.alert("Error", "No hay sesión");
+    if (selectedIds.length === 0) return Alert.alert("Selecciona viajes", "Debes seleccionar al menos un viaje.");
+    
+    setProcessing(true);
+    try {
+      console.log('\n🟦 [COORDINATOR] === handleCreatePaymentRequest (SOLICITUD DE PREFACTURA) ===');
+      console.log(`📦 Service IDs: ${JSON.stringify(selectedIds)}`);
+      console.log(`👤 Delivery ID: ${delivery.id}`);
+
+      // Paso 1: Crear snapshot a partir de los servicios
+      console.log('📤 Paso 1: Creando snapshot...');
+      const snapshotResult = await createSnapshotFromServices(selectedIds, delivery.id);
+      
+      // 🔍 Verificar si hay duplicados (en otro snapshot)
+      if (snapshotResult.restricted && snapshotResult.reason === 'SERVICES_ALREADY_IN_DELIVERY_SNAPSHOT') {
+        console.warn(`⚠️ Servicios duplicados encontrados`);
+        
+        // Obtener información detallada de servicios duplicados
+        const duplicateIds = snapshotResult.data?.duplicateServiceIds || [];
+        const duplicateDetails = duplicateIds
+          .map((id: string) => {
+            const service = unpaid.find(s => s.id === id);
+            return {
+              id: id,
+              name: `Viaje #${id.slice(-4)}`,
+              status: service?.status || 'N/A',
+              amount: service?.priceDeliverySrv || 0,
+            };
+          });
+        
+        setDuplicateServicesInfo({
+          duplicateServiceIds: duplicateIds || [],
+          duplicateServiceNames: duplicateDetails.map(d => d.name),
+          duplicateDetails: duplicateDetails,
+          isPending: snapshotResult.data?.isPending || false,
+          isPaid: snapshotResult.data?.isPaid || false,
+          snapshotStatus: snapshotResult.data?.duplicateSnapshotStatus || 'unknown',
+        });
+        setShowDuplicateModal(true);
+        setProcessing(false);
+        return;
+      }
+      
+      // 🔍 Verificar restricción por solicitud pendiente en el período
+      if (snapshotResult.restricted) {
+        console.warn(`⏳ Restricción: ${snapshotResult.reason}`);
+        Alert.alert(
+          '⏳ Solicitud Pendiente',
+          `${snapshotResult.message}\n\nTiene una solicitud de corte pendiente en este período.`
+        );
+        setProcessing(false);
+        return;
+      }
+      
+      // 🔍 Error al crear snapshot
+      if (!snapshotResult.success || !snapshotResult.data?.id) {
+        const errorMsg = snapshotResult.error?.message || 'No se pudo crear el snapshot';
+        console.error('❌ Error creando snapshot:', errorMsg);
+        Alert.alert('⚠️ Error', errorMsg);
+        setProcessing(false);
+        return;
+      }
+      
+      const snapshot = snapshotResult.data;
+      console.log(`✅ Snapshot creado: ${snapshot.id}`);
+
+      // Paso 2: Crear solicitud de pago
+      console.log('📤 Paso 2: Creando solicitud de pago...');
+      const request = await createPaymentRequest({ snapshot_id: snapshot.id });
+      
+      if (!request) {
+        console.error('❌ Error creando solicitud de pago');
+        Alert.alert('⚠️ Error', 'No se pudo crear la solicitud de pago');
+        setProcessing(false);
+        return;
+      }
+      
+      console.log(`✅ Solicitud creada: ${request.id}`);
+      
+      // ✅ ÉXITO
+      console.log(`\n✅ === SOLICITUD DE PREFACTURA CREADA ===`);
+      setShowPayModal(false);
+      setPaymentMode(null);
+      const processedCount = selectedIds.length;
+      setSelectedIds([]);
+      setSelectAll(false);
+      
+      // Mostrar modal de éxito
+      setSuccessData({
+        snapshotId: snapshot.id,
+        servicesCount: processedCount,
+        totalAmount: snapshot.total_earned || 0,
+      });
+      setShowSuccessModal(true);
+      
+      // Recargar datos
+      setTimeout(() => {
+        loadData();
+      }, 2000);
+    } catch (err: any) {
+      console.error('❌ Error:', err);
+      setErrorMessage(err.message || "No se pudo crear la solicitud de prefactura");
+      setShowErrorModal(true);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleConfirmPayment = async () => {
     if (!session?.access_token) return Alert.alert("Error", "No hay sesión");
     if (selectedIds.length === 0) return Alert.alert("Selecciona viajes", "Debes seleccionar al menos un viaje para generar el pago.");
@@ -518,11 +628,73 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
         </>
       )}
 
-      {/* Modal pago simple */}
-      <Modal visible={showPayModal} transparent animationType="slide">
+      {/* Modal pago - Selecciona tipo de pago */}
+      <Modal visible={showPayModal && paymentMode === null} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Generar pago</Text>
+            <Text style={styles.modalTitle}>Tipo de pago</Text>
+            <Text style={styles.modalSubtitle}>¿Cómo deseas procesar el pago?</Text>
+            <Text style={styles.modalSubtitle}>Se procesarán {selectedIds.length} viaje{selectedIds.length !== 1 ? 's' : ''}</Text>
+            <Text style={styles.modalSubtitle}>Total: {formatCurrency(totalSelectedAmount())}</Text>
+
+            <View style={{ marginVertical: 16, gap: 12 }}>
+              {/* Opción 1: Pago Inmediato */}
+              <TouchableOpacity 
+                style={[styles.paymentOptionCard, { borderColor: Colors.activeMenuText }]}
+                onPress={() => setPaymentMode("immediate")}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <Ionicons name="flash" size={20} color={Colors.activeMenuText} style={{ marginRight: 8 }} />
+                  <Text style={styles.paymentOptionTitle}>Pago Inmediato</Text>
+                </View>
+                <Text style={styles.paymentOptionDescription}>
+                  Registra el pago directamente. El domiciliario recibirá confirmación inmediata.
+                </Text>
+              </TouchableOpacity>
+
+              {/* Opción 2: Solicitud de Prefactura */}
+              <TouchableOpacity 
+                style={[styles.paymentOptionCard, { borderColor: '#FF9800' }]}
+                onPress={() => setPaymentMode("request")}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <Ionicons name="document-text" size={20} color="#FF9800" style={{ marginRight: 8 }} />
+                  <Text style={[styles.paymentOptionTitle, { color: '#FF9800' }]}>Crear Solicitud de Prefactura</Text>
+                </View>
+                <Text style={styles.paymentOptionDescription}>
+                  Genera una solicitud que el domiciliario debe aprobar. Disponible por 7 días.
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => {
+                  setShowPayModal(false);
+                  setPaymentMode(null);
+                }}
+                disabled={processing}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal pago - Detalles pago inmediato */}
+      <Modal visible={showPayModal && paymentMode === "immediate"} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <TouchableOpacity 
+              onPress={() => setPaymentMode(null)}
+              style={{ marginBottom: 12 }}
+            >
+              <Ionicons name="chevron-back" size={24} color={Colors.menuText} />
+            </TouchableOpacity>
+            
+            <Text style={styles.modalTitle}>Pago Inmediato</Text>
             <Text style={styles.modalSubtitle}>Se creará una factura con {selectedIds.length} viaje{selectedIds.length !== 1 ? 's' : ''}</Text>
             <Text style={styles.modalSubtitle}>Total: {formatCurrency(totalSelectedAmount())}</Text>
 
@@ -540,7 +712,11 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
             <View style={{ flexDirection: "row", gap: 12 }}>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]} 
-                onPress={() => setShowPayModal(false)}
+                onPress={() => {
+                  setShowPayModal(false);
+                  setPaymentMode(null);
+                  setReference("");
+                }}
                 disabled={processing}
               >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
@@ -554,6 +730,58 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
                   <ActivityIndicator color="white" size="small" />
                 ) : (
                   <Text style={styles.confirmButtonText}>Confirmar pago</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal solicitud prefactura - Confirmación */}
+      <Modal visible={showPayModal && paymentMode === "request"} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <TouchableOpacity 
+              onPress={() => setPaymentMode(null)}
+              style={{ marginBottom: 12 }}
+            >
+              <Ionicons name="chevron-back" size={24} color={Colors.menuText} />
+            </TouchableOpacity>
+            
+            <Text style={styles.modalTitle}>Solicitud de Prefactura</Text>
+            <Text style={styles.modalSubtitle}>Se enviará una solicitud al domiciliario</Text>
+            <Text style={styles.modalSubtitle}>{selectedIds.length} viaje{selectedIds.length !== 1 ? 's' : ''}</Text>
+            <Text style={styles.modalSubtitle}>Total: {formatCurrency(totalSelectedAmount())}</Text>
+
+            <View style={{ backgroundColor: 'rgba(255, 152, 0, 0.1)', padding: 12, borderRadius: 8, marginVertical: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <Ionicons name="information-circle" size={18} color="#FF9800" style={{ marginRight: 8, marginTop: 2 }} />
+                <Text style={{ color: '#FF9800', fontSize: 12, flex: 1, lineHeight: 18 }}>
+                  El domiciliario tendrá 7 días para revisar y aprobar esta solicitud de pago. Una vez aprobada, se procesará el pago automáticamente.
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => {
+                  setShowPayModal(false);
+                  setPaymentMode(null);
+                }}
+                disabled={processing}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton, processing && { opacity: 0.6 }]} 
+                onPress={handleCreatePaymentRequest}
+                disabled={processing}
+              >
+                {processing ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>Crear solicitud</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1503,5 +1731,23 @@ const styles = StyleSheet.create({
   downloadOptionSubtitle: {
     fontSize: 12,
     color: Colors.menuText,
+  },
+  // Estilos para opciones de pago
+  paymentOptionCard: {
+    backgroundColor: Colors.Border,
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 2,
+    flexDirection: 'column',
+  },
+  paymentOptionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.normalText,
+  },
+  paymentOptionDescription: {
+    fontSize: 12,
+    color: Colors.menuText,
+    lineHeight: 16,
   },
 });
