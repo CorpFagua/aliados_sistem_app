@@ -206,7 +206,7 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.snapshotId}>Factura #{item.id.slice(-8)}</Text>
           <Text style={styles.snapshotPeriod}>
-            {new Date(item.period_start).toLocaleDateString()} - {new Date(item.period_end).toLocaleDateString()}
+            {item.period_start} - {item.period_end}
           </Text>
         </View>
         <View style={[styles.statusBadge, styles.statusBadgePaid]}>
