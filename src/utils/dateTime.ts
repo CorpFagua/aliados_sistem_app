@@ -117,10 +117,12 @@ export function daysBetween(from: Date, to: Date): number {
  * @returns Fecha formateada en español
  */
 export function formatDateLocal(isoString: string): string {
-  // Si viene en formato ISO completo, extraer solo la fecha
-  const dateStr = isoString.split('T')[0];
+  // Convertir UTC a fecha Colombia antes de formatear para evitar desfase de día
+  const dateStr = isoString.includes('T')
+    ? parseBackendDateToLocal(isoString)
+    : isoString.split('T')[0];
   const date = parseLocalDate(dateStr);
-  
+
   return new Intl.DateTimeFormat("es-CO", {
     year: "numeric",
     month: "long",
@@ -155,7 +157,7 @@ export function formatDateShort(isoString: string): string {
  */
 export function formatDateTime(isoString: string): string {
   const date = new Date(isoString);
-  
+
   return new Intl.DateTimeFormat("es-CO", {
     year: "numeric",
     month: "long",
@@ -163,6 +165,7 @@ export function formatDateTime(isoString: string): string {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
+    timeZone: 'America/Bogota',
   }).format(date);
 }
 
@@ -175,10 +178,11 @@ export function formatDateTime(isoString: string): string {
  */
 export function formatTime(isoString: string): string {
   const date = new Date(isoString);
-  
+
   return new Intl.DateTimeFormat("es-CO", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: 'America/Bogota',
   }).format(date);
 }
 

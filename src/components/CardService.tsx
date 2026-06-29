@@ -10,6 +10,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constans/colors";
 import { ServiceHistorySummary } from "../hooks/useServiceHistory";
 import { useUnreadMessagesContext } from "../providers/UnreadMessagesProvider";
+import { formatDateTime } from "../utils/dateTime";
 
 interface CardServiceProps {
   service: ServiceHistorySummary;
@@ -31,12 +32,7 @@ const formatCurrency = (amount: number): string => {
 
 const formatDate = (dateString: string): string => {
   try {
-    return new Date(dateString).toLocaleDateString("es-CO", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatDateTime(dateString);
   } catch {
     return dateString;
   }

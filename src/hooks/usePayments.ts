@@ -854,7 +854,7 @@ export function usePayments(token: string | null) {
    * Obtener snapshots de pago de una tienda
    */
   const getStorePaymentSnapshots = useCallback(
-    async (storeId?: string): Promise<any[]> => {
+    async (storeId?: string, startDate?: string, endDate?: string): Promise<any[]> => {
       if (!token) {
         setError("No hay sesión activa");
         return [];
@@ -864,10 +864,16 @@ export function usePayments(token: string | null) {
       setError(null);
 
       try {
+        // Construir query params
+        const params = new URLSearchParams({ status: 'all' });
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+
         // Si viene storeId, usarlo en path; si no, usar /current para que el backend lo extraiga del perfil
-        const url = storeId && storeId.trim() 
-          ? `/payments/snapshots/store/${storeId}/history?status=all`
-          : `/payments/snapshots/store/current/history?status=all`; // Backend extrae del perfil
+        const basePath = storeId && storeId.trim()
+          ? `/payments/snapshots/store/${storeId}/history`
+          : `/payments/snapshots/store/current/history`;
+        const url = `${basePath}?${params.toString()}`;
 
         console.log(`🔄 [HOOK] Pidiendo snapshots de tienda. URL: ${url}`);
         console.log(`🔄 [HOOK] Store ID parámetro: ${storeId || '(vacío - se usa del perfil)'}`);
