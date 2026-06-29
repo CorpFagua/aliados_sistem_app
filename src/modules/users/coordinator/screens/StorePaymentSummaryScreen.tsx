@@ -8,7 +8,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { usePayments, useServicesDetail } from '../../../../hooks/usePayments';
 import ServiceDetailModal from '../../../../components/ServiceDetailModal';
-import EditServiceModal from '../components/EditServiceModal';
 
 type Params = {
   StorePaymentSummary: {
@@ -85,8 +84,6 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   const [selectedService, setSelectedService] = useState<any | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [serviceLoading, setServiceLoading] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [rawServiceToEdit, setRawServiceToEdit] = useState<any | null>(null);
 
   // Estados para envío de email
   const [sendingEmailSnapshotId, setSendingEmailSnapshotId] = useState<string | null>(null);
@@ -671,7 +668,7 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     const ed = parseDate(endDate);
     if (!sd && !ed) return list;
     return list.filter((s)=>{
-      const dt = s.completedAt ? new Date(s.completedAt) : new Date(s.createdAt);
+      const dt = new Date(s.createdAt);
       if (sd && dt < sd) return false;
       if (ed){ const edEnd = new Date(ed); edEnd.setHours(23,59,59,999); if (dt > edEnd) return false; }
       return true;
@@ -893,8 +890,6 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
 
   // Función para abrir el modal con los detalles del servicio
   const handleOpenServiceDetail = (service: any) => {
-    // Guardar servicio original para el modal de edición
-    setRawServiceToEdit(service);
     // Asegurar que pricing_delivery_srv existe, si no usar 0
     const priceDelivery = service.priceDeliverySrv || service.price_delivery_srv || 0;
     
@@ -1804,25 +1799,6 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
         onClose={() => {
           setShowDetailModal(false);
           setSelectedService(null);
-        }}
-        onEdit={() => {
-          setShowDetailModal(false);
-          setShowEditModal(true);
-        }}
-      />
-
-      <EditServiceModal
-        visible={showEditModal}
-        service={rawServiceToEdit}
-        onClose={() => {
-          setShowEditModal(false);
-          setRawServiceToEdit(null);
-        }}
-        onSuccess={() => {
-          setShowEditModal(false);
-          setRawServiceToEdit(null);
-          setLoadedTabs(prev => ({ ...prev, due: false }));
-          loadUnpaid();
         }}
       />
     </View>
