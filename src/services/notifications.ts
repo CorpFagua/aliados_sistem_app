@@ -13,11 +13,11 @@ Notifications.setNotificationHandler({
 });
 
 export async function registerPushToken() {
-  console.log(`\n📲 [NOTIF] Solicitando permisos de notificaciones...`);
+  //console.log(`\n📲 [NOTIF] Solicitando permisos de notificaciones...`);
 
   // En web, usar Web Push API directamente
   if (Platform.OS === "web") {
-    console.log(`🌐 [NOTIF] Detectada plataforma web, usando Web Push API...`);
+    //console.log(`🌐 [NOTIF] Detectada plataforma web, usando Web Push API...`);
     const subscription = await registerWebPushToken();
     
     if (!subscription) {
@@ -25,7 +25,7 @@ export async function registerPushToken() {
       return null;
     }
 
-    console.log(`✅ [NOTIF] Web subscription obtenida`);
+    //console.log(`✅ [NOTIF] Web subscription obtenida`);
     
     return {
       webSubscription: subscription,
@@ -41,12 +41,12 @@ export async function registerPushToken() {
     return null;
   }
 
-  console.log(`✅ [NOTIF] Permisos concedidos`);
+  //console.log(`✅ [NOTIF] Permisos concedidos`);
 
-  console.log(`📱 [NOTIF] Obteniendo token del dispositivo (${Platform.OS})...`);
+  //console.log(`📱 [NOTIF] Obteniendo token del dispositivo (${Platform.OS})...`);
   const { data: token } = await Notifications.getDevicePushTokenAsync();
 
-  console.log(`✅ [NOTIF] Token obtenido: ${token.substring(0, 30)}...`);
+  // console.log(`✅ [NOTIF] Token obtenido: ${token.substring(0, 30)}...`);
 
   return {
     token,
@@ -56,7 +56,7 @@ export async function registerPushToken() {
 
 export async function unregisterPushToken(token: string, accessToken: string) {
   try {
-    console.log(`\n🗑️  [NOTIF] Eliminando token: ${token.substring(0, 30)}...`);
+    //console.log(`\n🗑️  [NOTIF] Eliminando token: ${token.substring(0, 30)}...`);
     
     if (!accessToken) {
       console.error(`❌ [NOTIF] No hay access token disponible`);
@@ -68,14 +68,14 @@ export async function unregisterPushToken(token: string, accessToken: string) {
       "Content-Type": "application/json",
     };
 
-    console.log(`📤 [NOTIF] Enviando POST a /notifications/delete-token`);
+    //console.log(`📤 [NOTIF] Enviando POST a /notifications/delete-token`);
     const response = await api.post(
       "/notifications/delete-token",
       { token },
       { headers }
     );
     
-    console.log(`✅ [NOTIF] Token eliminado correctamente\n`);
+    //console.log(`✅ [NOTIF] Token eliminado correctamente\n`);
     return response.data;
   } catch (err: any) {
     console.error(`❌ [NOTIF] Error al eliminar token:`);
@@ -86,24 +86,24 @@ export async function unregisterPushToken(token: string, accessToken: string) {
 
 export async function unregisterAllPushTokens(accessToken: string) {
   try {
-    console.log(`\n🗑️  [NOTIF] Eliminando TODOS los tokens...`);
+    //console.log(`\n🗑️  [NOTIF] Eliminando TODOS los tokens...`);
     
     if (!accessToken) {
       console.error(`❌ [NOTIF] No hay access token disponible`);
       throw new Error("Access token no disponible");
     }
 
-    console.log(`🔑 [NOTIF] Token disponible: ${accessToken.substring(0, 30)}...`);
-    console.log(`📤 [NOTIF] Enviando POST a /notifications/delete-all-tokens`);
+    //console.log(`🔑 [NOTIF] Token disponible: ${accessToken.substring(0, 30)}...`);
+    //console.log(`📤 [NOTIF] Enviando POST a /notifications/delete-all-tokens`);
 
     const headers = {
       "Authorization": `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     };
 
-    console.log(`🔐 [NOTIF] Headers siendo enviados:`);
-    console.log(`   Authorization: Bearer ${accessToken.substring(0, 20)}...`);
-    console.log(`   Content-Type: application/json`);
+    //console.log(`🔐 [NOTIF] Headers siendo enviados:`);
+    //console.log(`   Authorization: Bearer ${accessToken.substring(0, 20)}...`);
+    //console.log(`   Content-Type: application/json`);
 
     const response = await api.post(
       "/notifications/delete-all-tokens",
@@ -111,8 +111,8 @@ export async function unregisterAllPushTokens(accessToken: string) {
       { headers }
     );
 
-    console.log(`✅ [NOTIF] Respuesta del servidor:`, response.status, response.data);
-    console.log(`✅ [NOTIF] Todos los tokens eliminados\n`);
+    //console.log(`✅ [NOTIF] Respuesta del servidor:`, response.status, response.data);
+    //console.log(`✅ [NOTIF] Todos los tokens eliminados\n`);
     
     return response.data;
   } catch (err: any) {

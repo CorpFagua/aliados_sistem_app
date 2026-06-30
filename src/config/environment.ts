@@ -18,14 +18,14 @@ export const ENV = {
 
 // Selector automático de API URL según ambiente
 export const getApiUrl = (): string => {
-  console.log('🌍 [ENV] BUILD_ENV:', ENV.BUILD_ENV);
+  //console.log('🌍 [ENV] BUILD_ENV:', ENV.BUILD_ENV);
   
   if (ENV.BUILD_ENV === 'production' || ENV.BUILD_ENV === 'preview') {
-    console.log('🌍 [ENV] Usando API_URL_PRODUCTION:', ENV.API_URL_PRODUCTION);
+    //console.log('🌍 [ENV] Usando API_URL_PRODUCTION:', ENV.API_URL_PRODUCTION);
     return ENV.API_URL_PRODUCTION;
   }
   
-  console.log('🌍 [ENV] Usando API_URL_LOCAL:', ENV.API_URL_LOCAL);
+  //console.log('🌍 [ENV] Usando API_URL_LOCAL:', ENV.API_URL_LOCAL);
   return ENV.API_URL_LOCAL;
 };
 
@@ -39,8 +39,8 @@ export const validateEnvironment = (): boolean => {
     return false;
   }
   
-  console.log('✅ [ENV] Variables de entorno validadas correctamente');
-  console.log('📍 [ENV] API URL activa:', getApiUrl());
+  //console.log('✅ [ENV] Variables de entorno validadas correctamente');
+  //console.log('📍 [ENV] API URL activa:', getApiUrl());
   return true;
 };
 
