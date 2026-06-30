@@ -8,6 +8,7 @@ import { TextInput, TouchableOpacity, Modal, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { usePayments,useServicesDetail } from "../../../../hooks/usePayments";
 import ServiceDetailModal from "../../../../components/ServiceDetailModal";
+import EditServiceModal from "../components/EditServiceModal";
 
 
 export default function DeliveryPaymentSummaryScreen({ delivery }) {
@@ -51,6 +52,8 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
   const [selectedService, setSelectedService] = useState<any | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [serviceLoading, setServiceLoading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [rawServiceToEdit, setRawServiceToEdit] = useState<any | null>(null);
 
   // Estados para descarga de Excel
   const [showDownloadModal, setShowDownloadModal] = useState(false);
@@ -318,6 +321,8 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
 
   // Función para abrir el modal con los detalles del servicio
   const handleOpenServiceDetail = (service: any) => {
+    // Guardar servicio original para el modal de edición
+    setRawServiceToEdit(service);
     // Asegurar que price_delivery_srv existe, si no usar 0
     const priceDelivery = service.priceDeliverySrv || service.price_delivery_srv || 0;
     
@@ -1176,6 +1181,24 @@ export default function DeliveryPaymentSummaryScreen({ delivery }) {
         onClose={() => {
           setShowDetailModal(false);
           setSelectedService(null);
+        }}
+        onEdit={() => {
+          setShowDetailModal(false);
+          setShowEditModal(true);
+        }}
+      />
+
+      <EditServiceModal
+        visible={showEditModal}
+        service={rawServiceToEdit}
+        onClose={() => {
+          setShowEditModal(false);
+          setRawServiceToEdit(null);
+        }}
+        onSuccess={() => {
+          setShowEditModal(false);
+          setRawServiceToEdit(null);
+          loadData();
         }}
       />
     </View>
