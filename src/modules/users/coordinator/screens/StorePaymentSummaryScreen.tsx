@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, FlatList, TouchableOpacity, RefreshControl, Modal, TextInput, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, FlatList, TouchableOpacity, RefreshControl, Modal, TextInput, Alert, Animated, ScrollView } from 'react-native';
 import { useAuth } from '../../../../providers/AuthProvider';
-import { fetchServices, updateServiceData } from '../../../../services/services';
+import { fetchServices, updateServiceData, fetchStoreServices } from '../../../../services/services';
 import { formatCurrency } from '../../../../services/payments';
 import { Colors } from '../../../../constans/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { usePayments, useServicesDetail } from '../../../../hooks/usePayments';
+import ServiceDetailModal from '../../../../components/ServiceDetailModal';
 
 type Params = {
   StorePaymentSummary: {
@@ -80,11 +81,20 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
   // Estados para servicios detallados
   const [servicesDetail, setServicesDetail] = useState<any[]>([]);
   const [showServicesDetailModal, setShowServicesDetailModal] = useState(false);
+  const [selectedService, setSelectedService] = useState<any | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [serviceLoading, setServiceLoading] = useState(false);
 
   // Estados para envío de email
   const [sendingEmailSnapshotId, setSendingEmailSnapshotId] = useState<string | null>(null);
   const [showSendEmailModal, setShowSendEmailModal] = useState(false);
   const [emailModalSnapshot, setEmailModalSnapshot] = useState<Snapshot | null>(null);
+
+  // Estados para descarga de Excel
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadModalServiceIds, setDownloadModalServiceIds] = useState<string[]>([]);
+  const [downloadModalFilename, setDownloadModalFilename] = useState('');
+  const [downloadingExcel, setDownloadingExcel] = useState(false);
 
   // Estados para notificaciones
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -144,16 +154,15 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     if (!session?.access_token || !storeId) return;
     setLoadingUnpaid(true);
     try{
-      console.log(`\n🛒 [STORE-PAYMENT] Cargando servicios en estado entregado para tienda: ${storeId}`);
+      console.log(`\n🛒 [STORE-PAYMENT] Cargando servicios para cobrar de tienda: ${storeId}`);
       
-      const all = await fetchServices(session.access_token);
-      const sUnpaid = all.filter((s)=> {
-        const belongs = (s.storeId === storeId || s.profileStoreId === storeId);
-        const status = (s.status || '').toString().toLowerCase();
-        const isDelivered = status === 'entregado';
-        return belongs && isDelivered;
-      });
-      console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios en estado entregado encontrados`);
+      // 🔄 Usar el nuevo endpoint /services/store/:storeId
+      // Esto trae SOLO los servicios en estado "entregado" de la tienda
+      const sUnpaid = await fetchStoreServices(session.access_token, storeId);
+      
+      console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios en estado entregado obtenidos del backend`);
+      console.log(`📈 ✅ Filtrado en el server - No hay descarte local`);
+      
       setUnpaid(sUnpaid);
       setLoadedTabs(prev => ({ ...prev, due: true }));
     }catch(e){
@@ -213,11 +222,24 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       return;
     }
 
+    setDownloadModalServiceIds(serviceIds);
+    setDownloadModalFilename(`servicios-tienda-${Date.now()}.xlsx`);
+    setShowDownloadModal(true);
+  };
+
+  const handleDownloadWithFormat = async (excelType: 'coordinator' | 'store') => {
+    if (downloadModalServiceIds.length === 0) return;
+
+    setDownloadingExcel(true);
     try {
-      await downloadServicesExcel(serviceIds, `servicios-tienda-${Date.now()}.xlsx`);
+      await downloadServicesExcel(downloadModalServiceIds, downloadModalFilename, excelType);
+      showNotification('success', `Excel descargado en formato ${excelType === 'store' ? 'Tienda' : 'Completo'}`);
+      setShowDownloadModal(false);
     } catch (err: any) {
-      Alert.alert('Error', 'Error al descargar Excel');
+      showNotification('error', 'Error al descargar Excel');
       console.error(err);
+    } finally {
+      setDownloadingExcel(false);
     }
   };
 
@@ -228,16 +250,10 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     try{
       console.log(`\n🛒 [STORE-PAYMENT] Cargando todos los datos de tienda: ${storeId}`);
       
-      // Cargar servicios
+      // Cargar servicios usando el nuevo endpoint optimizado
       console.log('📦 [STORE-PAYMENT] Cargando servicios en estado entregado...');
-      const all = await fetchServices(session.access_token);
-      const sUnpaid = all.filter((s)=> {
-        const belongs = (s.storeId === storeId || s.profileStoreId === storeId);
-        const status = (s.status || '').toString().toLowerCase();
-        const isDelivered = status === 'entregado';
-        return belongs && isDelivered;
-      });
-      console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios en estado entregado encontrados`);
+      const sUnpaid = await fetchStoreServices(session.access_token, storeId);
+      console.log(`✅ [STORE-PAYMENT] ${sUnpaid.length} servicios en estado entregado obtenidos`);
       setUnpaid(sUnpaid);
       setLoadingUnpaid(false);
 
@@ -652,27 +668,90 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     const ed = parseDate(endDate);
     if (!sd && !ed) return list;
     return list.filter((s)=>{
-      const dt = s.completedAt ? new Date(s.completedAt) : new Date(s.createdAt);
+      const dt = new Date(s.createdAt);
       if (sd && dt < sd) return false;
       if (ed){ const edEnd = new Date(ed); edEnd.setHours(23,59,59,999); if (dt > edEnd) return false; }
       return true;
     });
   };
 
+  // Desseleccionar todo cuando cambian los filtros de fecha
+  useEffect(() => {
+    setSelectedIds([]);
+    setSelectAll(false);
+  }, [startDate, endDate]);
+
+  // Función para formatear fecha UTC a hora local Colombia
+  const formatDateColombia = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('es-CO', { 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   const renderService = ({item}: any) => (
-    <View style={styles.serviceCardRow}>
-      <TouchableOpacity onPress={() => {
-        if (selectedIds.includes(item.id)) setSelectedIds(selectedIds.filter(id=>id!==item.id));
-        else setSelectedIds([...selectedIds, item.id]);
-      }}>
-        <Ionicons name={selectedIds.includes(item.id) ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={selectedIds.includes(item.id) ? Colors.activeMenuText : Colors.menuText} style={{marginRight:12}} />
+    <TouchableOpacity 
+      style={styles.serviceCardRow}
+      onPress={() => handleOpenServiceDetail(item)}
+      activeOpacity={0.7}
+    >
+      <TouchableOpacity 
+        style={{marginRight: 12}}
+        onPress={(e) => {
+          e.stopPropagation();
+          if (selectedIds.includes(item.id)) setSelectedIds(selectedIds.filter(id=>id!==item.id));
+          else setSelectedIds([...selectedIds, item.id]);
+        }}
+      >
+        <Ionicons name={selectedIds.includes(item.id) ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={selectedIds.includes(item.id) ? Colors.activeMenuText : Colors.menuText} />
       </TouchableOpacity>
       <View style={{flex:1}}>
-        <Text style={styles.serviceTitle}>Viaje #{String(item.id).slice(-6)}</Text>
-        <Text style={styles.serviceDetail}>Estado: {item.status}</Text>
-        <Text style={styles.serviceDetail}>Valor: {formatCurrency(item.price ?? item.amount ?? 0)}</Text>
+        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8}}>
+          <Text style={styles.serviceTitle}>#{String(item.id).slice(-6)}</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <Ionicons name="calendar" size={13} color={Colors.activeMenuText} style={{marginRight: 4}} />
+            <Text style={styles.serviceDate}>{formatDateColombia(item.createdAt)}</Text>
+          </View>
+        </View>
+        
+        <View style={{marginBottom: 8}}>
+          <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
+            <Ionicons name="location" size={13} color={Colors.menuText} style={{marginRight: 6}} />
+            <Text style={[styles.serviceDetail, {flex: 1}]} numberOfLines={1}>{item.zoneName || 'Zona sin asignar'}</Text>
+          </View>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <Ionicons name="pin" size={13} color={Colors.menuText} style={{marginRight: 6}} />
+            <Text style={[styles.serviceDetail, {flex: 1}]} numberOfLines={1}>{item.destination || 'Sin dirección'}</Text>
+          </View>
+        </View>
+
+        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 8, backgroundColor: 'rgba(244,197,66,0.08)', borderRadius: 6}}>
+          <View style={{flex: 1}}>
+            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
+              <Ionicons name="pricetag" size={12} color={Colors.menuText} style={{marginRight: 4}} />
+              <Text style={{fontSize: 10, color: Colors.menuText}}>Precio</Text>
+            </View>
+            <Text style={{fontSize: 14, fontWeight: '700', color: Colors.activeMenuText}}>{formatCurrency(item.price ?? item.amount ?? 0)}</Text>
+          </View>
+          <View style={{width: 1, height: 30, backgroundColor: Colors.Border, marginHorizontal: 12}} />
+          <View style={{flex: 1}}>
+            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
+              <Ionicons name="bicycle" size={12} color={Colors.success} style={{marginRight: 4}} />
+              <Text style={{fontSize: 10, color: Colors.menuText}}>Domiciliario</Text>
+            </View>
+            <Text style={{fontSize: 14, fontWeight: '700', color: Colors.success}}>{formatCurrency(item.priceDeliverySrv ?? 0)}</Text>
+          </View>
+        </View>
       </View>
-    </View>
+      <Ionicons name="chevron-forward" size={20} color={Colors.menuText} style={{marginLeft: 8}} />
+    </TouchableOpacity>
   );
 
   const renderSnapshot = ({ item }: { item: Snapshot }) => (
@@ -807,9 +886,68 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
     </TouchableOpacity>
   );
 
+  const getFilteredServices = () => applyDateFilter(unpaid);
+
+  // Función para abrir el modal con los detalles del servicio
+  const handleOpenServiceDetail = (service: any) => {
+    // Asegurar que pricing_delivery_srv existe, si no usar 0
+    const priceDelivery = service.priceDeliverySrv || service.price_delivery_srv || 0;
+    
+    // Adaptar servicio a formato de ServiceDetailModal
+    const adaptedService = {
+      ...service,
+      id: service.id,
+      deliveryAddress: service.destination || 'Sin dirección',
+      pickupAddress: service.pickup || null,
+      clientName: service.clientName || 'Cliente desconocido',
+      clientPhone: service.phone || 'Sin teléfono',
+      priceDelivery: priceDelivery,
+      price: service.price || 0,
+      paymentMethod: service.payment || 'efectivo',
+      totalToCollect: service.amount || 0,
+      isPaid: service.isPaid || false,
+      status: service.status || 'disponible',
+      type: { name: service.typeId || 'Domicilio' },
+      zone: { name: service.zoneName || 'Sin zona', id: service.zoneId || null },
+      profileStore: { name: service.profileStoreName || 'Sucursal', id: service.profileStoreId || null },
+      store: { name: service.storeName || 'Tienda', type: service.storeType },
+      delivery: service.assignedDelivery ? { 
+        name: service.assignedDeliveryName || 'Sin nombre', 
+        id: service.assignedDelivery,
+        phone: service.deliveryPhone || null 
+      } : null,
+      timeline: [],
+      timeAnalysis: {
+        totalTime: 0,
+        performanceScore: 0,
+        timeToRoute: 0,
+        timeToDelivery: 0,
+        averageTimeToRouteInZone: 0,
+        averageTimeToDeliveryInZone: 0,
+        comparisonToZoneAverage: { timeToRoutePercent: 0, timeToDeliveryPercent: 0 }
+      },
+    };
+    
+    console.log('📋 [DETAIL-MODAL] Service adapted:', { 
+      id: adaptedService.id,
+      priceDelivery: adaptedService.priceDelivery,
+      price: adaptedService.price,
+      zone: adaptedService.zone.name 
+    });
+    
+    setSelectedService(adaptedService);
+    setShowDetailModal(true);
+  };
+
   const handleSelectAll = () => {
-    if (selectAll){ setSelectedIds([]); setSelectAll(false); }
-    else { setSelectedIds(unpaid.map(s=>s.id)); setSelectAll(true); }
+    if (selectAll) {
+      setSelectedIds([]);
+      setSelectAll(false);
+    } else {
+      const filteredServices = getFilteredServices();
+      setSelectedIds(filteredServices.map(s => s.id));
+      setSelectAll(true);
+    }
   };
 
   return (
@@ -998,40 +1136,91 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-              {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((w) => (
-                <Text key={w} style={{ width: 36, textAlign: 'center', color: Colors.menuText, fontWeight: '600' }}>{w}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((w) => (
+                <View key={w} style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ color: Colors.activeMenuText, fontWeight: '700', fontSize: 11 }}>{w}</Text>
+                </View>
               ))}
             </View>
 
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 }}>
               {(() => {
                 const first = startOfMonth(calendarMonth);
-                const lead = first.getDay();
+                const startDay = first.getDay();
                 const total = daysInMonth(calendarMonth);
-                const nodes = [] as any[];
-                for (let i = 0; i < lead; i++) nodes.push(<View key={'e' + i} style={{ width: 36, height: 36, margin: 2 }} />);
-                for (let d = 1; d <= total; d++) {
-                  const cur = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), d);
-                  const iso = formatISO(cur);
-                  const isStart = iso === startDate;
-                  const isEnd = iso === endDate;
-                  const inRange = isBetween(iso);
-
-                  const dayStyle: any = { width: 36, height: 36, margin: 2, borderRadius: 6, justifyContent: 'center', alignItems: 'center' };
-                  const textStyle: any = { color: Colors.menuText };
-
-                  if (isStart) { dayStyle.backgroundColor = Colors.activeMenuText; textStyle.color = Colors.Background; }
-                  else if (isEnd) { dayStyle.backgroundColor = Colors.success; textStyle.color = Colors.Background; }
-                  else if (inRange) { dayStyle.backgroundColor = Colors.gradientStart; textStyle.color = Colors.Background; }
-
-                  nodes.push(
-                    <TouchableOpacity key={iso} onPress={() => onPickDate(cur)} style={dayStyle}>
-                      <Text style={textStyle}>{d}</Text>
-                    </TouchableOpacity>
-                  );
+                const cellSize = 48;
+                const containerWidth = 420 - 32;
+                const cellWidth = containerWidth / 7;
+                
+                const weeks = [];
+                let currentWeek = [];
+                
+                // Agregar días vacíos al inicio
+                for (let i = 0; i < startDay; i++) {
+                  currentWeek.push(null);
                 }
-                return nodes;
+                
+                // Agregar días del mes
+                for (let d = 1; d <= total; d++) {
+                  if (currentWeek.length === 7) {
+                    weeks.push([...currentWeek]);
+                    currentWeek = [];
+                  }
+                  currentWeek.push(d);
+                }
+                
+                // Completar última semana
+                while (currentWeek.length < 7) {
+                  currentWeek.push(null);
+                }
+                if (currentWeek.length > 0) {
+                  weeks.push(currentWeek);
+                }
+                
+                return weeks.map((week, weekIdx) => (
+                  <View key={`week-${weekIdx}`} style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', marginBottom: 4 }}>
+                    {week.map((d, dayIdx) => {
+                      if (!d) {
+                        return <View key={`empty-${dayIdx}`} style={{ flex: 1, height: cellSize, marginHorizontal: 2 }} />;
+                      }
+                      
+                      const cur = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), d);
+                      const iso = formatISO(cur);
+                      const isStart = iso === startDate;
+                      const isEnd = iso === endDate;
+                      const inRange = isBetween(iso);
+
+                      const dayStyle: any = { 
+                        flex: 1,
+                        height: cellSize, 
+                        marginHorizontal: 2,
+                        borderRadius: 8, 
+                        justifyContent: 'center', 
+                        alignItems: 'center',
+                        backgroundColor: 'transparent'
+                      };
+                      const textStyle: any = { color: Colors.normalText, fontWeight: '600', fontSize: 14 };
+
+                      if (isStart) { 
+                        dayStyle.backgroundColor = Colors.activeMenuText; 
+                        textStyle.color = Colors.Background; 
+                      } else if (isEnd) { 
+                        dayStyle.backgroundColor = Colors.activeMenuText; 
+                        textStyle.color = Colors.Background; 
+                      } else if (inRange) { 
+                        dayStyle.backgroundColor = 'rgba(244, 197, 66, 0.2)'; 
+                        textStyle.color = Colors.activeMenuText;
+                      }
+
+                      return (
+                        <TouchableOpacity key={iso} onPress={() => onPickDate(cur)} style={dayStyle}>
+                          <Text style={textStyle}>{d}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ));
               })()}
             </View>
 
@@ -1276,78 +1465,85 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
       {/* Modal de Servicios Duplicados - MEJORADO */}
       <Modal visible={showDuplicateModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modal, { maxWidth: 420 }]}>
-            {/* Header */}
-            <View style={styles.duplicateModalHeader}>
-              <View style={styles.duplicateIconContainer}>
-                <Ionicons name="warning" size={32} color="#FF9800" />
+          <View style={[styles.modal, styles.scrollableModal, { maxWidth: 420 }]}>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 16 }}
+              showsVerticalScrollIndicator={true}
+              scrollIndicatorInsets={{ right: 1 }}
+            >
+              {/* Header */}
+              <View style={styles.duplicateModalHeader}>
+                <View style={styles.duplicateIconContainer}>
+                  <Ionicons name="warning" size={32} color="#FF9800" />
+                </View>
+                <Text style={styles.duplicateModalTitle}>Servicios Duplicados</Text>
               </View>
-              <Text style={styles.duplicateModalTitle}>Servicios Duplicados</Text>
-            </View>
 
-            {/* Info Box */}
-            <View style={styles.duplicateInfoBox}>
-              {duplicateServicesInfo?.isPending && (
-                <View style={{ marginBottom: 12 }}>
-                  <Text style={styles.duplicateModalSubtitle}>
-                    ⏳ {duplicateServicesInfo?.duplicateServiceIds.length || 0} servicio(s) está(n) en una solicitud de cobro pendiente de aprobación
-                  </Text>
-                </View>
-              )}
-              {duplicateServicesInfo?.isPaid && (
-                <View style={{ marginBottom: 12 }}>
-                  <Text style={styles.duplicateModalSubtitle}>
-                    ✓ {duplicateServicesInfo?.duplicateServiceIds.length || 0} servicio(s) ya ha(n) sido cobrado(s)
-                  </Text>
-                </View>
-              )}
-              {!duplicateServicesInfo?.isPending && !duplicateServicesInfo?.isPaid && (
-                <View style={{ marginBottom: 12 }}>
-                  <Text style={styles.duplicateModalSubtitle}>
-                    {duplicateServicesInfo?.duplicateServiceIds.length || 0} servicio(s) ya está(n) en otra factura de tienda
-                  </Text>
-                </View>
-              )}
-            </View>
+              {/* Info Box */}
+              <View style={styles.duplicateInfoBox}>
+                {duplicateServicesInfo?.isPending && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={styles.duplicateModalSubtitle}>
+                      ⏳ {duplicateServicesInfo?.duplicateServiceIds.length || 0} servicio(s) está(n) en una solicitud de cobro pendiente de aprobación
+                    </Text>
+                  </View>
+                )}
+                {duplicateServicesInfo?.isPaid && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={styles.duplicateModalSubtitle}>
+                      ✓ {duplicateServicesInfo?.duplicateServiceIds.length || 0} servicio(s) ya ha(n) sido cobrado(s)
+                    </Text>
+                  </View>
+                )}
+                {!duplicateServicesInfo?.isPending && !duplicateServicesInfo?.isPaid && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={styles.duplicateModalSubtitle}>
+                      {duplicateServicesInfo?.duplicateServiceIds.length || 0} servicio(s) ya está(n) en otra factura de tienda
+                    </Text>
+                  </View>
+                )}
+              </View>
 
-            {/* Lista de servicios duplicados */}
-            {duplicateServicesInfo && duplicateServicesInfo.duplicateDetails && duplicateServicesInfo.duplicateDetails.length > 0 && (
-              <View style={styles.duplicateServicesList}>
-                {duplicateServicesInfo.duplicateDetails.map((detail: any, idx: number) => (
-                  <View key={idx} style={styles.duplicateServiceItemContainer}>
-                    <View style={styles.duplicateServiceItemLeft}>
-                      <Ionicons name="alert-circle" size={18} color="#FF9800" />
-                      <View style={{ marginLeft: 12, flex: 1 }}>
-                        <Text style={styles.duplicateServiceName}>{detail.name}</Text>
-                        <Text style={styles.duplicateServiceDetail}>
-                          Estado: {detail.status}
-                        </Text>
-                        <Text style={styles.duplicateServiceAmount}>
-                          ${detail.amount.toFixed(2)}
-                        </Text>
+              {/* Lista de servicios duplicados */}
+              {duplicateServicesInfo && duplicateServicesInfo.duplicateDetails && duplicateServicesInfo.duplicateDetails.length > 0 && (
+                <View style={styles.duplicateServicesList}>
+                  {duplicateServicesInfo.duplicateDetails.map((detail: any, idx: number) => (
+                    <View key={idx} style={styles.duplicateServiceItemContainer}>
+                      <View style={styles.duplicateServiceItemLeft}>
+                        <Ionicons name="alert-circle" size={18} color="#FF9800" />
+                        <View style={{ marginLeft: 12, flex: 1 }}>
+                          <Text style={styles.duplicateServiceName}>{detail.name}</Text>
+                          <Text style={styles.duplicateServiceDetail}>
+                            Estado: {detail.status}
+                          </Text>
+                          <Text style={styles.duplicateServiceAmount}>
+                            ${detail.amount.toFixed(2)}
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))}
-              </View>
-            )}
+                  ))}
+                </View>
+              )}
 
-            {/* Explicación */}
-            <View style={styles.duplicateWarningBox}>
-              <Ionicons name="information-circle" size={20} color={Colors.activeMenuText} />
-              <Text style={styles.duplicateWarningText}>
-                {duplicateServicesInfo?.isPending
-                  ? 'Deselecciona estos servicios para continuar. O espera a que se apruebe la solicitud pendiente.'
-                  : duplicateServicesInfo?.isPaid
-                  ? 'Estos servicios ya fueron cobrados y no se pueden cobrar nuevamente.'
-                  : 'Deselecciona estos servicios para continuar con la facturación.'}
-              </Text>
-            </View>
+              {/* Explicación */}
+              <View style={styles.duplicateWarningBox}>
+                <Ionicons name="information-circle" size={20} color={Colors.activeMenuText} />
+                <Text style={styles.duplicateWarningText}>
+                  {duplicateServicesInfo?.isPending
+                    ? 'Deselecciona estos servicios para continuar. O espera a que se apruebe la solicitud pendiente.'
+                    : duplicateServicesInfo?.isPaid
+                    ? 'Estos servicios ya fueron cobrados y no se pueden cobrar nuevamente.'
+                    : 'Deselecciona estos servicios para continuar con la facturación.'}
+                </Text>
+              </View>
+            </ScrollView>
 
             {/* Botones */}
-            <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
+            <View style={{ flexDirection: "row", gap: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }}>
               <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]} 
+                style={[styles.modalButton, styles.cancelButton, { flex: 1 }]} 
                 onPress={() => {
                   setShowDuplicateModal(false);
                   setDuplicateServicesInfo(null);
@@ -1357,7 +1553,7 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
               </TouchableOpacity>
               {duplicateServicesInfo?.isPending && (
                 <TouchableOpacity 
-                  style={[styles.modalButton, styles.confirmButton]} 
+                  style={[styles.modalButton, styles.confirmButton, { flex: 1 }]} 
                   onPress={() => {
                     // Deseleccionar los duplicados
                     const newSelection = selectedIds.filter(
@@ -1529,6 +1725,82 @@ export default function StorePaymentSummaryScreen({ store, onClose }: { store?: 
           </View>
         </View>
       </Modal>
+
+      {/* Modal de descarga de Excel */}
+      <Modal visible={showDownloadModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, styles.downloadModal]}>
+            <View style={styles.modalHeaderDownload}>
+              <Ionicons name="download" size={24} color={Colors.activeMenuText} />
+              <Text style={styles.modalTitle}>Descargar Excel</Text>
+            </View>
+            
+            <View style={styles.downloadInfoBox}>
+              <Ionicons name="information-circle" size={18} color="#2196F3" style={{marginRight: 10}} />
+              <Text style={{color: Colors.normalText, fontSize: 13, lineHeight: 18, flex: 1}}>
+                Selecciona el formato en el que deseas descargar los servicios. El formato "Tienda" incluye solo los campos principales.
+              </Text>
+            </View>
+
+            <View style={styles.downloadOptionsContainer}>
+              <TouchableOpacity 
+                style={[styles.downloadOptionButton, styles.downloadOptionComlete, {flex: 1}]}
+                onPress={() => handleDownloadWithFormat('coordinator')}
+                disabled={downloadingExcel}
+                activeOpacity={0.7}
+              >
+                <View style={styles.downloadOptionIconContainer}>
+                  <Ionicons name="document-text" size={28} color="#FF9800" />
+                </View>
+                <View style={{flex: 1}}>
+                  <Text style={styles.downloadOptionTitle}>Completo</Text>
+                  <Text style={styles.downloadOptionSubtitle}>24 columnas con IDs</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#FF9800" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.downloadOptionButton, styles.downloadOptionStore, {flex: 1}]}
+                onPress={() => handleDownloadWithFormat('store')}
+                disabled={downloadingExcel}
+                activeOpacity={0.7}
+              >
+                <View style={styles.downloadOptionIconContainer}>
+                  <Ionicons name="storefront" size={28} color="#4CAF50" />
+                </View>
+                <View style={{flex: 1}}>
+                  <Text style={styles.downloadOptionTitle}>Como Tienda</Text>
+                  <Text style={styles.downloadOptionSubtitle}>13 columnas simplificadas</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#4CAF50" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={() => setShowDownloadModal(false)}
+              disabled={downloadingExcel}
+            >
+              {downloadingExcel ? (
+                <ActivityIndicator color={Colors.normalText} size="small" />
+              ) : (
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de detalles del servicio */}
+      <ServiceDetailModal
+        visible={showDetailModal}
+        service={selectedService}
+        loading={serviceLoading}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedService(null);
+        }}
+      />
     </View>
   );
 }
@@ -1566,6 +1838,11 @@ const styles = StyleSheet.create({
   serviceDetail: {
     fontSize: 13,
     color: Colors.menuText,
+  },
+  serviceDate: {
+    fontSize: 11,
+    color: Colors.activeMenuText,
+    fontWeight: '600',
   },
   emptyText: {
     color: Colors.menuText,
@@ -1695,6 +1972,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     width: "90%",
+  },
+  scrollableModal: {
+    maxHeight: '85%',
+    display: 'flex',
+    flexDirection: 'column',
   },
   modalTitle: {
     fontSize: 18,
@@ -2156,5 +2438,63 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  downloadModal: {
+    maxHeight: '75%',
+  },
+  modalHeaderDownload: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(244, 197, 66, 0.1)',
+  },
+  downloadInfoBox: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(33, 150, 243, 0.08)',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 18,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+  },
+  downloadOptionsContainer: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  downloadOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  downloadOptionIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  downloadOptionComlete: {
+    backgroundColor: 'rgba(255, 152, 0, 0.08)',
+    borderColor: 'rgba(255, 152, 0, 0.2)',
+  },
+  downloadOptionStore: {
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+    borderColor: 'rgba(76, 175, 80, 0.2)',
+  },
+  downloadOptionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.normalText,
+    marginBottom: 2,
+  },
+  downloadOptionSubtitle: {
+    fontSize: 12,
+    color: Colors.menuText,
   },
 });

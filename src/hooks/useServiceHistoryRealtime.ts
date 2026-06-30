@@ -65,7 +65,7 @@ export function useServiceHistoryRealtime(token: string | null) {
     sortOrder: "desc",
   });
 
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeFiltersRef = useRef<Partial<ServiceHistoryFilters>>({});
   const subscriptionRef = useRef<any>(null);
   const lastFiltersRef = useRef<Partial<ServiceHistoryFilters>>({});
@@ -77,16 +77,27 @@ export function useServiceHistoryRealtime(token: string | null) {
       let result = services;
 
       // Filtro por búsqueda
+      // Solo busca por: ID (completo o últimos 4 dígitos) y nombre de tienda
       if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        result = result.filter(
-          (s) =>
-            s.clientName?.toLowerCase().includes(searchLower) ||
-            s.clientPhone?.toLowerCase().includes(searchLower) ||
-            s.deliveryAddress?.toLowerCase().includes(searchLower) ||
-            s.profileStore?.name?.toLowerCase().includes(searchLower) ||
-            s.id.toLowerCase().includes(searchLower)
-        );
+        const searchLower = filters.search.toLowerCase().trim();
+        result = result.filter((s) => {
+          // Buscar por ID completo
+          if (s.id.toLowerCase().includes(searchLower)) {
+            return true;
+          }
+          // Buscar por últimos 4 dígitos del ID
+          if (s.id.length >= 4) {
+            const last4Digits = s.id.slice(-4).toLowerCase();
+            if (last4Digits.includes(searchLower)) {
+              return true;
+            }
+          }
+          // Buscar por nombre de tienda
+          if (s.profileStore?.name?.toLowerCase().includes(searchLower)) {
+            return true;
+          }
+          return false;
+        });
       }
 
       // Filtro por estado
@@ -157,20 +168,20 @@ export function useServiceHistoryRealtime(token: string | null) {
    * Carga datos del backend en batches
    */
   const loadFromBackend = useCallback(
-    async (filters: ServiceHistoryFilters, loadMore: boolean = false) => {
+    async (filters: ServiceHistoryFilters, isLoadingMore: boolean = false) => {
       if (!token) {
         setError("No token disponible");
         return false;
       }
 
       // Si es load more y ya cargamos todo, no hacer nada
-      if (loadMore && cacheRef.current.hasLoadedAll) {
+      if (isLoadingMore && cacheRef.current.hasLoadedAll) {
         console.log("[LOAD] Ya cargamos todos los servicios");
         return true;
       }
 
       // Determinar offset
-      const offset = loadMore ? cacheRef.current.allServices.length : 0;
+      const offset = isLoadingMore ? cacheRef.current.allServices.length : 0;
 
       setLoading(true);
       setError(null);
@@ -182,14 +193,24 @@ export function useServiceHistoryRealtime(token: string | null) {
           offset,
         });
 
+        // Crear un Map con los IDs actuales para evitar duplicados
+        const existingIds = new Set(cacheRef.current.allServices.map(s => s.id));
+        const newItems = data.items.filter(item => !existingIds.has(item.id));
+
         // Agregar nuevos items al caché
-        if (loadMore) {
+        if (isLoadingMore) {
           cacheRef.current.allServices = [
             ...cacheRef.current.allServices,
-            ...data.items,
+            ...newItems,
           ];
+          console.log(
+            `[LOAD] [LOADMORE] Agregados ${newItems.length} servicios únicos (${data.items.length} recibidos)`
+          );
         } else {
           cacheRef.current.allServices = data.items;
+          console.log(
+            `[LOAD] [RESET] ${data.items.length} servicios cargados (caché limpiado)`
+          );
         }
 
         cacheRef.current.total = data.total;
@@ -223,7 +244,7 @@ export function useServiceHistoryRealtime(token: string | null) {
    * Obtiene historial (primero del caché, luego filtra localmente)
    */
   const getServiceHistory = useCallback(
-    async (filters: ServiceHistoryFilters, appendMode: boolean = false) => {
+    async (filters: ServiceHistoryFilters) => {
       currentFiltersRef.current = filters;
 
       // Detectar si han cambiado los filtros de fecha
@@ -254,19 +275,14 @@ export function useServiceHistoryRealtime(token: string | null) {
           cacheRef.current.allServices = []; // Limpiar caché anterior
           console.log("[CACHE] Limpiando caché porque cambiaron las fechas");
         }
-        const loaded = await loadFromBackend(filters, appendMode);
+        const loaded = await loadFromBackend(filters, false);
         if (!loaded) return;
       }
 
       // Aplicar filtros locales
       const filtered = applyLocalFilters(cacheRef.current.allServices, filters);
 
-      if (appendMode) {
-        setFilteredServices((prev) => [...prev, ...filtered]);
-      } else {
-        setFilteredServices(filtered);
-      }
-
+      setFilteredServices(filtered);
       cacheRef.current.filteredServices = filtered;
     },
     [loadFromBackend, applyLocalFilters]

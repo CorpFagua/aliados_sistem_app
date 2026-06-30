@@ -110,6 +110,37 @@ export async function fetchDeliveryServices(token: string, deliveryId?: string):
   }
 }
 
+/**
+ * 🛒 Obtener servicios de una TIENDA en estado "entregado" (listos para cobrar)
+ * 
+ * @param token - Token de autenticación
+ * @param storeId - ID de la tienda
+ * @returns Array de servicios en estado entregado listos para cobrar
+ */
+export async function fetchStoreServices(token: string, storeId: string): Promise<Service[]> {
+  try {
+    if (!storeId) {
+      throw new Error('storeId is required');
+    }
+
+    console.log(`🛒 [STORE] Obteniendo servicios para cobrar de tienda: ${storeId}`);
+    const res = await api.get<ServiceResponse[]>(`/services/store/${storeId}`, {
+      headers: authHeaders(token),
+    });
+
+    // ⚡ Aseguramos que siempre sea un array
+    const raw = Array.isArray(res.data) ? res.data : (res.data as any).data;
+
+    console.log(`✅ [STORE] ${raw.length} servicios en estado entregado obtenidos`);
+
+    // ⚡ Transformamos DTO -> Modelo interno
+    return raw.map(toService);
+  } catch (err: any) {
+    console.error(`❌ Error fetching store services for ${storeId}:`, err.response?.data || err.message);
+    throw err;
+  }
+}
+
 // Actualizar estado de un servicio
 export async function updateServiceStatus(
   serviceId: string,

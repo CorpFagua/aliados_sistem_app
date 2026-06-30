@@ -40,12 +40,31 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
   const [amount, setAmount] = useState("");
   const [prepTime, setPrepTime] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ destination?: string; phone?: string }>({});
 
   const { session, logout } = useAuth(); // 🔑 token de Supabase Auth + función logout
 
   const handleSubmit = async () => {
   if (!session) return alert("Debes estar autenticado");
   if (loading) return; // Prevenir doble envío
+
+  // Validar campos obligatorios
+  const newErrors: { destination?: string; phone?: string } = {};
+  
+  if (!destination || destination.trim() === "") {
+    newErrors.destination = "La dirección es obligatoria";
+  }
+  
+  if (!phone || phone.trim() === "") {
+    newErrors.phone = "El teléfono es obligatorio";
+  }
+  
+  if (Object.keys(newErrors).length > 0) {
+    setErrors(newErrors);
+    return;
+  }
+  
+  setErrors({});
 
   setLoading(true);
   const createdAt = new Date();
@@ -59,7 +78,7 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
     payment,
     amount: payment === "transferencia" ? 0 : Number(amount),
     createdAt,
-    prepTime: Number(prepTime),
+    prepTime: prepTime ? Number(prepTime) : 15,
   };
 
   const payload = toServicePayload(newService);
@@ -151,16 +170,20 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
             {/* Campos */}
             <Text style={styles.label}>Dirección de destino</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, errors.destination && styles.inputError]}
               placeholder="Ej: Cra 10 #20-30"
               placeholderTextColor={Colors.menuText}
               value={destination}
-              onChangeText={setDestination}
+              onChangeText={(value) => {
+                setDestination(value);
+                if (errors.destination) setErrors({ ...errors, destination: undefined });
+              }}
               editable={!loading}
             />
+            {errors.destination && <Text style={styles.errorText}>{errors.destination}</Text>}
 
             <Text style={styles.label}>Teléfono del cliente</Text>
-            <View style={styles.inputIcon}>
+            <View style={[styles.inputIcon, errors.phone && styles.inputIconError]}>
               <Ionicons name="call-outline" size={18} color={Colors.menuText} style={{ marginRight: 8 }} />
               <TextInput
                 style={styles.inputFlex}
@@ -168,10 +191,14 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
                 placeholderTextColor={Colors.menuText}
                 keyboardType="phone-pad"
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(value) => {
+                  setPhone(value);
+                  if (errors.phone) setErrors({ ...errors, phone: undefined });
+                }}
                 editable={!loading}
               />
             </View>
+            {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
 
             <Text style={styles.label}>Nombre del cliente</Text>
             <View style={styles.inputIcon}>
@@ -287,16 +314,20 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
               {/* Campos */}
               <Text style={styles.label}>Dirección de destino</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, errors.destination && styles.inputError]}
                 placeholder="Ej: Cra 10 #20-30"
                 placeholderTextColor={Colors.menuText}
                 value={destination}
-                onChangeText={setDestination}
+                onChangeText={(value) => {
+                  setDestination(value);
+                  if (errors.destination) setErrors({ ...errors, destination: undefined });
+                }}
                 editable={!loading}
               />
+              {errors.destination && <Text style={styles.errorText}>{errors.destination}</Text>}
 
               <Text style={styles.label}>Teléfono del cliente</Text>
-              <View style={styles.inputIcon}>
+              <View style={[styles.inputIcon, errors.phone && styles.inputIconError]}>
                 <Ionicons name="call-outline" size={18} color={Colors.menuText} style={{ marginRight: 8 }} />
                 <TextInput
                   style={styles.inputFlex}
@@ -304,10 +335,14 @@ export default function ServiceFormModal({ visible, onClose, onSuccess }: Props)
                   placeholderTextColor={Colors.menuText}
                   keyboardType="phone-pad"
                   value={phone}
-                  onChangeText={setPhone}
+                  onChangeText={(value) => {
+                    setPhone(value);
+                    if (errors.phone) setErrors({ ...errors, phone: undefined });
+                  }}
                   editable={!loading}
                 />
               </View>
+              {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
 
               <Text style={styles.label}>Nombre del cliente</Text>
               <View style={styles.inputIcon}>
@@ -494,6 +529,11 @@ const styles = StyleSheet.create({
     minHeight: Platform.OS === 'web' ? undefined : 50,
   },
   
+  inputError: {
+    borderColor: "#FF4444",
+    borderWidth: 1.5,
+  },
+  
   inputIcon: { 
     flexDirection: "row", 
     alignItems: "center", 
@@ -504,6 +544,11 @@ const styles = StyleSheet.create({
     borderWidth: 1, 
     borderColor: Colors.Border,
     minHeight: Platform.OS === 'web' ? undefined : 50,
+  },
+  
+  inputIconError: {
+    borderColor: "#FF4444",
+    borderWidth: 1.5,
   },
   
   inputFlex: { 
@@ -571,5 +616,14 @@ const styles = StyleSheet.create({
     color: Colors.menuText, 
     fontSize: isSmallDevice ? 12 : 13, 
     fontWeight: "500" 
+  },
+  
+  errorText: {
+    color: "#FF4444",
+    fontSize: isSmallDevice ? 10 : 11,
+    fontWeight: "500",
+    marginTop: Platform.OS === 'web' ? (isSmallDevice ? -6 : -8) : -10,
+    marginBottom: Platform.OS === 'web' ? (isSmallDevice ? 8 : 10) : 12,
+    paddingHorizontal: 4,
   },
 });

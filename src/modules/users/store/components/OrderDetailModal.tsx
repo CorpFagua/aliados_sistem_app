@@ -52,7 +52,7 @@ export default function OrderDetailModal({ visible, onClose, pedido, onRefresh }
               <Ionicons name="map-outline" size={18} color={Colors.menuText} />
               <Text style={styles.infoText}>
                 <Text style={styles.label}>Zona: </Text>
-                {pedido.zone}
+                {pedido.zoneName ||  "Sin zona"}
               </Text>
             </View>
 

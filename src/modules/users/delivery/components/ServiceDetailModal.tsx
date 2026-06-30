@@ -326,9 +326,22 @@ export default function OrderDetailModal({
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text style={styles.price}>
-              {pedido.amount ? `$ ${pedido.amount}` : "Sin monto"}
-            </Text>
+            <View style={styles.priceSection}>
+              <View style={styles.priceContainer}>
+                <Text style={styles.priceLabel}>Monto</Text>
+                <Text style={styles.price}>
+                  {pedido.amount ? `$ ${pedido.amount}` : "Sin monto"}
+                </Text>
+              </View>
+              <View style={styles.paymentContainer}>
+                <Text style={styles.paymentLabel}>Método de pago</Text>
+                <Text style={styles.paymentMethod}>
+                  {pedido.payment
+                    ? pedido.payment.charAt(0).toUpperCase() + pedido.payment.slice(1)
+                    : "No especificado"}
+                </Text>
+              </View>
+            </View>
 
             <View style={styles.actionsRow}>
               <TouchableOpacity
@@ -577,11 +590,39 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     marginTop: 10,
   },
+  priceSection: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    gap: 12,
+  },
+  priceContainer: {
+    flex: 1,
+  },
+  priceLabel: {
+    fontSize: 12,
+    color: Colors.menuText,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
   price: {
     fontSize: 18,
     fontWeight: "700",
     color: Colors.gradientStart,
-    marginBottom: 10,
+  },
+  paymentContainer: {
+    flex: 1,
+  },
+  paymentLabel: {
+    fontSize: 12,
+    color: Colors.menuText,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  paymentMethod: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: Colors.normalText,
   },
   actionsRow: {
     flexDirection: "row",

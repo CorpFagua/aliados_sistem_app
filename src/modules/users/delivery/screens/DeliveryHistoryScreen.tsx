@@ -219,9 +219,13 @@ export default function DeliveryHistoryScreen() {
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Período:</Text>
           <Text style={styles.infoValue}>
+
             {item.period_start && item.period_end
-              ? `${new Date(item.period_start).toLocaleDateString("es-CO")} - ${new Date(item.period_end).toLocaleDateString("es-CO")}`
-              : item.period || "N/A"}
+
+              ? `${(item.period_start)} - ${(item.period_end)}`
+              : item.period || "N/A"
+              
+              }
           </Text>
         </View>
         <View style={styles.infoRow}>

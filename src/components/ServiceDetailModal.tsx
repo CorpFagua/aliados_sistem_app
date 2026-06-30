@@ -19,12 +19,14 @@ import {
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Colors } from "../constans/colors";
 import { ServiceHistoryDetail } from "../hooks/useServiceHistory";
+import { formatDateTime, formatTime as formatTimeUtil } from "../utils/dateTime";
 
 interface ServiceDetailModalProps {
   visible: boolean;
   service: ServiceHistoryDetail | null;
   loading?: boolean;
   onClose: () => void;
+  onEdit?: () => void;
 }
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -40,11 +42,7 @@ const formatCurrency = (amount: number): string => {
 
 const formatTime = (dateString: string): string => {
   try {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("es-CO", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatTimeUtil(dateString);
   } catch {
     return dateString;
   }
@@ -52,11 +50,7 @@ const formatTime = (dateString: string): string => {
 
 const formatDate = (dateString: string): string => {
   try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("es-CO", {
-      month: "short",
-      day: "numeric",
-    });
+    return formatDateTime(dateString);
   } catch {
     return dateString;
   }
@@ -84,6 +78,7 @@ export default function ServiceDetailModal({
   service,
   loading = false,
   onClose,
+  onEdit,
 }: ServiceDetailModalProps) {
   // Calcular duración total legible
   const formattedDuration = useMemo(() => {
@@ -140,9 +135,16 @@ export default function ServiceDetailModal({
               </View>
             </View>
             <Text style={styles.headerTitle}>Detalle del Servicio</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButtonContainer}>
-              <Text style={styles.closeButton}>✕</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {onEdit && (
+                <TouchableOpacity onPress={onEdit} style={styles.editButtonContainer}>
+                  <MaterialIcons name="edit" size={18} color={Colors.activeMenuText} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={onClose} style={styles.closeButtonContainer}>
+                <Text style={styles.closeButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {loading ? (
@@ -539,6 +541,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.normalText,
     textAlign: "center",
+  },
+
+  editButtonContainer: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: 'rgba(244,197,66,0.12)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(244,197,66,0.25)',
   },
 
   closeButtonContainer: {

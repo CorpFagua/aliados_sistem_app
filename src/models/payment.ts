@@ -157,6 +157,9 @@ export const CUT_TYPE_DATES = {
 
 /**
  * Determine cut type based on current date
+ * ✅ IMPORTANTE: Usa la zona horaria local del dispositivo
+ * El dispositivo DEBE estar configurado con zona horaria de Colombia (UTC-5)
+ * para que esto funcione correctamente
  */
 export function getCurrentCutType(): CutType {
   const day = new Date().getDate();
@@ -165,26 +168,33 @@ export function getCurrentCutType(): CutType {
 
 /**
  * Get next cut date (when can request next cut)
+ * ✅ IMPORTANTE: Usa la zona horaria local del dispositivo
+ * El dispositivo DEBE estar configurado con zona horaria de Colombia (UTC-5)
+ * 
+ * NOTA: Estos cálculos son solo para mostrar información al usuario.
+ * El backend es la fuente de verdad para validaciones críticas.
  */
 export function getNextCutDate(): Date {
   const now = new Date();
   const day = now.getDate();
+  const month = now.getMonth();
+  const year = now.getFullYear();
+
+  // Obtener el último día del mes
+  const lastDay = getDaysInMonth(now);
 
   if (day < 15) {
-    // Next cut on 15th
-    return new Date(now.getFullYear(), now.getMonth(), 15);
+    // Próximo corte el 15
+    return new Date(year, month, 15, 22, 0, 0);
   } else if (day === 15) {
-    // Can request now
+    // Hoy es 15, corte disponible ahora
     return new Date(now);
-  } else if (day < 31 && now.getMonth() === 1 && now.getFullYear() % 4 === 0) {
-    // February
-    return new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  } else if (day < getDaysInMonth(now)) {
-    // Next cut on last day or 1st of next month
-    return new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  } else if (day < lastDay) {
+    // Próximo corte el último día del mes
+    return new Date(year, month, lastDay, 22, 0, 0);
   } else {
-    // Next cut on 1st
-    return new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    // Hoy es el último día, corte disponible ahora
+    return new Date(now);
   }
 }
 
